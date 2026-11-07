@@ -193,7 +193,11 @@ async function kvSet(key, value) {
    --------------------------------------------------------------------- */
 
 function setAppearance(name, value) {      // name: 'theme'
-  document.documentElement.dataset[name] = value;
+  const root = document.documentElement;
+  root.classList.add('theme-fade');                // colours glide into the new theme
+  clearTimeout(setAppearance.t);
+  setAppearance.t = setTimeout(() => root.classList.remove('theme-fade'), 420);
+  root.dataset[name] = value;
   savePref('fv-' + name, value);
   syncAppearanceUI();
 }
@@ -207,19 +211,6 @@ function syncAppearanceUI() {
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-theme-set]');
   if (t) setAppearance('theme', t.dataset.themeSet);
-});
-
-/* Glass slider: right = solid panels (the classic look), left = frosted glass.
-   The maths lives in the <head> script (window.applyGlass) so the page never flashes the wrong look. */
-const glassInputs = document.querySelectorAll('.glass-range');
-const glassStart = Number(loadPref('fv-glass', String(window.GLASS_DEFAULT))) || 0;
-glassInputs.forEach((input) => {
-  input.value = glassStart;
-  input.addEventListener('input', () => {
-    glassInputs.forEach((o) => { if (o !== input) o.value = input.value; });
-    window.applyGlass(Number(input.value));
-    savePref('fv-glass', input.value);
-  });
 });
 
 /* ----- Installing as an app (PWA): Chrome/Edge offer it, other browsers simply don't show the button ----- */
@@ -665,6 +656,42 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
 
 
 /* ---------------------------------------------------------------------
+   Smooth show / hide. Everything that pops up or opens just sets `el.hidden`
+   as before; for the listed elements the setter now plays an in/out animation
+   (CSS classes anim-in / anim-out) and only really hides after the out-animation.
+   --------------------------------------------------------------------- */
+(function () {
+  const OUT_MS = 220;
+  const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint',
+   'empty', 'grid', 'toolbar', 'footKeys', 'footStart', 'noResults'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let logical = native.get.call(el), timer = 0;
+    Object.defineProperty(el, 'hidden', {
+      configurable: true,
+      get() { return logical; },
+      set(v) {
+        v = !!v;
+        if (v === logical) return;
+        logical = v;
+        clearTimeout(timer);
+        if (!v) {                                           // appear
+          native.set.call(el, false);
+          el.classList.remove('anim-out');
+          void el.offsetWidth;
+          el.classList.add('anim-in');
+        } else {                                            // disappear
+          el.classList.remove('anim-in');
+          el.classList.add('anim-out');
+          timer = setTimeout(() => { native.set.call(el, true); el.classList.remove('anim-out'); }, OUT_MS);
+        }
+      },
+    });
+  });
+})();
+
+/* ---------------------------------------------------------------------
    5b. DIALOGS AND FILE INFO
    One dialog at a time. Used for the folder hint and for "file details"
    (like Get Info on a Mac).
@@ -683,7 +710,7 @@ function closeModal() {
   if (M.el.hidden) return;
   M.el.hidden = true;
   M.entry = null;
-  M.body.replaceChildren();
+  setTimeout(() => { if (M.el.hidden) M.body.replaceChildren(); }, 260);   // keep the content while it fades out
 }
 M.el.addEventListener('pointerdown', (e) => { if (e.target === M.el) closeModal(); });     // click outside = close
 M.el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) b.blur(); });

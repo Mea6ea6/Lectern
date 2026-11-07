@@ -650,17 +650,52 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 
 /* =====================================================================
-   Glass slider (left = frosted glass, right = solid)
+   Motion: everything that opens or pops up glides in and out
    ===================================================================== */
-.glass-range {
-  -webkit-appearance: none; appearance: none;
-  width: 236px; height: 44px; flex: none; margin: 0; padding: 0; background: transparent; cursor: pointer;
+:root { --ease-out: cubic-bezier(.22, 1, .36, 1); --ease-in: cubic-bezier(.5, 0, .75, 0); }
+
+@keyframes fade-in   { from { opacity: 0; } }
+@keyframes fade-out  { to   { opacity: 0; } }
+@keyframes pop-in    { from { opacity: 0; transform: translateY(-8px) scale(.96); } }
+@keyframes pop-out   { to   { opacity: 0; transform: translateY(-6px) scale(.97); } }
+@keyframes card-in   { from { opacity: 0; transform: translateY(14px) scale(.95); } }
+@keyframes card-out  { to   { opacity: 0; transform: translateY(8px) scale(.97); } }
+@keyframes rise-in   { from { opacity: 0; transform: translateY(14px); } }
+@keyframes rise-out  { to   { opacity: 0; transform: translateY(8px); } }
+@keyframes view-in   { from { opacity: 0; transform: scale(.985); } }
+@keyframes view-out  { to   { opacity: 0; transform: scale(.99); } }
+
+.anim-in  { animation: fade-in .22s var(--ease-out) backwards; }
+.anim-out { animation: fade-out .18s var(--ease-in) forwards; pointer-events: none; }
+
+#settings.anim-in, #sortMenu.anim-in, #vMenu.anim-in   { animation: pop-in .26s var(--ease-out) backwards; transform-origin: top right; }
+#settings.anim-out, #sortMenu.anim-out, #vMenu.anim-out { animation: pop-out .15s var(--ease-in) forwards; transform-origin: top right; }
+#vMenu.anim-in, #vMenu.anim-out { transform-origin: bottom right; }
+
+.modal.anim-in  { animation: fade-in .24s var(--ease-out) backwards; }
+.modal.anim-out { animation: fade-out .18s var(--ease-in) forwards; }
+.modal.anim-in .modal-card  { animation: card-in .34s var(--ease-out) backwards; }
+.modal.anim-out .modal-card { animation: card-out .18s var(--ease-in) forwards; }
+
+#viewer.anim-in  { animation: view-in .3s var(--ease-out) backwards; }
+#viewer.anim-out { animation: view-out .2s var(--ease-in) forwards; }
+#overview.anim-in  { animation: rise-in .3s var(--ease-out) backwards; }
+#overview.anim-out { animation: rise-out .18s var(--ease-in) forwards; }
+
+#grid.anim-in, #empty.anim-in, #footKeys.anim-in, #footStart.anim-in, #toolbar.anim-in { animation: rise-in .38s var(--ease-out) backwards; }
+#grid.anim-out, #empty.anim-out, #footKeys.anim-out, #footStart.anim-out, #toolbar.anim-out { animation: rise-out .16s var(--ease-in) forwards; }
+
+.drop-hint.anim-in .drop-frame { animation: card-in .3s var(--ease-out) backwards; }
+
+.btn:active, .chip:active { transform: scale(.97); }
+.btn, .chip { transition: box-shadow .15s, background .15s, transform .15s var(--ease-out); }
+
+/* Theme switch: colours cross-fade instead of jumping */
+html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after {
+  transition: background-color .35s ease, color .35s ease, border-color .35s ease, box-shadow .35s ease, fill .35s ease, stroke .35s ease !important;
 }
-.glass-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: rgba(128,128,128,.38); }
-.glass-range::-moz-range-track { height: 6px; border-radius: 3px; background: rgba(128,128,128,.38); }
-.glass-range::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%;
-  background: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.4);
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-in, .anim-out, .anim-in *, .anim-out * { animation-duration: .01ms !important; }
+  html.theme-fade, html.theme-fade * { transition: none !important; }
 }
-.glass-range::-moz-range-thumb { width: 26px; height: 26px; border: 0; border-radius: 50%; background: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
-.glass-range:focus-visible::-webkit-slider-thumb { box-shadow: var(--sh-3); }

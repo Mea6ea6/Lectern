@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <script>
     /* Applied before the first paint, so there is no flash of the wrong theme or the wrong glass */
-    window.GLASS_DEFAULT = 35;     // 0 = full frosted glass … 100 = solid panels
+    window.GLASS_DEFAULT = 60;     // fixed look: 0 = full frosted glass … 100 = solid panels
     window.applyGlass = function (value) {
       var solid = Math.max(0, Math.min(100, value)) / 100, g = 1 - solid, r = document.documentElement.style;
       r.setProperty('--g', g.toFixed(3));                              // how much glass (0 … 1)
@@ -25,9 +25,8 @@
       var d = document.documentElement;
       var t = localStorage.getItem('fv-theme');
       if (t) d.dataset.theme = t;
-      var gl = localStorage.getItem('fv-glass');
-      window.applyGlass(gl === null ? window.GLASS_DEFAULT : Number(gl));
-    } catch (e) { window.applyGlass(window.GLASS_DEFAULT); }
+    } catch (e) { /* storage blocked: keep defaults */ }
+    window.applyGlass(window.GLASS_DEFAULT);
     /* The manifest only makes sense on a web address (it can't be fetched from a flash drive) */
     if (/^https?:$/.test(location.protocol)) {
       var m = document.createElement('link');
@@ -110,9 +109,6 @@
               <button type="button" data-theme-set="light">Light</button>
               <button type="button" data-theme-set="dark">Dark</button>
             </div>
-          </div>
-          <div class="pop-row"><span class="pop-label">Glass</span>
-            <input class="glass-range" type="range" min="0" max="100" step="1" aria-label="Glass transparency" title="Left: frosted glass · Right: solid">
           </div>
         </div>
       </div>
@@ -277,10 +273,6 @@
         <button type="button" data-theme-set="light">Light</button>
         <button type="button" data-theme-set="dark">Dark</button>
       </div>
-    </div>
-    <div class="menu-row">
-      <span class="menu-label">Glass</span>
-      <input class="glass-range" type="range" min="0" max="100" step="1" aria-label="Glass transparency" title="Left: frosted glass · Right: solid">
     </div>
   </div>
 
