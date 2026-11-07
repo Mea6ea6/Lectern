@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <script>
     /* Applied before the first paint, so there is no flash of the wrong theme or the wrong glass */
-    window.GLASS_DEFAULT = 40;     // 0 = full frosted glass … 100 = solid panels
+    window.GLASS_DEFAULT = 35;     // 0 = full frosted glass … 100 = solid panels
     window.applyGlass = function (value) {
       var solid = Math.max(0, Math.min(100, value)) / 100, g = 1 - solid, r = document.documentElement.style;
       r.setProperty('--g', g.toFixed(3));                              // how much glass (0 … 1)
@@ -142,10 +142,10 @@
   <main>
     <section id="empty" class="empty">
       <div class="empty-card">
-        <svg class="icon empty-icon"><use href="#i-folder"/></svg>
-        <h2>Choose a folder with your files</h2>
-        <p>For example the <b>Files</b> folder on this flash drive.<br>
-          Supported: PPTX, PDF, DOCX, XLSX, images and text files.</p>
+        <svg class="icon empty-icon icon-idle"><use href="#i-folder"/></svg>
+        <svg class="icon empty-icon icon-drop"><use href="#i-addfile"/></svg>
+        <h2 class="t-idle">Choose a folder with your files</h2>
+        <h2 class="t-drop">Drop to add files</h2>
         <div class="empty-actions">
           <button class="btn btn-primary btn-big" id="btnFolder2" type="button">
             <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
@@ -157,8 +157,6 @@
             <svg class="icon"><use href="#i-addfile"/></svg><span>Choose files</span>
           </button>
         </div>
-        <p class="hint">You can also drag files and folders into this window.<br>
-          If the browser asks to upload files — confirm. Nothing leaves this computer, everything works offline.</p>
       </div>
     </section>
 
@@ -166,11 +164,20 @@
     <p id="noResults" class="no-results" hidden>Nothing found</p>
   </main>
 
-  <footer class="footer" id="footer" hidden>
-    <span><kbd>Space</kbd> details</span>
-    <span><kbd>Enter</kbd> open</span>
-    <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> select</span>
-    <span><kbd>/</kbd> search</span>
+  <footer class="footer" id="footer">
+    <div class="foot-line" id="footKeys" hidden>
+      <span><kbd>Space</kbd> details</span>
+      <span><kbd>Enter</kbd> open</span>
+      <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> select</span>
+      <span><kbd>/</kbd> search</span>
+    </div>
+    <div class="foot-start" id="footStart">
+      <div class="foot-line">
+        <span>Drag files or folders into this window</span>
+        <span>Everything stays on this computer and works offline</span>
+      </div>
+      <div class="foot-line"><span>PPTX · PDF · DOCX · XLSX · CSV · images · TXT</span></div>
+    </div>
   </footer>
 </div>
 
@@ -179,7 +186,7 @@
   <div class="modal-card" role="dialog" aria-modal="true" id="modalBody"></div>
 </div>
 
-<div id="dropHint" class="drop-hint" hidden>Drop to add files</div>
+<div id="dropHint" class="drop-hint" hidden><div class="drop-frame">Drop to add files</div></div>
 
 <!-- ============ VIEWER: opens over the list ============ -->
 <div id="viewer" class="viewer" hidden>

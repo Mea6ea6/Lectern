@@ -434,19 +434,25 @@ $('btnRefresh').onclick = rescan;
 
 /* ----- Drag & drop (files and whole folders) ----- */
 let dragDepth = 0;
+function setDragging(on) {
+  document.body.classList.toggle('dragging', on);
+  const empty = state.files.length === 0;
+  document.body.classList.toggle('drag-empty', on && empty);     // start screen: the dashed card reacts
+  $('dropHint').hidden = !(on && !empty);                       // list: a glass frame over the page
+}
 window.addEventListener('dragenter', (e) => {
   e.preventDefault();
-  if (!document.body.classList.contains('viewing')) { dragDepth++; $('dropHint').hidden = false; }
+  if (!document.body.classList.contains('viewing')) { dragDepth++; setDragging(true); }
 });
 window.addEventListener('dragleave', () => {
   dragDepth = Math.max(0, dragDepth - 1);
-  if (!dragDepth) $('dropHint').hidden = true;
+  if (!dragDepth) setDragging(false);
 });
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {
   e.preventDefault();
   dragDepth = 0;
-  $('dropHint').hidden = true;
+  setDragging(false);
   if (document.body.classList.contains('viewing')) return;
   const files = await filesFromDrop(e.dataTransfer);
   if (files.length) addFiles(files, false);
@@ -531,7 +537,8 @@ function render() {
   const hasFiles = state.files.length > 0;
   $('empty').hidden = hasFiles;
   $('toolbar').hidden = !hasFiles;
-  $('footer').hidden = !hasFiles;
+  $('footKeys').hidden = !hasFiles;
+  $('footStart').hidden = hasFiles;
   $('grid').hidden = !hasFiles;
 
   renderStatus();
