@@ -193,13 +193,16 @@ async function kvSet(key, value) {
    --------------------------------------------------------------------- */
 
 function setAppearance(name, value) {      // name: 'theme'
-  const root = document.documentElement;
-  root.classList.add('theme-fade');                // colours glide into the new theme
-  clearTimeout(setAppearance.t);
-  setAppearance.t = setTimeout(() => root.classList.remove('theme-fade'), 420);
-  root.dataset[name] = value;
-  savePref('fv-' + name, value);
-  syncAppearanceUI();
+  const apply = () => {
+    document.documentElement.dataset[name] = value;
+    savePref('fv-' + name, value);
+    syncAppearanceUI();
+  };
+  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.startViewTransition(apply);   // smooth cross-fade where the browser supports it, instant switch elsewhere
+  } else {
+    apply();
+  }
 }
 
 function syncAppearanceUI() {
@@ -663,8 +666,7 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint',
-   'empty', 'grid', 'toolbar', 'footKeys', 'footStart', 'noResults'].forEach((id) => {
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     let logical = native.get.call(el), timer = 0;
