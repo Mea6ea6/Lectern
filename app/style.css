@@ -31,13 +31,13 @@
   --bg:        #efefef;
   --surface-rgb:   255 255 255;
   --surface-2-rgb: 231 231 231;
-  --surface-3-rgb: 217 217 217;
+  --surface-3-rgb: 208 208 208;
   --surface:   rgb(var(--surface-rgb) / var(--a1));      /* panels (opacity is set by the Glass slider) */
   --surface-2: rgb(var(--surface-2-rgb) / var(--a2));    /* controls on panels */
   --surface-3: rgb(var(--surface-3-rgb) / var(--a2));
   --ink:       #1c1c1c;     /* "black" is a soft black, not pure #000 */
-  --ink-soft:  #6b6b6b;
-  --ink-faint: #c1c1c1;
+  --ink-soft:  #555555;
+  --ink-faint: #b5b5b5;
   --on-ink:    #ffffff;     /* text on top of --ink (inverted state) */
   --viewer-bg: #050505;     /* the open document always sits on black */
   --wall-bg:   #d6d6d6;
@@ -60,15 +60,15 @@
 /* ---------- Theme: dark ---------- */
 [data-theme="dark"] {
   --bg:        #0b0b0b;
-  --surface-rgb:   21 21 21;
-  --surface-2-rgb: 31 31 31;
-  --surface-3-rgb: 43 43 43;
+  --surface-rgb:   26 26 26;
+  --surface-2-rgb: 38 38 38;
+  --surface-3-rgb: 54 54 54;
   --surface:   rgb(var(--surface-rgb) / var(--a1));
   --surface-2: rgb(var(--surface-2-rgb) / var(--a2));
   --surface-3: rgb(var(--surface-3-rgb) / var(--a2));
-  --ink:       #e8e8e8;
-  --ink-soft:  #8f8f8f;
-  --ink-faint: #4a4a4a;
+  --ink:       #f2f2f2;
+  --ink-soft:  #b4b4b4;
+  --ink-faint: #5c5c5c;
   --on-ink:    #0b0b0b;
   --viewer-bg: #050505;
   --wall-bg:   #101010;
@@ -231,7 +231,12 @@ button:disabled { cursor: default; }
   font-size: var(--label-size); font-weight: var(--label-weight);
   text-transform: var(--label-case); letter-spacing: var(--label-track);
 }
-.chip b { margin-left: 6px; font-weight: 500; opacity: .55; }
+.chip b { margin-left: 6px; font-weight: 600; opacity: .8; }
+/* A small dot in the file-type colour, so filters match the badges on the cards */
+.chip:not(.k-all)::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%;
+  background: var(--kc); vertical-align: 1px; box-shadow: 0 0 0 1.5px rgb(255 255 255 / .22);
+}
 .chip:hover { box-shadow: var(--sh-2); }
 .chip.active { background: var(--ink); color: var(--on-ink); }
 .dd { position: relative; margin-left: auto; }
@@ -285,14 +290,20 @@ button:disabled { cursor: default; }
   display: grid; gap: var(--gap); padding: 4px var(--pad) var(--pad);
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
+.k-pptx { --kc: var(--c-pptx); } .k-pdf { --kc: var(--c-pdf); } .k-docx { --kc: var(--c-docx); }
+.k-xlsx { --kc: var(--c-xlsx); } .k-image { --kc: var(--c-image); } .k-text { --kc: var(--c-text); }
 .card {
-  display: flex; flex-direction: column; cursor: pointer;
+  position: relative; display: flex; flex-direction: column; cursor: pointer;
   background: var(--surface); border-radius: var(--r-lg); overflow: hidden;
   box-shadow: var(--sh-1);
   transition: transform .12s, box-shadow .12s;
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--sh-hover); }
-.card.selected { transform: translateY(-3px); box-shadow: var(--sh-select); }   /* selection = a deeper shadow */
+.card.selected { transform: translateY(-3px); box-shadow: var(--sh-select); }   /* selection = lift + deep shadow … */
+/* … and an inverted name bar: impossible to miss from the back of the room */
+.card.selected .card-foot { background: var(--ink); color: var(--on-ink); }
+.card.selected .card-info { background: rgb(128 128 128 / .35); color: var(--on-ink); }
+.card.selected .card-foot, .card .card-foot { transition: background .15s, color .15s; }
 
 .thumb {
   position: relative; aspect-ratio: 16 / 10; width: 100%;

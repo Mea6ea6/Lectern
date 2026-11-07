@@ -500,7 +500,7 @@ function visibleFiles() {
 }
 
 function createCard(entry) {
-  const card = h('div', 'card');
+  const card = h('div', 'card k-' + entry.kind);
   card.dataset.id = entry.id;
   card.title = entry.name;
 
@@ -576,7 +576,7 @@ function renderChips() {
   if (!filters.some((f) => f.id === state.filter)) state.filter = 'all';
   const chips = filters.map((f) => {
     const count = f.id === 'all' ? state.files.length : state.files.filter((e) => e.kind === f.id).length;
-    const chip = h('button', 'chip' + (state.filter === f.id ? ' active' : ''), f.title);
+    const chip = h('button', 'chip k-' + f.id + (state.filter === f.id ? ' active' : ''), f.title);
     chip.type = 'button';
     chip.appendChild(h('b', '', String(count)));
     chip.onclick = () => { state.filter = f.id; render(); };
