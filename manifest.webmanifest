@@ -1,0 +1,38 @@
+{
+  "name": "Lectern",
+  "short_name": "Lectern",
+  "description": "Offline viewer for presentations, PDFs, documents, spreadsheets, images and text.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#0b0b0b",
+  "theme_color": "#0b0b0b",
+  "orientation": "any",
+  "categories": ["productivity", "education"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "launch_handler": { "client_mode": ["focus-existing", "auto"] },
+  "file_handlers": [
+    {
+      "action": "./",
+      "name": "Lectern",
+      "accept": {
+        "application/pdf": [".pdf"],
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow": [".ppsx"],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+        "text/csv": [".csv"],
+        "text/plain": [".txt", ".log"],
+        "text/markdown": [".md"],
+        "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif"]
+      }
+    }
+  ]
+}
