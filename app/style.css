@@ -733,12 +733,13 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
   position: absolute; top: 8px; left: 8px; z-index: 2; width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--r-md); background: var(--surface); color: var(--ink);
-  box-shadow: var(--sh-1); font-weight: 700; font-size: 14px; opacity: .72;
+  box-shadow: var(--sh-1); font-weight: 700; font-size: 14px; opacity: 0;
   transition: opacity .12s, background .12s, box-shadow .12s;
 }
 .card-queue .icon { width: 18px; height: 18px; }
 .card:hover .card-queue, .card.selected .card-queue, .card-queue:focus-visible { opacity: 1; }
 .card-queue:hover { box-shadow: var(--sh-2); }
+@media (hover: none) { .card-queue { opacity: .8; } }
 .card.queued .card-queue { background: var(--ink); color: var(--on-ink); opacity: 1; }
 #btnQueue .qcount { min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--ink); color: var(--on-ink); font-size: 12px; text-align: center; }
 #btnQueue .qcount:empty { display: none; }
@@ -805,15 +806,14 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .ink-bar .vbtn-icon { min-width: 40px; }
 .ink-bar .vbtn-solid { padding: 0 14px; }
 .ink-grip {
-  display: flex; flex-direction: column; justify-content: center; gap: 3px; width: 22px; align-self: stretch;
-  padding: 0 5px; cursor: grab; touch-action: none; opacity: .5;
+  width: 22px; align-self: stretch; cursor: grab; touch-action: none; opacity: .45;
+  background: radial-gradient(circle, var(--ink) 1.4px, transparent 1.9px) center / 7px 7px;
+  -webkit-mask: linear-gradient(#000, #000) center / 14px 21px no-repeat; mask: linear-gradient(#000, #000) center / 14px 21px no-repeat;
 }
-.ink-grip:hover { opacity: .85; }
+.ink-grip:hover { opacity: .8; }
 .ink-bar.moving .ink-grip { cursor: grabbing; }
-.ink-grip span { height: 2px; border-radius: 2px; background: var(--ink); }
 .ink-sep { width: 1px; align-self: stretch; margin: 6px 0; background: var(--ink); opacity: .12; }
 .ink-pos { min-width: 44px; text-align: center; color: var(--ink-soft); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.ink-sizes button i { display: block; width: var(--d); height: var(--d); margin: auto; border-radius: 50%; background: currentColor; }
 .ink-colors { display: flex; gap: 8px; padding: 0 4px; transition: opacity .15s; }
 .ink-colors.off { opacity: .3; pointer-events: none; }
 .ink-swatch {
@@ -882,12 +882,123 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .epub-page table { border-collapse: collapse; } .epub-page td, .epub-page th { padding: 4px 8px; border: 1px solid #ccc; }
 @media (max-width: 720px) { .epub-page, .rtf-page, .zip-page { padding: 24px 20px; } }
 
-/* ---------- Buttons feel real: a little bigger under the pointer, a little smaller when pressed ---------- */
-.btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn {
-  transition: scale .16s var(--ease-out), box-shadow .15s, background .15s, color .15s, opacity .15s, transform .14s var(--ease-out);
+/* ---------- Buttons feel real: the press is the main feedback, the hover is only a hint ---------- */
+.btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn, .menu-item {
+  transition: scale .24s cubic-bezier(.34, 1.45, .64, 1), box-shadow .15s, background .15s, color .15s, opacity .15s, transform .14s var(--ease-out);
 }
-.btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover, .seg button:hover:not(:disabled),
-.card-info:hover, .card-queue:hover, .stepper button:hover:not(:disabled), .ink-swatch:hover { scale: 1.05; }
-.btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .seg button:active:not(:disabled),
-.card-info:active, .card-queue:active, .stepper button:active:not(:disabled), .ink-swatch:active { scale: .95; transition-duration: .08s; }
-@media (hover: none) { .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .seg button:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover { scale: 1; } }
+.btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover { scale: 1.02; }
+.btn-icon:hover:not(:disabled), .vbtn-icon:hover:not(:disabled), .card-info:hover, .card-queue:hover,
+.stepper button:hover:not(:disabled), .ink-swatch:hover { scale: 1.07; }
+.btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .card-info:active, .card-queue:active,
+.stepper button:active:not(:disabled), .ink-swatch:active { scale: .95; transition-duration: .07s; }
+.seg button:active:not(:disabled), .menu-item:active { scale: .97; transition-duration: .07s; }
+@media (hover: none) { .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover { scale: 1; } }
+
+/* Filter chips: sentence case, lighter than the small caps labels elsewhere */
+.chip { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 600; }
+.chip b { font-weight: 600; opacity: .55; }
+
+/* ---------- Tooltips ---------- */
+.tip {
+  position: fixed; left: 0; top: 0; z-index: 400; max-width: 260px; padding: 6px 10px; border-radius: 8px;
+  background: #1f1f1f; color: #f4f4f4; font-size: 12.5px; font-weight: 600; line-height: 1.35; letter-spacing: .005em;
+  box-shadow: 0 6px 18px rgb(0 0 0 / .35), 0 1px 3px rgb(0 0 0 / .3), inset 0 1px 0 rgb(255 255 255 / .09);
+  pointer-events: none; opacity: 0; transform: translateY(var(--ty, 4px)); transition: opacity .14s, transform .16s var(--ease-out);
+  display: flex; align-items: center; gap: 8px;
+}
+[data-theme="dark"] .tip { background: #2c2c2c; }
+.tip.show { opacity: 1; transform: translateY(0); }
+.tip.instant { transition-duration: 0s; }
+.tip kbd {
+  min-width: 0; margin: 0; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  background: rgb(255 255 255 / .16); color: #fff; box-shadow: none;
+}
+
+/* ---------- Timer ---------- */
+.vright { display: flex; align-items: center; gap: 10px; }
+.timer-pill { font-variant-numeric: tabular-nums; min-width: 0; }
+.timer-pill.done, #btnTimer.done { background: var(--ink); color: var(--on-ink); animation: timer-pulse 1s ease-in-out infinite; }
+@keyframes timer-pulse { 50% { opacity: .55; } }
+#btnTimer.running span, .timer-pill span { font-variant-numeric: tabular-nums; }
+.timer-dialog { text-align: center; }
+.timer-dialog .modal-title { text-align: center; }
+.timer-big { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; margin: 8px 0 22px; font-variant-numeric: tabular-nums; }
+.timer-big.done { opacity: .6; }
+.timer-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 auto 16px; max-width: 360px; }
+.timer-presets .btn { min-height: 40px; padding: 0 16px; background: var(--surface-2); }
+.timer-presets .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.timer-custom { display: inline-flex; align-items: center; gap: 4px; padding: 4px; margin-bottom: 4px; background: var(--surface-2); border-radius: var(--r-md); }
+.timer-custom button { min-width: 44px; min-height: 40px; border-radius: 8px; background: transparent; }
+.timer-custom button:hover { background: var(--surface-3); }
+.timer-custom output { min-width: 96px; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.timer-dialog .modal-actions { justify-content: center; margin-top: 22px; }
+
+/* ---------- Bookmarks ---------- */
+.scrub-marks { position: absolute; left: 14px; right: 14px; top: 0; height: 100%; pointer-events: none; }
+.scrub-marks i {
+  position: absolute; top: 4px; width: 6px; height: 16px; margin-left: -3px; border-radius: 3px; background: var(--ink);
+  box-shadow: 0 0 0 2px rgb(var(--surface-rgb)), 0 1px 4px rgb(0 0 0 / .4);
+}
+#vMark[aria-pressed="true"] .icon path { fill: currentColor; }
+.ov-cell.marked .ov-thumb::after {
+  content: ""; position: absolute; top: 0; right: 10px; width: 16px; height: 24px; z-index: 2; background: var(--ink);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%); filter: drop-shadow(0 1px 2px rgb(0 0 0 / .4));
+}
+.ov-thumb { position: relative; }
+
+/* ---------- Speaker notes ---------- */
+.notes {
+  position: absolute; z-index: 6; right: 12px; top: calc(var(--bt) + 8px); bottom: calc(var(--bb) + 8px); width: min(380px, 38vw);
+  display: flex; flex-direction: column; background: var(--surface); color: var(--ink); border-radius: var(--r-lg); box-shadow: var(--sh-3);
+  -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd); overflow: hidden;
+}
+.notes-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 10px 4px 18px; font-size: 13px; color: var(--ink-soft); }
+.notes-head b { font-size: var(--label-size); font-weight: var(--label-weight); text-transform: var(--label-case); letter-spacing: var(--label-track); }
+.notes-head .vbtn { min-height: 38px; min-width: 38px; background: transparent; }
+.notes-body { flex: 1; overflow: auto; padding: 8px 20px 20px; font-size: 21px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.notes-body.empty { color: var(--ink-soft); font-size: 16px; }
+.viewer.notes-open .stagewrap { right: min(404px, 40vw); }
+.viewer.inking .notes { display: none; }
+
+/* DOCX first page drawn small (cards and the info window) */
+.page-thumb {
+  position: relative; height: 90%; max-width: 90%; overflow: hidden; border-radius: 2px; background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.page-thumb > .docx-host {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0; transform: scale(var(--s, .2)); pointer-events: none; overflow: hidden;
+}
+.page-thumb .docx-wrapper { padding: 0 !important; background: none !important; }
+.page-thumb section.docx { margin: 0 !important; box-shadow: none !important; }
+.info-thumb .page-thumb { height: 100%; }
+
+/* Queue dialog: "Remove all" is a quiet text link, not a third button */
+.q-clear-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+.q-clear { padding: 6px 4px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-radius: 6px; }
+.q-clear:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.viewer.inking.notes-open .stagewrap { right: 0; }
+
+/* Thickness slider in the drawing bar */
+.ink-size { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
+.ink-size input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 110px; height: 28px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer; outline: none; touch-action: none;
+}
+.ink-size input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--ink) var(--fill, 20%), color-mix(in srgb, var(--ink) 22%, transparent) var(--fill, 20%));
+}
+.ink-size input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.ink-size input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--ink); }
+.ink-size input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -9px; border: 0; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.06); transition: scale .15s;
+}
+.ink-size input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; border: 0; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.06);
+}
+.ink-size input[type="range"]:hover::-webkit-slider-thumb { scale: 1.08; }
+.ink-size input[type="range"]:active::-webkit-slider-thumb { scale: .94; }
+.ink-dot-box { display: grid; place-items: center; width: 28px; height: 28px; flex: none; }
+.ink-dot-box i { display: block; border-radius: 50%; background: var(--ink); width: 6px; height: 6px; }

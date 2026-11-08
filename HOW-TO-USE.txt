@@ -1,4 +1,4 @@
-LECTERN V.1.3 — offline viewer for the classroom
+LECTERN v1.5.1 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -56,7 +56,8 @@ IN THE VIEWER
 PEN AND MARKER (any page or slide)
   Press "Draw" (or D). The top and bottom bars step aside, so the page gets the
   whole screen, and one compact bar appears. Choose Pen, Marker (see-through) or
-  Eraser, a thickness (thin / medium / thick) and a colour. Undo, Redo, Clear and
+  Eraser, a colour and a thickness (drag the slider; the dot next to it shows the
+  size, and each tool remembers its own). Undo, Redo, Clear and
   "save as picture" are in the same bar. Drag the bar by its grip (the three
   lines on the left) if it covers something. The file is not changed; the
   drawing stays on the screen of that page until you go back to the list.
@@ -70,14 +71,29 @@ CLASS QUEUE (the files for one lesson, in order)
   While a file of the queue is open, the arrows in the top bar (or [ and ]) jump
   to the next / previous file. At the very end of a file a second "Next" moves on
   to the next file, so a presentation clicker can run the whole lesson.
-  The list is remembered on this computer. When you open the folder again the
-  files are found by themselves.
+  The queue lives while the page is open: after a reload, or when you choose a
+  different folder, it starts empty.
+
+BOOKMARKS
+  Press M (or the bookmark button in the bottom bar) to mark the page you are on.
+  Marks show on the progress bar and in the Overview, and are remembered for that
+  file. "," and "." jump to the previous / next mark.
+
+SPEAKER NOTES (PPTX and ODP)
+  Press N (or More - Speaker notes) to open the notes of the slide on screen in a
+  side panel. They change with the slide.
+
+LESSON TIMER
+  The "Timer" button in the top bar: pick 5 - 80 minutes (or set your own) and
+  Start, or use the Stopwatch. The clock stays in the top bar, also while a file
+  is open, and flashes with a soft chime when time is up.
 
 KEYBOARD
   List     Arrows select    Enter open    Space details    / search    Q queue
   Viewer   → ↓ Space Enter = next        ← ↑ Backspace = previous
            Home / End = first / last     G = overview     F = fullscreen
-           D = draw (1 pen, 2 marker, 3 eraser, Ctrl+Z undo, Ctrl+Shift+Z redo)
+           D = draw (1 pen, 2 marker, 3 eraser; Ctrl+Z undo, Ctrl+Shift+Z redo)
+           M = bookmark   , . = previous / next bookmark   N = notes
            B = black screen   W = white screen   R = rotate   + − 0 = zoom
            [ ] = previous / next file of the queue          Esc = back
 

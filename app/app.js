@@ -327,6 +327,8 @@ function addFiles(list, replace) {
     state.files.filter((e) => !seen.has(e.key)).forEach(releaseEntry);
     state.files = next;
     state.skipped = skipped;
+    relinkQueue();
+    Q.items = Q.items.filter((it) => it.entry && next.includes(it.entry));   // files that are gone from the new folder leave the queue
   } else {
     const have = new Set(state.files.map((e) => e.key));
     for (const e of incoming) if (!have.has(e.key)) { state.files.push(e); have.add(e.key); }
@@ -601,7 +603,7 @@ function renderActions() {
 
 function renderStatus() {
   if (state.note) { $('status').textContent = state.note; return; }
-  if (!state.files.length) { $('status').textContent = 'No files selected'; return; }
+  if (!state.files.length) { $('status').textContent = 'Nothing open yet'; return; }
   const n = state.files.length;
   let text = (state.folderName ? state.folderName + ' · ' : '') + n + ' ' + plural(n, ['file', 'files']);
   if (state.skipped) text += ' · ' + state.skipped + ' skipped (.ppt / .doc) — re-save as .pptx / .docx';
@@ -704,7 +706,7 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar'].forEach((id) => {
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     let logical = native.get.call(el), timer = 0;
@@ -858,6 +860,7 @@ function openInfo(entry) {
   box.append(head, rows, actions, keys);
   M.entry = entry;
   openModal(box, { onEnter: openFile, spaceCloses: true, cls: 'about' });
+  fitPageThumbs(box);
 
   // The rest (pages, author, dimensions…) needs reading inside the file, so it arrives a moment later
   loadDetails(entry).then((extra) => {
@@ -970,27 +973,15 @@ async function loadDetails(entry) {
    the Queue button opens the list to put it in order and start. While a file of the queue is open,
    [ ] (or the two small arrows in the top bar) jump between the files, and a second "Next" at the
    very end of a file moves on to the next one — handy with a presentation clicker.
-   The list is remembered between visits (only names and sizes — the files themselves stay where they are);
-   when the folder is opened again the entries find their files by themselves.
+   The list lives only while the page is open: a reload, or a different folder, starts with an empty queue
+   (a rescan of the same folder keeps it).
    --------------------------------------------------------------------- */
 
 const Q = { items: [] };      // { path, name, size, modified, ext, entry }   (entry = the loaded file, or null)
 
-(function loadQueue() {
-  try {
-    const list = JSON.parse(loadPref('fv-queue', '[]'));
-    if (Array.isArray(list)) {
-      Q.items = list.filter((i) => i && i.name).map((i) => ({
-        path: String(i.path || i.name), name: String(i.name), size: Number(i.size) || 0,
-        modified: Number(i.modified) || 0, ext: getExt(String(i.name)), entry: null,
-      }));
-    }
-  } catch (e) { /* a damaged list is simply forgotten */ }
-})();
+try { localStorage.removeItem('fv-queue'); } catch (e) { /* the queue of older versions is forgotten: it only ever lives while the page is open */ }
 
-function saveQueue() {
-  savePref('fv-queue', JSON.stringify(Q.items.map(({ path, name, size, modified }) => ({ path, name, size, modified }))));
-}
+function saveQueue() { /* the queue lives only while this page is open */ }
 
 // Connects every remembered item with the loaded file that is the same one (same place and size, or same name and size)
 function relinkQueue() {
@@ -1088,9 +1079,9 @@ function renderQueueDialog(first) {
   const loaded = Q.items.filter((it) => it.entry).length;
 
   if (!Q.items.length) {
-    box.appendChild(h('p', 'modal-text', 'Nothing here yet. Press the + on a file card (or Q on the keyboard) to add the files for this lesson. Then put them in order here.'));
+    box.appendChild(h('p', 'modal-text', 'Nothing here yet. Press + on a file card (or Q) to add the files for this lesson.'));
   } else {
-    box.appendChild(h('p', 'modal-text', 'Start opens the first file. While a file is open, the small arrows in the top bar (or [ and ]) jump to the next and previous file. The list is remembered on this computer.'));
+    box.appendChild(h('p', 'modal-text', 'Put the files in order, then press Start. Inside a file, [ and ] jump to the next and previous one.'));
     const list = h('div', 'q-list');
     Q.items.forEach((it, i) => {
       const row = h('div', 'q-row' + (it.entry ? '' : ' missing'));
@@ -1115,15 +1106,13 @@ function renderQueueDialog(first) {
       list.appendChild(row);
     });
     box.appendChild(list);
+    const clear = h('button', 'q-clear', 'Remove all');
+    clear.type = 'button';
+    clear.onclick = () => { Q.items = []; queueChanged(); };
+    box.appendChild(h('div', 'q-clear-row')).appendChild(clear);
   }
 
   const actions = h('div', 'modal-actions');
-  if (Q.items.length) {
-    const clear = h('button', 'btn q-clear', 'Remove all');
-    clear.type = 'button';
-    clear.onclick = () => { Q.items = []; queueChanged(); };
-    actions.appendChild(clear);
-  }
   const close = h('button', 'btn', 'Close');
   close.type = 'button';
   close.onclick = closeModal;
@@ -1199,6 +1188,7 @@ function putThumb(entry) {
   if (!entry.card || !entry.thumbNode) return;
   const thumb = entry.card.querySelector('.thumb');
   thumb.replaceChildren(entry.thumbNode, ...thumb.querySelectorAll('.tag, .card-queue'));   // picture + the buttons on top
+  fitPageThumbs(thumb);
 }
 
 // PDF: draw page 1 into a small canvas
@@ -1237,6 +1227,10 @@ async function thumbOffice(entry) {
     return;
   }
 
+  if (entry.kind === 'docx' && entry.size < 6 * 1024 * 1024) {          // no stored picture: draw the real first page
+    try { if (await thumbDocxPage(entry)) return; } catch (err) { console.warn('DOCX thumbnail:', err); }
+  }
+
   const xmlFile = zip.file(entry.kind === 'pptx' ? 'ppt/slides/slide1.xml' : 'word/document.xml');
   if (!xmlFile) return;
   const xml = await xmlFile.async('string');
@@ -1251,6 +1245,38 @@ async function thumbOffice(entry) {
   snippet.appendChild(document.createTextNode(pieces.slice(1).join(' ')));
   entry.thumbNode = snippet;
 }
+
+// DOCX without a stored picture: render the document out of sight and keep a scaled copy of its first page
+async function thumbDocxPage(entry) {
+  await lib('docx');
+  const host = h('div', 'docx-host');
+  Object.assign(host.style, { position: 'fixed', left: '-20000px', top: '0', width: '1000px' });
+  document.body.appendChild(host);
+  try {
+    await docx.renderAsync(await entry.file.arrayBuffer(), host, null,
+      { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false });
+    const page = host.querySelector('section.docx');
+    if (!page || !page.offsetWidth || !page.offsetHeight) return false;
+    const W = page.offsetWidth, H = page.offsetHeight;
+    const copy = host.cloneNode(true);                                   // keeps docx-preview's own <style> with it
+    copy.style.cssText = 'width:' + W + 'px;height:' + H + 'px';
+    copy.querySelectorAll('section.docx').forEach((sec, i) => { if (i) sec.remove(); });
+    const box = h('div', 'page-thumb');
+    box.dataset.w = W; box.dataset.h = H;
+    box.style.aspectRatio = W + ' / ' + H;
+    box.appendChild(copy);
+    entry.thumbNode = box;
+    return true;
+  } finally { host.remove(); }
+}
+// A page-thumb is drawn at the page's natural size and scaled to fit its box (cards and the info window)
+function fitPageThumbs(root) {
+  (root || document).querySelectorAll('.page-thumb').forEach((box) => {
+    const w = Number(box.dataset.w), width = box.clientWidth;
+    if (w && width) box.style.setProperty('--s', (width / w).toFixed(4));
+  });
+}
+if ('ResizeObserver' in window) new ResizeObserver(() => fitPageThumbs()).observe($('grid'));
 
 // XLSX / CSV: a tiny table of the first rows (only the first rows are parsed — fast)
 async function thumbXlsx(entry) {
@@ -1340,6 +1366,8 @@ class BaseViewer {
 
   get count() { return 1; }
   get index() { return 0; }
+  notesFor() { return ''; }          // speaker notes of page i (PPTX / ODP)
+  get hasNotes() { return false; }
   goTo() {}
   go(where) {
     const i = this.index, last = this.count - 1;
@@ -1494,6 +1522,47 @@ class BoxViewer extends BaseViewer {
   }
 }
 
+/* ----- PPTX speaker notes: read straight from the file (ppt/notesSlides), one text per slide ----- */
+async function pptxNotes(zip) {
+  const text = async (n) => { const f = zip.file(n); return f ? f.async('string') : ''; };
+  const dom = (x) => new DOMParser().parseFromString(x, 'application/xml');
+  const resolve = (base, target) => {
+    if (target.startsWith('/')) return target.slice(1);
+    const parts = base.split('/'); parts.pop();
+    for (const seg of target.split('/')) { if (seg === '..') parts.pop(); else if (seg !== '.') parts.push(seg); }
+    return parts.join('/');
+  };
+  const rels = async (path) => {
+    const dir = path.split('/'), file = dir.pop();
+    const xml = await text(dir.join('/') + '/_rels/' + file + '.rels');
+    const out = [];
+    if (xml) for (const r of dom(xml).getElementsByTagName('Relationship')) {
+      out.push({ id: r.getAttribute('Id'), type: r.getAttribute('Type') || '', target: resolve(path, r.getAttribute('Target') || '') });
+    }
+    return out;
+  };
+  const pres = dom(await text('ppt/presentation.xml'));
+  const presRels = await rels('ppt/presentation.xml');
+  const notes = [];
+  for (const sld of pres.getElementsByTagName('p:sldId')) {
+    const slide = (presRels.find((r) => r.id === sld.getAttribute('r:id')) || {}).target;
+    let note = '';
+    const link = slide ? (await rels(slide)).find((r) => /\/notesSlide$/.test(r.type)) : null;
+    if (link) {
+      const d = dom(await text(link.target));
+      for (const sp of d.getElementsByTagName('p:sp')) {
+        const ph = sp.getElementsByTagName('p:ph')[0];
+        if (!ph || ph.getAttribute('type') !== 'body') continue;
+        note = [...sp.getElementsByTagName('a:p')]
+          .map((p) => [...p.getElementsByTagName('a:t')].map((t) => t.textContent).join(''))
+          .join('\n').trim();
+      }
+    }
+    notes.push(note);
+  }
+  return notes;
+}
+
 /* ----- PPTX: one slide at a time ----- */
 class PptxViewer extends BoxViewer {
   constructor(...args) { super(...args); this.hasOverview = true; }
@@ -1503,9 +1572,9 @@ class PptxViewer extends BoxViewer {
     this.buf = await file.arrayBuffer();
 
     // Slide proportions (16:9, 4:3 …) from presentation.xml
-    let ratio = 9 / 16;
+    let ratio = 9 / 16, zip = null;
     try {
-      const zip = await JSZip.loadAsync(this.buf);
+      zip = await JSZip.loadAsync(this.buf);
       const xml = await zip.file('ppt/presentation.xml').async('string');
       const cx = xml.match(/<p:sldSz[^>]*\scx="(\d+)"/);
       const cy = xml.match(/<p:sldSz[^>]*\scy="(\d+)"/);
@@ -1516,6 +1585,7 @@ class PptxViewer extends BoxViewer {
     this.previewer = pptxPreview.init(this.box, { width: this.W, height: this.H, mode: 'slide' });
     await this.previewer.load(this.buf);
     this.total = this.previewer.slideCount;
+    this.notes = zip ? await pptxNotes(zip).catch(() => []) : [];
     this.cur = 0;
     this.show();
     this.refit();
@@ -1524,6 +1594,8 @@ class PptxViewer extends BoxViewer {
   get count() { return this.total; }
   get index() { return this.cur; }
   get thumbRatio() { return this.H / this.W; }
+  notesFor(i) { return (this.notes && this.notes[i]) || ''; }
+  get hasNotes() { return !!this.notes && this.notes.some(Boolean); }
   label() { return 'Slide ' + (this.cur + 1) + ' of ' + this.total; }
 
   show() {
@@ -1852,6 +1924,7 @@ async function openViewer(entry) {
   closeMenu();
   closeOverview();
   if (window.Pen) Pen.reset();                 // drawings belong to one opening of one file
+  notesReset();
   V.armed = null;
   V.el.classList.remove('is-media');
 
@@ -1901,6 +1974,7 @@ function closeDriver() {
 function closeViewer() {
   V.openToken++;
   if (window.Pen) Pen.reset();
+  notesReset();
   V.armed = null;
   hideCover();
   closeMenu();
@@ -1947,6 +2021,8 @@ function updateBar() {
   $('vOverview').disabled = !ready || !d.hasOverview || d.count < 2;
   $('vInk').disabled = !ready || !d.canDraw;
   $('vInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
+  Marks.refresh();
+  notesRefresh();
 
   // Video / audio: play button, big play button
   const media = ready && d.isMedia;
@@ -2073,6 +2149,7 @@ function openOverview() {
     thumb.dataset.i = i;
     thumb.style.aspectRatio = '1 / ' + d.thumbRatio;
     cell.append(thumb, h('span', 'ov-cap', d.caption(i)));
+    if (Marks.has(i)) cell.classList.add('marked');
     cell.onclick = () => { closeOverview(); V.driver.goTo(i); };
     grid.appendChild(cell);
     cells.push(cell);
@@ -2290,6 +2367,7 @@ document.addEventListener('keydown', (e) => {
       if (V.menuOpen) return act(closeMenu);
       if (V.overviewOpen) return act(closeOverview);
       if (window.Pen && Pen.on) return act(() => Pen.toggle());
+      if (Notes.open) return act(() => notesToggle(false));
       // In real fullscreen the browser handles Esc itself; the fake one we handle
       return act(() => (V.immersive ? setImmersive(false) : closeViewer()));
     }
@@ -2313,6 +2391,10 @@ document.addEventListener('keydown', (e) => {
     }
 
     if (e.code === 'KeyD') return act(toggleInk);
+    if (e.code === 'KeyM') return act(() => Marks.toggle());
+    if (e.code === 'Comma') return act(() => Marks.jump(-1));
+    if (e.code === 'Period') return act(() => Marks.jump(1));
+    if (e.code === 'KeyN') return act(() => notesToggle());
     if (window.Pen && Pen.on) {                               // 1 / 2 / 3 choose pen, marker, eraser
       if (e.key === '1') return act(() => Pen.setTool('pen'));
       if (e.key === '2') return act(() => Pen.setTool('marker'));
@@ -2372,6 +2454,283 @@ document.addEventListener('keydown', (e) => {
     if (entry) { e.preventDefault(); queueToggle(entry); }
   }
 });
+
+
+/* =====================================================================
+   Tooltips: small designed hints instead of the browser's plain ones.
+   Any element with a title (or an icon-only button with an aria-label) gets one;
+   it appears after a short pause (like macOS: about 0.7 s), and the next one right away.
+   A title ending in "(Key)" or "(Key or Key)" shows the keys as little keycaps.
+   ===================================================================== */
+const Tip = (function () {
+  const el = $('tip');
+  const DELAY = 700, GRACE = 600;
+  const canHover = window.matchMedia && matchMedia('(hover: hover)').matches;
+  let timer = 0, target = null, visible = false, lastHidden = 0;
+  const KEYS = /^(.*?)\s*\(([^()\s]{1,10}(?:\s+or\s+[^()\s]{1,10})*)\)\s*$/;
+
+  function adopt(root) {
+    if (!root || root.nodeType !== 1) return;
+    const list = root.matches('[title], button[aria-label]') ? [root] : [];
+    list.push(...root.querySelectorAll('[title], button[aria-label]'));
+    for (const n of list) {
+      if (n.classList.contains('card')) continue;                    // the card shows its own name; the browser's hint helps with long names
+      const title = n.getAttribute('title');
+      if (title) {
+        n.dataset.tip = title;
+        n.removeAttribute('title');
+        if (!n.hasAttribute('aria-label') && !n.textContent.trim()) n.setAttribute('aria-label', title.replace(/\s*\([^()]*\)\s*$/, ''));
+      } else if (!n.dataset.tip && !n.textContent.trim() && n.getAttribute('aria-label')) {
+        n.dataset.tip = n.getAttribute('aria-label');
+      }
+    }
+  }
+  adopt(document.body);
+  new MutationObserver((records) => {
+    for (const r of records) {
+      if (r.type === 'attributes') adopt(r.target); else r.addedNodes.forEach(adopt);
+    }
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['title'] });
+
+  function hide() {
+    clearTimeout(timer);
+    target = null;
+    if (visible) { visible = false; lastHidden = performance.now(); el.classList.remove('show'); el.setAttribute('aria-hidden', 'true'); }
+  }
+  function show(node, instant) {
+    if (!node.isConnected || !node.matches(':hover')) return;
+    const raw = node.dataset.tip || '';
+    const m = raw.match(KEYS);
+    const label = m ? m[1] : raw;
+    const keys = m ? m[2].split(/\s+or\s+/) : [];
+    if (!keys.length && label.trim().toLowerCase() === node.textContent.trim().toLowerCase()) return;   // the button already says it
+    el.replaceChildren(h('span', '', label), ...keys.map((k) => h('kbd', '', k)));
+    el.classList.toggle('instant', !!instant);
+    const r = node.getBoundingClientRect();
+    el.style.left = '0px'; el.style.top = '0px';
+    const w = el.offsetWidth, hh = el.offsetHeight;
+    let y = r.top - hh - 10, below = false;
+    if (y < 8) { y = r.bottom + 10; below = true; }
+    el.style.setProperty('--ty', below ? '-4px' : '4px');
+    el.style.left = clamp(r.left + r.width / 2 - w / 2, 8, window.innerWidth - w - 8) + 'px';
+    el.style.top = y + 'px';
+    visible = true;
+    el.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(() => el.classList.add('show'));
+  }
+
+  if (canHover) {
+    document.addEventListener('mouseover', (e) => {
+      const t = e.target.closest ? e.target.closest('[data-tip]') : null;
+      if (t === target) return;
+      const wasVisible = visible;
+      hide();
+      if (!t) return;
+      target = t;
+      const quick = wasVisible || performance.now() - lastHidden < GRACE;     // moving along a row of buttons: no new wait
+      timer = setTimeout(() => show(t, quick), quick ? 90 : DELAY);
+    }, true);
+    document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) hide(); }, true);
+    ['pointerdown', 'keydown', 'wheel', 'scroll', 'blur'].forEach((ev) => window.addEventListener(ev, hide, true));
+  }
+  return { hide };
+})();
+
+/* =====================================================================
+   Lesson timer: a countdown (5 – 240 min) or a stopwatch. It keeps running while files are
+   opened and closed; a small clock shows in the header and in the viewer's top bar.
+   ===================================================================== */
+const Timer = { mode: 'down', minutes: 45, total: 0, startedAt: 0, before: 0, running: false, active: false, done: false, big: null };
+function timerMs() {
+  const spent = Timer.before + (Timer.running ? Date.now() - Timer.startedAt : 0);
+  return Timer.mode === 'down' ? Timer.total - spent : spent;
+}
+function timerText(ms) {
+  const sec = Timer.mode === 'down' ? Math.max(0, Math.ceil(ms / 1000)) : Math.floor(ms / 1000);
+  const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60;
+  return (hh ? hh + ':' + String(mm).padStart(2, '0') : String(mm)) + ':' + String(ss).padStart(2, '0');
+}
+function chime() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    [0, 0.24, 0.48].forEach((t, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), at = ctx.currentTime + t;
+      o.type = 'sine'; o.frequency.value = [880, 1109, 1319][i];
+      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.22, at + 0.02); g.gain.exponentialRampToValueAtTime(0.001, at + 0.8);
+      o.connect(g).connect(ctx.destination); o.start(at); o.stop(at + 0.85);
+    });
+    setTimeout(() => ctx.close(), 2000);
+  } catch (e) { /* no sound: the clock still flashes */ }
+}
+function timerRender() {
+  const text = Timer.active ? timerText(timerMs()) : '';
+  $('timerText').textContent = Timer.active ? text : 'Timer';
+  $('btnTimer').classList.toggle('done', Timer.done);
+  $('vTimer').hidden = !Timer.active;
+  $('vTimerText').textContent = text;
+  $('vTimer').classList.toggle('done', Timer.done);
+  if (Timer.big && Timer.big.isConnected) { Timer.big.textContent = text; Timer.big.classList.toggle('done', Timer.done); }
+}
+setInterval(() => {
+  if (!Timer.active) return;
+  if (Timer.running && Timer.mode === 'down' && timerMs() <= 0) {
+    Timer.running = false; Timer.done = true; Timer.before = Timer.total;
+    chime(); showToast('Time is up');
+    if (!M.el.hidden && M.body.classList.contains('timer-dialog')) renderTimerDialog();
+  }
+  timerRender();
+}, 250);
+
+function timerStart(mode) {
+  Timer.mode = mode;
+  Timer.total = Timer.minutes * 60000;
+  Timer.before = 0; Timer.startedAt = Date.now();
+  Timer.running = true; Timer.active = true; Timer.done = false;
+  timerRender(); renderTimerDialog();
+}
+function timerPause() {
+  if (Timer.running) { Timer.before += Date.now() - Timer.startedAt; Timer.running = false; }
+  else { Timer.startedAt = Date.now(); Timer.running = true; }
+  timerRender(); renderTimerDialog();
+}
+function timerReset() {
+  Timer.active = false; Timer.running = false; Timer.done = false; Timer.before = 0;
+  timerRender(); renderTimerDialog();
+}
+function openTimer() {
+  closeMenu();
+  renderTimerDialog(M.el.hidden);
+}
+function renderTimerDialog(first) {
+  if (!first && !(!M.el.hidden && M.body.classList.contains('timer-dialog'))) return;
+  const box = h('div');
+  box.appendChild(h('h2', 'modal-title', 'Lesson timer'));
+  const btn = (label, fn, cls) => { const b = h('button', 'btn' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = fn; return b; };
+  const actions = h('div', 'modal-actions');
+  if (Timer.active) {
+    Timer.big = h('div', 'timer-big', timerText(timerMs()));
+    box.appendChild(Timer.big);
+    if (!Timer.done) actions.appendChild(btn(Timer.running ? 'Pause' : 'Resume', timerPause));
+    actions.append(btn('Reset', timerReset), btn('Close', closeModal, 'btn-primary'));
+  } else {
+    Timer.big = null;
+    const presets = h('div', 'timer-presets');
+    [5, 10, 15, 30, 45, 80].forEach((m) => {
+      const b = btn(m + ' min', () => { Timer.minutes = m; renderTimerDialog(); });
+      b.setAttribute('aria-pressed', String(Timer.minutes === m));
+      presets.appendChild(b);
+    });
+    box.appendChild(presets);
+    const custom = h('div', 'timer-custom');
+    const out = h('output', '', Timer.minutes + ' min');
+    const step = (d) => () => { Timer.minutes = clamp(Timer.minutes + d, 1, 240); renderTimerDialog(); };
+    const minus = btn('−', step(-5)), plus = btn('+', step(5));
+    minus.setAttribute('aria-label', 'Less time'); plus.setAttribute('aria-label', 'More time');
+    custom.append(minus, out, plus);
+    box.appendChild(custom);
+    actions.append(btn('Close', closeModal), btn('Stopwatch', () => timerStart('up')), btn('Start', () => timerStart('down'), 'btn-primary'));
+  }
+  box.appendChild(actions);
+  const onEnter = () => { if (!Timer.active) timerStart('down'); else if (!Timer.done) timerPause(); else closeModal(); };
+  if (first) openModal(box, { onEnter, cls: 'timer-dialog' });
+  else { M.body.replaceChildren(box); M.onEnter = onEnter; }
+}
+$('btnTimer').onclick = openTimer;
+$('vTimer').onclick = openTimer;
+$('mTimer').onclick = openTimer;
+
+/* =====================================================================
+   Bookmarks: M marks or unmarks the current page; , and . jump to the previous / next mark.
+   Marks are remembered per file (name + size) on this computer; they show on the progress bar
+   and in the overview.
+   ===================================================================== */
+const Marks = (function () {
+  let all = {};
+  try { all = JSON.parse(localStorage.getItem('fv-marks') || '{}') || {}; } catch (e) { all = {}; }
+  let sig = '';
+  const key = () => (V.entry ? V.entry.path + '|' + V.entry.size : '');
+  const total = (d) => (d.pages && d.pages.length > 1 ? d.pages.length : d.count);
+  const usable = () => { const d = V.driver; return !!d && !d.isMedia && $('vMsg').hidden && total(d) > 1; };
+  const list = () => all[key()] || [];
+  function save() {
+    const keys = Object.keys(all);
+    if (keys.length > 300) delete all[keys[0]];
+    try { localStorage.setItem('fv-marks', JSON.stringify(all)); } catch (e) { /* private window: marks last until the page closes */ }
+  }
+  function ratio(d, i, n) {                                  // where the mark of page i sits on the progress bar
+    if (d instanceof ScrollViewer && d.pages && d.pages[i]) {
+      const st = d.stage, room = st.scrollHeight - st.clientHeight;
+      const top = d.pages[i].getBoundingClientRect().top - st.getBoundingClientRect().top + st.scrollTop;
+      return room > 0 ? clamp(top / room, 0, 1) : 0;
+    }
+    return n > 1 ? i / (n - 1) : 0;
+  }
+  function toggle() {
+    if (!usable()) { showToast('Bookmarks need a file with pages'); return; }
+    const i = V.driver.currentIndex(), k = key(), arr = list().slice();
+    const at = arr.indexOf(i);
+    if (at >= 0) arr.splice(at, 1); else arr.push(i);
+    arr.sort((a, b) => a - b);
+    if (arr.length) all[k] = arr; else delete all[k];
+    save(); sig = ''; refresh();
+    showToast(at >= 0 ? 'Bookmark removed' : 'Bookmarked page ' + (i + 1));
+  }
+  function jump(dir) {
+    if (!usable()) return;
+    const cur = V.driver.currentIndex(), arr = list();
+    const to = dir > 0 ? arr.find((i) => i > cur) : arr.slice().reverse().find((i) => i < cur);
+    if (to === undefined) { showToast(arr.length ? 'No more bookmarks' : 'No bookmarks yet — press M'); return; }
+    V.driver.goTo(to);
+  }
+  function refresh() {
+    const ok = usable(), d = V.driver;
+    $('vMark').disabled = !ok;
+    $('vMark').setAttribute('aria-pressed', String(ok && list().includes(d.currentIndex())));
+    const arr = ok ? list() : [];
+    const s = key() + '|' + arr.join(',') + '|' + (ok ? total(d) + '|' + V.view.zoom + '|' + V.view.fit + '|' + (d.stage ? d.stage.scrollHeight : 0) : '');
+    if (s === sig) return;
+    sig = s;
+    $('vMarks').replaceChildren(...arr.map((i) => { const t = document.createElement('i'); t.style.left = (ratio(d, i, total(d)) * 100) + '%'; return t; }));
+  }
+  return { toggle, jump, refresh, has: (i) => list().includes(i) };
+})();
+$('vMark').onclick = () => Marks.toggle();
+
+/* =====================================================================
+   Speaker notes (PPTX and ODP): N opens a side panel with the notes of the slide on screen.
+   ===================================================================== */
+const Notes = { open: false };
+function notesFill() {
+  const d = V.driver;
+  if (!Notes.open || !d) return;
+  const i = d.currentIndex(), text = d.notesFor(i);
+  $('notesTitle').textContent = 'Notes · slide ' + (i + 1);
+  $('notesBody').textContent = text || 'No notes for this slide.';
+  $('notesBody').classList.toggle('empty', !text);
+}
+function notesRefresh() {
+  const d = V.driver, has = !!d && !!d.hasNotes && $('vMsg').hidden;
+  $('mNotes').disabled = !has;
+  if (Notes.open && !has) notesToggle(false);
+  else notesFill();
+}
+function notesToggle(force) {
+  const d = V.driver;
+  if (!d || !d.hasNotes) { if (force !== false) showToast('This file has no speaker notes'); return; }
+  Notes.open = force === undefined ? !Notes.open : !!force;
+  $('notes').hidden = !Notes.open;
+  V.el.classList.toggle('notes-open', Notes.open);
+  notesFill();
+}
+function notesReset() {
+  Notes.open = false;
+  $('notes').hidden = true;
+  V.el.classList.remove('notes-open');
+}
+$('notesClose').onclick = () => notesToggle(false);
+$('mNotes').onclick = () => { closeMenu(); notesToggle(); };
+
 
 /* ----- Start ----- */
 // After a mouse click a button gives up the focus, so Space / Enter keep working on the selected file

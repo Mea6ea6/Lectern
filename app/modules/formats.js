@@ -703,6 +703,15 @@ class OdpViewer extends BoxViewer {
   get thumbRatio() { return this.H / this.W; }
   label() { return 'Slide ' + (this.cur + 1) + ' of ' + this.total; }
 
+  // Speaker notes: the text of presentation:notes on each slide
+  notesFor(i) {
+    const page = this.pages[i];
+    const n = page && page.getElementsByTagName('presentation:notes')[0];
+    if (!n) return '';
+    return [...n.getElementsByTagName('text:p')].map((p) => p.textContent.trim()).filter(Boolean).join('\n');
+  }
+  get hasNotes() { return this.pages.some((_, i) => this.notesFor(i)); }
+
   async show() {
     const token = ++this.showToken || (this.showToken = 1);
     const slide = await this.buildSlide(this.cur);

@@ -22,13 +22,15 @@ const Pen = (function () {
     pen:    { width: 0.0035, min: 2.5, alpha: 1,    cap: 'round', color: '#e5322d' },
     marker: { width: 0.022,  min: 16,  alpha: 0.38, cap: 'butt',  color: '#f5b400' },
   };
-  // three thicknesses per tool: [thin, medium, thick]
-  const SIZES = {
-    pen:    [{ width: 0.0020, min: 1.6 }, { width: 0.0035, min: 2.5 }, { width: 0.0070, min: 5 }],
-    marker: [{ width: 0.012,  min: 9 },   { width: 0.022,  min: 16 },  { width: 0.040,  min: 30 }],
-    eraser: [12, 20, 36],
-  };
-  const level = { pen: 1, marker: 1, eraser: 1 };
+  // thickness is a slider, 0..100 per tool (remembered per tool)
+  const level = { pen: 20, marker: 27, eraser: 25 };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function sizeOf(tool) {
+    const t = clamp(level[tool], 0, 100) / 100;
+    if (tool === 'marker') return { width: lerp(0.008, 0.06, t), min: lerp(6, 36, t) };
+    if (tool === 'eraser') return { radius: lerp(8, 60, t) };
+    return { width: lerp(0.0015, 0.012, t), min: lerp(1.2, 9, t) };
+  }
 
   const self = {
     on: false, tool: 'pen',
@@ -116,10 +118,10 @@ const Pen = (function () {
       drawing = { tool: 'eraser', before: page().strokes.slice(), changed: false };
       erase(p);
     } else {
-      const t = TOOLS[self.tool];
+      const t = TOOLS[self.tool], z = sizeOf(self.tool);
       drawing = {
         tool: self.tool,
-        stroke: { tool: self.tool, color: t.color, alpha: t.alpha, cap: t.cap, w: SIZES[self.tool][level[self.tool]].width, min: SIZES[self.tool][level[self.tool]].min, pts: [pt] },
+        stroke: { tool: self.tool, color: t.color, alpha: t.alpha, cap: t.cap, w: z.width, min: z.min, pts: [pt] },
       };
       redraw();
     }
@@ -158,7 +160,7 @@ const Pen = (function () {
   function erase(p) {
     const r = rect(), pg = page();
     const keep = pg.strokes.filter((s) => {
-      const lw = Math.max(s.min, s.w * r.w) / 2 + SIZES.eraser[level.eraser];
+      const lw = Math.max(s.min, s.w * r.w) / 2 + sizeOf('eraser').radius;
       const pts = s.pts;
       for (let i = 0; i < pts.length; i++) {
         const ax = r.x + pts[i][0] * r.w, ay = r.y + pts[i][1] * r.w;
@@ -185,6 +187,7 @@ const Pen = (function () {
   V.stage.addEventListener('scroll', () => { if (self.on) redraw(); }, { passive: true });
 
   /* ----- the drawing bar ----- */
+  const sizeInput = $('inkSize'), sizeDot = $('inkDot');
   const colorBox = $('inkColors');
   COLORS.forEach(([hex, name]) => {
     const b = h('button', 'ink-swatch');
@@ -214,7 +217,11 @@ const Pen = (function () {
     const pg = V.driver ? page() : { strokes: [], undo: [], redo: [] };
     $('inkUndo').disabled = !pg.undo.length;
     $('inkRedo').disabled = !pg.redo.length;
-    bar.querySelectorAll('[data-ink-size]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.inkSize === level[self.tool])));
+    sizeInput.value = String(level[self.tool]);
+    sizeInput.style.setProperty('--fill', level[self.tool] + '%');
+    const dot = sizeDot.style, dm = { pen: [2, 14], marker: [6, 26], eraser: [6, 26] }[self.tool];
+    dot.width = dot.height = lerp(dm[0], dm[1], level[self.tool] / 100) + 'px';
+    dot.opacity = self.tool === 'marker' ? '.45' : '1';
     const lbl = V.driver && V.driver.label ? V.driver.label() : '';
     $('inkPos').textContent = lbl.replace(/^Page /, '').replace(' of ', ' / ');
     $('inkClear').disabled = !pg.strokes.length;
@@ -223,9 +230,7 @@ const Pen = (function () {
     $('vInk').setAttribute('aria-pressed', String(self.on));
   }
   bar.querySelectorAll('[data-ink-tool]').forEach((b) => { b.onclick = () => setTool(b.dataset.inkTool); });
-  bar.querySelectorAll('[data-ink-size]').forEach((b) => {
-    b.onclick = () => { level[self.tool] = +b.dataset.inkSize; savePref('fv-ink-size-' + self.tool, String(level[self.tool])); refreshButtons(); };
-  });
+  sizeInput.oninput = () => { level[self.tool] = +sizeInput.value; savePref('fv-ink-sz-' + self.tool, String(level[self.tool])); refreshButtons(); };
 
   /* ----- the bar can be dragged out of the way (by the grip on its left) ----- */
   const grip = $('inkGrip');
@@ -353,7 +358,7 @@ const Pen = (function () {
 
   // Remembered choices
   const t = loadPref('fv-ink-tool', 'pen');
-  for (const n of ['pen', 'marker', 'eraser']) { const v = +loadPref('fv-ink-size-' + n, '1'); if (v >= 0 && v <= 2) level[n] = v; }
+  for (const n of ['pen', 'marker', 'eraser']) { const raw = loadPref('fv-ink-sz-' + n, ''); const v = +raw; if (raw !== '' && v >= 0 && v <= 100) level[n] = v; }
   if (t === 'pen' || t === 'marker' || t === 'eraser') self.tool = t;
   for (const name of ['pen', 'marker']) {
     const c = loadPref('fv-ink-' + name, '');
