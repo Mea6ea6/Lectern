@@ -11,7 +11,7 @@ Open presentations, PDFs, documents, spreadsheets, photos, video and more straig
 
 <a href="https://github.com/Mea6ea6/Lectern/raw/main/downloads/Lectern-V.1.1.zip"><img src="https://img.shields.io/badge/%E2%AC%87%20Download%20for%20flash%20drive-Lectern%20V.1.1%20(zip)-1c1c1c?style=for-the-badge" alt="Download Lectern V.1.1 for a flash drive"></a>
 &nbsp;
-<a href="https://lectern-blush.vercel.app"><img src="https://img.shields.io/badge/Open%20in%20the%20browser-lectern--blush.vercel.app-ffffff?style=for-the-badge&labelColor=ffffff&color=ffffff&logoColor=1c1c1c" alt="Open Lectern in the browser"></a>
+<a href="https://lectern-wheat.vercel.app/"><img src="https://img.shields.io/badge/Open%20in%20the%20browser-lectern--blush.vercel.app-ffffff?style=for-the-badge&labelColor=ffffff&color=ffffff&logoColor=1c1c1c" alt="Open Lectern in the browser"></a>
 
 <sub>Unzip, copy the <code>Lectern</code> folder to a flash drive, double-click <code>Lectern.html</code>. The zip also has <code>HOW-TO-USE.txt</code>.</sub>
 
