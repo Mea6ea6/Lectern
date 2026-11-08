@@ -2,14 +2,14 @@
 The version number changes automatically, so installed copies refresh themselves."""
 import hashlib, os, json
 root = os.path.dirname(os.path.abspath(__file__))
-skip_dirs = {'Files', 'node_modules', 'docs'}
+skip_dirs = {'Files', 'node_modules', 'docs', 'downloads'}
 files = ['./', 'Lectern.html', 'manifest.webmanifest']
 h = hashlib.sha1()
 for d, dirs, names in os.walk(root):
     dirs[:] = sorted(x for x in dirs if x not in skip_dirs and not x.startswith('.'))
     for n in sorted(names):
         rel = os.path.relpath(os.path.join(d, n), root).replace(os.sep, '/')
-        if rel in ('sw.js', 'sw.template.js', 'make-sw.py', 'HOW-TO-USE.txt', 'vercel.json') or n.startswith('.') or n.endswith('.txt'):
+        if rel in ('sw.js', 'sw.template.js', 'make-sw.py', 'make-flash.py', 'README.md', 'vercel.json') or n.startswith('.') or n.endswith(('.txt', '.md')):
             continue
         if rel not in files:
             files.append(rel)

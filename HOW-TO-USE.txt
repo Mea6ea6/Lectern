@@ -1,58 +1,89 @@
-LECTERN (V.0.5) — offline viewer for presentations, PDFs, documents, spreadsheets, images and text
-================================================================================================
-================================================================================================
-HOW TO USE
-1. Put your files into the "Files" folder (or any folder on the drive).
-2. Open "Lectern.html" on any computer (double-click). It opens in the browser, no installation, no internet.
-3. Click "Choose folder" and pick the "Files" folder.
-   - Chrome / Edge: a normal folder picker. The folder is remembered; use the refresh button to rescan
-     after you copy new files to the drive.
-   - Firefox: the browser asks "Upload files to this site?" — confirm (this is the browser's own dialog and cannot be disabled; dragging the folder into the window skips it). Nothing is uploaded anywhere.
-   - You can also drag files or folders into the window.
-4. Click a file (or select it and press Enter) to open it. Space (or the "i" button) shows file details. "Fullscreen" fills the screen; the buttons hide themselves.
-================================================================================================
-CONTROLS (viewer)
-  Bottom bar    First / Previous / Next / Last, progress bar (click or drag to jump),
-                Overview (all slides/pages as a grid), More (menu)
-  More menu     Zoom, Fit (page / width), Rotate, Black screen, Keep screen on, Theme
-  Fullscreen    Tap the left / right edge to turn pages, swipe left / right, tap the middle to show the buttons
-  Keyboard      Right / Down / Space / Enter = next      Left / Up / Backspace = previous
-                Home / End = first / last                G = overview        F = fullscreen
-                B = black screen   W = white screen      R = rotate (Shift+R = left)
-                + / - / 0 = zoom                         Esc = close menu / overview / viewer
-================================================================================================
+LECTERN V.1.1 — offline viewer for the classroom
+================================================================================
+Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
+and archives straight from a flash drive. Nothing to install, no internet, no
+account. Files are only READ — they are never changed, copied or uploaded.
+
+THIS FOLDER
+  Lectern.html   the page you open (double-click it)
+  app/           the program and its libraries — do not delete or rename
+  Files/         put your files here (any other folder also works)
+Keep all three together.
+
+HOW TO START FROM A FLASH DRIVE
+  1. Copy the whole "Lectern" folder to the drive. Put your files into "Files".
+  2. On the classroom computer plug in the drive and double-click "Lectern.html".
+     It opens in the browser (Chrome, Edge, Firefox or Safari).
+  3. Press "Choose folder" and pick the "Files" folder (or drag the folder, or
+     single files, into the window).
+       Chrome / Edge   A normal folder picker. The folder is remembered: next time
+                       press "Reopen" (the browser asks once for permission).
+                       The round arrow rescans the folder after you add files.
+       Firefox         The browser asks "Upload files to this site?" — answer
+                       yes. This is only its standard wording: nothing is
+                       uploaded anywhere. Dragging the folder into the window
+                       skips the question.
+       Safari          Not tested by the author. If the folder button does not
+                       work, use "Add files" or drag files into the window.
+  4. Click a file (or select it and press Enter) to open it. Space (or the "i"
+     button on the card) shows details. Esc goes back.
+
 SUPPORTED FILES
-  PPTX, PPSX (no animations or transitions)   PDF   DOCX (read-only)   XLSX, XLS, CSV
-  PNG, JPG, GIF, WEBP, BMP, SVG, AVIF         TXT, MD, LOG (UTF-8 and Windows-1251)
+  Presentations   PPTX, PPSX, ODP            (no animations or transitions)
+  PDF             PDF
+  Documents       DOCX, ODT, RTF
+  Spreadsheets    XLSX, XLS, CSV, ODS
+  Images          PNG, JPG, GIF, WEBP, BMP, SVG, AVIF, HEIC (iPhone photos)
+  Video           MP4, M4V, WEBM, MOV, OGV
+  Audio           MP3, WAV, OGG, M4A, AAC, FLAC, OPUS
+  Books           EPUB
+  Text            TXT, MD, LOG (UTF-8 and Windows-1251)
+  Code and data   JSON, HTML (shown as text — web pages are never run)
+  Archives        ZIP (shows what is inside; nothing is unpacked)
   Old .ppt / .doc are not supported — re-save them as .pptx / .docx.
-================================================================================================
-FOLDER LAYOUT — keep it as is
-  Lectern.html     the page you open
-  app/            the program and its libraries (do not delete or rename)
-  Files/          your files
-================================================================================================
-LICENSES
-  PDF.js (Apache-2.0), docx-preview (Apache-2.0), pptx-preview (ISC), SheetJS fork @e965/xlsx (Apache-2.0),
-  JSZip (MIT), Inter font (SIL OFL 1.1 — license text in app/fonts/).
+  Video and sound play only if the browser knows the format (MP4 with H.264 and
+  WebM are fine in Chrome, Edge, Safari; some .mov files are not).
 
-V.0.4 CHANGES (earlier)
-  Only the Swiss look remains (Soft style removed). File details window redesigned like "About This Mac".
-  Key hints are drawn as keycaps with a soft shadow. Sort is a designed drop-down. The start card has a dashed
-  outline (the only outline in the app). Side arrows have no background. All menu controls share one size.
+IN THE VIEWER
+  Bottom bar      First / Previous / Next / Last, progress bar (click or drag),
+                  Draw, Overview (all pages as a grid), More (zoom, fit, rotate,
+                  black screen, keep screen on, theme)
+  Fullscreen      Tap the left / right edge to turn pages, swipe, tap the middle
+                  to show the buttons. The buttons hide themselves.
+  Video / audio   Only three buttons: back 5 seconds, play / pause, forward 5
+                  seconds. Keys: Space = play / pause, ← → = 5 seconds.
 
-V.0.5 CHANGES
-  - Glass slider (Appearance menu and the viewer's More menu): left = frosted glass, right = solid panels.
-    Backdrop, panels, bars, menus and dialogs follow it; the open document always sits on black.
-  - Installable web app (PWA): works offline once opened from a web address. Chrome/Edge show an "Install" button;
-    after installing, "Open with Lectern" works for PDF, PPTX, DOCX, XLSX, CSV, images and text files.
-  - Libraries (PDF, Office, Excel) load only when a file needs them: the start page opens much faster.
-  - Bars float over the page and the page scrolls under them (that is what the glass blurs).
+PEN AND MARKER (any page or slide)
+  Press "Draw" (or D). Choose Pen, Marker (see-through) or Eraser, and a colour.
+  Undo, Clear and "save as picture" are in the same bar. The file is not changed;
+  the drawing stays on the screen of that page until you go back to the list.
+  While drawing is on, a finger or the mouse draws instead of swiping — use the
+  arrows in the drawing bar (or the keys) to change page. Press Done (D / Esc)
+  to return to normal gestures.
 
-PUBLISHING THE WEB VERSION (Vercel)
-  1. Put this folder (Lectern.html, app/, icons/, manifest.webmanifest, sw.js, vercel.json, .vercelignore)
-     into a GitHub repository. The Files folder is skipped automatically (.vercelignore).
-  2. Vercel -> Add New Project -> import the repository. Framework: Other. No build command, output = root.
-  3. Open the address in Chrome or Edge -> "Install". Safari: Share -> Add to Dock. Firefox can't install web apps
-     on a computer, but the site still works offline after the first visit.
-  4. After you change any file, run   python3 make-sw.py   once, so installed copies refresh themselves.
-  The flash-drive version needs none of this: Lectern.html works as before.
+CLASS QUEUE (the files for one lesson, in order)
+  Press the "+" on a file card (or Q on the keyboard). The "Queue" button in the
+  top bar opens the list: move files up / down, remove, Start.
+  While a file of the queue is open, the arrows in the top bar (or [ and ]) jump
+  to the next / previous file. At the very end of a file a second "Next" moves on
+  to the next file, so a presentation clicker can run the whole lesson.
+  The list is remembered on this computer. When you open the folder again the
+  files are found by themselves.
+
+KEYBOARD
+  List     Arrows select    Enter open    Space details    / search    Q queue
+  Viewer   → ↓ Space Enter = next        ← ↑ Backspace = previous
+           Home / End = first / last     G = overview     F = fullscreen
+           D = draw (1 pen, 2 marker, 3 eraser, Ctrl+Z undo)
+           B = black screen   W = white screen   R = rotate   + − 0 = zoom
+           [ ] = previous / next file of the queue          Esc = back
+
+BROWSERS
+  Chrome and Edge (recommended): remember the folder, can install Lectern as an
+  app from the web address. Firefox works too, without remembering the folder.
+  Use a recent version of the browser. Safari has not been tested.
+
+LICENSES OF THE PARTS INSIDE
+  PDF.js (Apache-2.0), docx-preview (Apache-2.0), pptx-preview (ISC), SheetJS
+  (Apache-2.0), JSZip (MIT), heic2any (MIT; contains libheif, LGPL-3.0),
+  Inter font (SIL OFL 1.1). Details: README on GitHub.

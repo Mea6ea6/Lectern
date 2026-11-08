@@ -18,26 +18,50 @@
    1. CONSTANTS AND STATE
    --------------------------------------------------------------------- */
 
-// File extension -> what kind of viewer opens it
+// File extension -> the kind of file (decides the badge colour, the filter and the thumbnail)
 const EXT_TO_KIND = {
-  pptx: 'pptx', ppsx: 'pptx',
+  pptx: 'pptx', ppsx: 'pptx', odp: 'pptx',
   pdf: 'pdf',
-  docx: 'docx',
-  xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xlsx', csv: 'xlsx',
+  docx: 'docx', odt: 'docx', rtf: 'docx',
+  xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xlsx', ods: 'xlsx', csv: 'xlsx',
   png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image', avif: 'image',
+  heic: 'image', heif: 'image',
   txt: 'text', md: 'text', log: 'text',
+  mp4: 'video', m4v: 'video', webm: 'video', mov: 'video', ogv: 'video',
+  mp3: 'audio', wav: 'audio', ogg: 'audio', oga: 'audio', m4a: 'audio', aac: 'audio', flac: 'audio', opus: 'audio',
+  zip: 'archive',
+  json: 'code', html: 'code', htm: 'code',
+  epub: 'book',
 };
+
+// Extension -> which viewer opens it (when it is not simply the same as the kind)
+const EXT_TO_VIEWER = {
+  odp: 'odp', odt: 'odt', rtf: 'rtf', ods: 'xlsx',
+  heic: 'heic', heif: 'heic',
+  mp4: 'media', m4v: 'media', webm: 'media', mov: 'media', ogv: 'media',
+  mp3: 'media', wav: 'media', ogg: 'media', oga: 'media', m4a: 'media', aac: 'media', flac: 'media', opus: 'media',
+  zip: 'zip', json: 'json', html: 'text', htm: 'text', epub: 'epub',
+};
+
+// These viewers live in app/modules/formats.js, which is loaded the first time one of them is needed
+const FORMAT_VIEWERS = new Set(['odp', 'odt', 'rtf', 'heic', 'media', 'zip', 'json', 'epub']);
+function viewerKey(entry) { return EXT_TO_VIEWER[entry.ext] || entry.kind; }
 
 // Old Office formats can't be opened — we only count them to tell the user
 const LEGACY_EXT = ['ppt', 'pps', 'doc'];
 
 const KINDS = {
-  pptx:  { order: 1, noun: ['slide', 'slides'],  title: 'Presentations' },
-  pdf:   { order: 2, noun: ['page', 'pages'],    title: 'PDF' },
-  docx:  { order: 3, noun: null,                 title: 'Documents' },
-  xlsx:  { order: 4, noun: ['sheet', 'sheets'],  title: 'Spreadsheets' },
-  image: { order: 5, noun: null,                 title: 'Images' },
-  text:  { order: 6, noun: null,                 title: 'Text' },
+  pptx:    { order: 1,  noun: ['slide', 'slides'],  title: 'Presentations' },
+  pdf:     { order: 2,  noun: ['page', 'pages'],    title: 'PDF' },
+  docx:    { order: 3,  noun: null,                 title: 'Documents' },
+  xlsx:    { order: 4,  noun: ['sheet', 'sheets'],  title: 'Spreadsheets' },
+  image:   { order: 5,  noun: null,                 title: 'Images' },
+  video:   { order: 6,  noun: null,                 title: 'Video' },
+  audio:   { order: 7,  noun: null,                 title: 'Audio' },
+  book:    { order: 8,  noun: null,                 title: 'Books' },
+  text:    { order: 9,  noun: null,                 title: 'Text' },
+  code:    { order: 10, noun: null,                 title: 'Code & data' },
+  archive: { order: 11, noun: null,                 title: 'Archives' },
 };
 
 // Everything the page "remembers" about the file list
@@ -66,6 +90,10 @@ const LIB_FILES = {
   docx: ['jszip.min.js', 'docx-preview.min.js'],
   pptx: ['jszip.min.js', 'pptx-preview.umd.js'],
   xlsx: ['xlsx.full.min.js'],
+  heic: ['heic2any.min.js'],
+  // Lectern's own code that is only needed sometimes (a name with a "/" is looked up inside app/, not app/lib/)
+  formats: ['jszip.min.js', 'modules/formats.js'],
+  ink:     ['modules/ink.js'],
 };
 const scriptLoads = {};
 const libLoads = {};
@@ -73,7 +101,7 @@ function loadScript(file) {
   if (!scriptLoads[file]) {
     scriptLoads[file] = new Promise((ok, fail) => {
       const el = document.createElement('script');
-      el.src = 'app/lib/' + file;
+      el.src = (file.includes('/') ? 'app/' : 'app/lib/') + file;
       el.onload = ok;
       el.onerror = () => { delete scriptLoads[file]; fail(new Error('Could not load ' + file)); };
       document.head.appendChild(el);
@@ -262,6 +290,7 @@ function makeEntry(file, ext) {
     ext,
     tag: ext.toUpperCase(),
     kind: EXT_TO_KIND[ext],
+    viewer: EXT_TO_VIEWER[ext] || EXT_TO_KIND[ext],   // which viewer class opens it
     size: file.size,
     modified: file.lastModified,
     key: path + '|' + file.size + '|' + file.lastModified,   // same file twice? we notice
@@ -507,6 +536,11 @@ function createCard(entry) {
   const thumb = h('span', 'thumb');
   thumb.appendChild(h('span', 'tag tag-' + entry.kind, entry.tag));     // format badge, top-right
 
+  const qb = h('button', 'card-queue');                                // "+" = add to the class queue (top-left)
+  qb.type = 'button';
+  qb.onclick = (e) => { e.stopPropagation(); queueToggle(entry); };
+  thumb.appendChild(qb);
+
   const info = h('button', 'card-info');
   info.type = 'button';
   info.title = 'Details (Space)';
@@ -523,11 +557,13 @@ function createCard(entry) {
   card.onpointerenter = (e) => { if (e.pointerType === 'mouse') select(entry.id, false); };
 
   entry.card = card;
+  markQueue(entry);
   if (entry.thumbNode) putThumb(entry);
   return card;
 }
 
 function render() {
+  relinkQueue();
   const hasFiles = state.files.length > 0;
   $('empty').hidden = hasFiles;
   $('toolbar').hidden = !hasFiles;
@@ -559,6 +595,8 @@ function renderActions() {
     if (label) label.textContent = state.stored ? 'Reopen “' + state.stored.name + '”' : 'Reopen last folder';
   });
   $('btnRefresh').hidden = !state.handle;
+  $('btnQueue').hidden = !state.files.length && !Q.items.length;
+  $('qCount').textContent = Q.items.length ? String(Q.items.length) : '';
 }
 
 function renderStatus() {
@@ -666,7 +704,7 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint'].forEach((id) => {
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     let logical = native.get.call(el), timer = 0;
@@ -759,6 +797,11 @@ const KIND_NAMES = {
   png: 'PNG image', jpg: 'JPEG image', jpeg: 'JPEG image', gif: 'GIF image', webp: 'WebP image',
   bmp: 'BMP image', svg: 'SVG image', avif: 'AVIF image',
   txt: 'Plain text', md: 'Markdown text', log: 'Log file',
+  odp: 'OpenDocument presentation', odt: 'OpenDocument text', ods: 'OpenDocument spreadsheet', rtf: 'Rich Text document',
+  heic: 'HEIC photo (iPhone)', heif: 'HEIF image',
+  mp4: 'MP4 video', m4v: 'MP4 video', webm: 'WebM video', mov: 'QuickTime video', ogv: 'Ogg video',
+  mp3: 'MP3 audio', wav: 'WAV audio', ogg: 'Ogg audio', oga: 'Ogg audio', m4a: 'M4A audio', aac: 'AAC audio', flac: 'FLAC audio', opus: 'Opus audio',
+  zip: 'ZIP archive', json: 'JSON data', html: 'HTML page (shown as source)', htm: 'HTML page (shown as source)', epub: 'EPUB book',
 };
 
 // A picture for the dialog: canvases can't be cloned with their pixels, so convert them
@@ -841,7 +884,11 @@ async function loadDetails(entry) {
   const dateText = (v) => { const d = new Date(v); return isNaN(d) ? '' : fullDate(d.getTime()); };
 
   try {
-    if (entry.kind === 'pdf') {
+    if (FORMAT_VIEWERS.has(entry.viewer)) {
+      await lib('formats');
+      await VIEWER_CLASSES[entry.viewer].details(entry, add, dateText);
+
+    } else if (entry.kind === 'pdf') {
       await lib('pdf');
       const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await entry.file.arrayBuffer()) }).promise;
       let info = {};
@@ -897,7 +944,7 @@ async function loadDetails(entry) {
         if (img.naturalWidth) add('Dimensions', img.naturalWidth + ' × ' + img.naturalHeight + ' px');
       } finally { URL.revokeObjectURL(url); }
 
-    } else if (entry.kind === 'text') {
+    } else if (entry.kind === 'text' || entry.kind === 'code') {
       if (entry.size <= 2 * 1024 * 1024) {
         const buf = await entry.file.arrayBuffer();
         let encoding = 'UTF-8';
@@ -915,6 +962,190 @@ async function loadDetails(entry) {
   if (!rows.length) rows.push(['More', 'No extra details found in this file']);
   return rows;
 }
+
+
+/* ---------------------------------------------------------------------
+   5c. CLASS QUEUE
+   The files for one lesson, in the order they will be shown. "+" on a card (or Q) adds a file;
+   the Queue button opens the list to put it in order and start. While a file of the queue is open,
+   [ ] (or the two small arrows in the top bar) jump between the files, and a second "Next" at the
+   very end of a file moves on to the next one — handy with a presentation clicker.
+   The list is remembered between visits (only names and sizes — the files themselves stay where they are);
+   when the folder is opened again the entries find their files by themselves.
+   --------------------------------------------------------------------- */
+
+const Q = { items: [] };      // { path, name, size, modified, ext, entry }   (entry = the loaded file, or null)
+
+(function loadQueue() {
+  try {
+    const list = JSON.parse(loadPref('fv-queue', '[]'));
+    if (Array.isArray(list)) {
+      Q.items = list.filter((i) => i && i.name).map((i) => ({
+        path: String(i.path || i.name), name: String(i.name), size: Number(i.size) || 0,
+        modified: Number(i.modified) || 0, ext: getExt(String(i.name)), entry: null,
+      }));
+    }
+  } catch (e) { /* a damaged list is simply forgotten */ }
+})();
+
+function saveQueue() {
+  savePref('fv-queue', JSON.stringify(Q.items.map(({ path, name, size, modified }) => ({ path, name, size, modified }))));
+}
+
+// Connects every remembered item with the loaded file that is the same one (same place and size, or same name and size)
+function relinkQueue() {
+  if (!Q.items.length) return;
+  const taken = new Set(Q.items.map((it) => it.entry).filter((e) => e && state.files.includes(e)));
+  for (const it of Q.items) {
+    if (it.entry && state.files.includes(it.entry)) continue;
+    const free = (e) => !taken.has(e);
+    it.entry = state.files.find((e) => free(e) && e.path === it.path && e.size === it.size)
+            || state.files.find((e) => free(e) && e.name === it.name && e.size === it.size)
+            || state.files.find((e) => free(e) && e.path === it.path)
+            || null;
+    if (it.entry) taken.add(it.entry);
+  }
+}
+
+function queueIndexOf(entry) { return Q.items.findIndex((it) => it.entry === entry); }
+
+function queueToggle(entry) {
+  const i = queueIndexOf(entry);
+  if (i >= 0) Q.items.splice(i, 1);
+  else Q.items.push({ path: entry.path, name: entry.name, size: entry.size, modified: entry.modified, ext: entry.ext, entry });
+  queueChanged();
+}
+function queueChanged() {
+  saveQueue();
+  document.querySelectorAll('#grid .card').forEach((card) => {
+    const entry = state.files.find((e) => e.id === Number(card.dataset.id));
+    if (entry) markQueue(entry);
+  });
+  $('btnQueue').hidden = !state.files.length && !Q.items.length;
+  $('qCount').textContent = Q.items.length ? String(Q.items.length) : '';
+  if (!M.el.hidden && M.body.classList.contains('queue-dialog')) renderQueueDialog();
+  updateQueueNav();
+}
+
+// The little button on a card: "+" when it is not in the queue, its place number when it is
+function markQueue(entry) {
+  if (!entry.card) return;
+  const btn = entry.card.querySelector('.card-queue');
+  const i = queueIndexOf(entry);
+  entry.card.classList.toggle('queued', i >= 0);
+  btn.replaceChildren(i >= 0 ? document.createTextNode(String(i + 1)) : icon('i-plus'));
+  btn.title = i >= 0 ? 'In the class queue (place ' + (i + 1) + ') — click to remove (Q)' : 'Add to the class queue (Q)';
+  btn.setAttribute('aria-label', btn.title);
+}
+
+/* ----- Moving between the files of the queue while viewing ----- */
+function queueNeighbor(dir) {
+  const i = V.entry ? queueIndexOf(V.entry) : -1;
+  if (i < 0) return null;
+  for (let j = i + dir; j >= 0 && j < Q.items.length; j += dir) if (Q.items[j].entry) return Q.items[j];
+  return null;
+}
+function queueStep(dir) {
+  const n = queueNeighbor(dir);
+  if (n) openViewer(n.entry);
+  else if (V.entry && queueIndexOf(V.entry) >= 0) showToast(dir > 0 ? 'This is the last file of the queue' : 'This is the first file of the queue');
+}
+// Pressed Next at the end of a file (or Previous at its start): the first press only announces the move
+function queueEdge(where) {
+  const n = queueNeighbor(where === 'next' ? 1 : -1);
+  if (!n) return false;
+  const a = V.armed;
+  if (a && a.where === where && a.entry === V.entry && Date.now() < a.until) { V.armed = null; openViewer(n.entry); return true; }
+  V.armed = { where, entry: V.entry, until: Date.now() + 4000 };
+  showToast((where === 'next' ? 'Next file: ' : 'Previous file: ') + n.name + ' — press again');
+  return true;
+}
+function updateQueueNav() {
+  const i = V.entry ? queueIndexOf(V.entry) : -1;
+  const show = i >= 0 && Q.items.length > 1;
+  $('qNav').hidden = !show;
+  if (!show) return;
+  $('qPos').textContent = (i + 1) + ' / ' + Q.items.length;
+  $('qPrev').disabled = !queueNeighbor(-1);
+  $('qNext').disabled = !queueNeighbor(1);
+}
+
+/* ----- The queue window ----- */
+function queueStart() {
+  const first = Q.items.find((it) => it.entry);
+  if (!first) return;
+  closeModal();
+  openViewer(first.entry);
+}
+
+function openQueue() {
+  if (M.el.hidden) renderQueueDialog(true); else renderQueueDialog();
+}
+
+function renderQueueDialog(first) {
+  const box = h('div');
+  box.appendChild(h('h2', 'modal-title', 'Class queue'));
+  const loaded = Q.items.filter((it) => it.entry).length;
+
+  if (!Q.items.length) {
+    box.appendChild(h('p', 'modal-text', 'Nothing here yet. Press the + on a file card (or Q on the keyboard) to add the files for this lesson. Then put them in order here.'));
+  } else {
+    box.appendChild(h('p', 'modal-text', 'Start opens the first file. While a file is open, the small arrows in the top bar (or [ and ]) jump to the next and previous file. The list is remembered on this computer.'));
+    const list = h('div', 'q-list');
+    Q.items.forEach((it, i) => {
+      const row = h('div', 'q-row' + (it.entry ? '' : ' missing'));
+      const info = h('span', 'q-name');
+      info.append(h('b', '', it.name), h('small', '', it.entry ? whereText(it.entry) : 'Not loaded — choose the folder again'));
+      const btn = (iconId, label, fn, disabled) => {
+        const b = h('button', 'vbtn vbtn-icon q-btn');
+        b.type = 'button'; b.title = label; b.setAttribute('aria-label', label);
+        b.appendChild(icon(iconId));
+        b.disabled = !!disabled;
+        b.onclick = () => { fn(); b.blur(); };
+        return b;
+      };
+      const move = (d) => () => { const t = Q.items[i + d]; Q.items[i + d] = it; Q.items[i] = t; queueChanged(); };
+      row.append(
+        h('span', 'q-num', String(i + 1)),
+        h('span', 'tag tag-' + (EXT_TO_KIND[it.ext] || 'text'), (it.ext || '?').toUpperCase()),
+        info,
+        btn('i-up', 'Move up', move(-1), i === 0),
+        btn('i-down', 'Move down', move(1), i === Q.items.length - 1),
+        btn('i-x', 'Remove from the queue', () => { Q.items.splice(i, 1); queueChanged(); }));
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+  }
+
+  const actions = h('div', 'modal-actions');
+  if (Q.items.length) {
+    const clear = h('button', 'btn q-clear', 'Remove all');
+    clear.type = 'button';
+    clear.onclick = () => { Q.items = []; queueChanged(); };
+    actions.appendChild(clear);
+  }
+  const close = h('button', 'btn', 'Close');
+  close.type = 'button';
+  close.onclick = closeModal;
+  const start = h('button', 'btn btn-primary', 'Start');
+  start.type = 'button';
+  start.disabled = !loaded;
+  start.onclick = queueStart;
+  actions.append(close, start);
+  box.appendChild(actions);
+
+  if (first) {
+    openModal(box, { onEnter: queueStart, cls: 'queue-dialog' });
+  } else {
+    const old = M.body.querySelector('.q-list');
+    const top = old ? old.scrollTop : 0;
+    M.body.replaceChildren(box);
+    const now = M.body.querySelector('.q-list');
+    if (now) now.scrollTop = top;
+    M.onEnter = queueStart;
+  }
+}
+$('btnQueue').onclick = openQueue;
 
 
 /* ---------------------------------------------------------------------
@@ -942,11 +1173,15 @@ async function runThumbQueue() {
   while (thumbQueue.length && V.el.hidden) {
     const entry = thumbQueue.shift();
     try {
-      switch (entry.kind) {
+      if (FORMAT_VIEWERS.has(entry.viewer)) {          // the newer formats make their own thumbnails
+        await lib('formats');
+        await VIEWER_CLASSES[entry.viewer].thumb(entry);
+      } else switch (entry.kind) {
         case 'pdf':   await thumbPdf(entry); break;
         case 'xlsx':  await thumbXlsx(entry); break;
         case 'image': thumbImage(entry); break;
         case 'text':  await thumbText(entry); break;
+        case 'code':  await thumbText(entry); break;
         default:      await thumbOffice(entry);
       }
     } catch (err) {
@@ -960,7 +1195,7 @@ async function runThumbQueue() {
 function putThumb(entry) {
   if (!entry.card || !entry.thumbNode) return;
   const thumb = entry.card.querySelector('.thumb');
-  thumb.replaceChildren(entry.thumbNode, thumb.querySelector('.tag'));   // picture + the badge on top
+  thumb.replaceChildren(entry.thumbNode, ...thumb.querySelectorAll('.tag, .card-queue'));   // picture + the buttons on top
 }
 
 // PDF: draw page 1 into a small canvas
@@ -1067,6 +1302,7 @@ async function thumbText(entry) {
      refit()         re-fit after a size / zoom / rotation change
      renderThumb()   draw one overview thumbnail
      destroy()       clean up
+     inkKey()        which page the pen drawing belongs to; inkAnchor() the element it is measured against
    Shared view settings (zoom, fit, rotation) arrive as `this.view`.
    --------------------------------------------------------------------- */
 
@@ -1080,7 +1316,13 @@ class BaseViewer {
     this.canRotate = false;
     this.hasOverview = false;
     this.defaultFit = 'page';
+    this.canDraw = true;        // pen / marker allowed
+    this.isMedia = false;       // video / audio have their own tiny controls
   }
+
+  // Pen drawing: which page it belongs to, and the element it is anchored to (so it follows zoom and scroll)
+  inkKey() { return this.index; }
+  inkAnchor() { return this.content; }
 
   // Space available for the page (the content has padding around it; in fullscreen it has none)
   free() {
@@ -1126,6 +1368,7 @@ class PdfViewer extends BaseViewer {
     this.doc = await pdfjsLib.getDocument({ data }).promise;
     this.total = this.doc.numPages;
     this.page = 1;
+    this.shown = 0;            // the page that is really on the screen (a new one takes a moment to draw)
     this.drawId = 0;
     const first = await this.doc.getPage(1);
     const v = first.getViewport({ scale: 1 });
@@ -1136,6 +1379,8 @@ class PdfViewer extends BaseViewer {
   get count() { return this.total; }
   get index() { return this.page - 1; }
   get thumbRatio() { return this.ratio || 1.4; }
+  inkKey() { return this.shown; }
+  inkAnchor() { return this.content.firstElementChild; }
   label() { return 'Page ' + this.page + ' of ' + this.total; }
 
   goTo(i) {
@@ -1177,6 +1422,7 @@ class PdfViewer extends BaseViewer {
     if (myId !== this.drawId) return;
 
     this.content.replaceChildren(canvas);          // swap the whole picture at once — no flicker
+    this.shown = this.page - 1;
     if (!keepScroll) this.stage.scrollTo(0, 0);
     this.onChange();
   }
@@ -1219,6 +1465,8 @@ class BoxViewer extends BaseViewer {
     this.holder.appendChild(this.box);
     this.content.replaceChildren(this.holder);
   }
+
+  inkAnchor() { return this.holder; }
 
   refit() {
     if (!this.holder) return;
@@ -1338,6 +1586,7 @@ class ImageViewer extends BoxViewer {
 
 /* ----- Shared base for scrolling content (DOCX, text) ----- */
 class ScrollViewer extends BaseViewer {
+  inkKey() { return 'doc'; }
   scrollRatio() {
     const max = this.stage.scrollHeight - this.stage.clientHeight;
     return max > 0 ? this.stage.scrollTop / max : 0;
@@ -1446,13 +1695,17 @@ class TextViewer extends ScrollViewer {
     const buffer = await file.slice(0, LIMIT).arrayBuffer();
     this.host = h('div', 'text-host');
     const page = h('div', 'text-page');
-    page.textContent = decodeText(buffer, file.size > LIMIT);
+    const text = decodeText(buffer, file.size > LIMIT);
+    const shown = this.format(text, file.size > LIMIT);       // subclasses may re-format the text (JSON)
+    page.textContent = shown.text;
     this.host.appendChild(page);
-    if (file.size > LIMIT) this.host.appendChild(h('div', 'text-note', 'Only the first 2 MB are shown.'));
+    if (shown.note) this.host.appendChild(h('div', 'text-note', shown.note));
+    else if (file.size > LIMIT) this.host.appendChild(h('div', 'text-note', 'Only the first 2 MB are shown.'));
     this.content.replaceChildren(this.host);
     this.listenScroll();
     this.refit();
   }
+  format(text) { return { text, note: '' }; }
   refit() {
     if (!this.host) return;
     const before = this.scrollRatio();
@@ -1477,6 +1730,7 @@ class XlsxViewer extends BaseViewer {
 
   get count() { return this.names.length; }
   get index() { return this.cur; }
+  inkAnchor() { return this.host; }
   caption(i) { return this.names[i]; }
   label() { return 'Sheet ' + (this.cur + 1) + ' of ' + this.names.length + ' · ' + this.names[this.cur]; }
   goTo(i) {
@@ -1562,6 +1816,7 @@ class XlsxViewer extends BaseViewer {
   }
 }
 
+// The newer formats (odp, odt, rtf, heic, media, zip, json, epub) add themselves from app/modules/formats.js
 const VIEWER_CLASSES = { pdf: PdfViewer, pptx: PptxViewer, docx: DocxViewer, xlsx: XlsxViewer, image: ImageViewer, text: TextViewer };
 
 
@@ -1585,6 +1840,7 @@ const V = {
   awake: loadPref('fv-awake', '1') === '1',
   wakeLock: null,
   ovObserver: null,
+  armed: null,          // "press Next again to open the next file of the queue"
 };
 
 async function openViewer(entry) {
@@ -1592,6 +1848,9 @@ async function openViewer(entry) {
   closeDriver();
   closeMenu();
   closeOverview();
+  if (window.Pen) Pen.reset();                 // drawings belong to one opening of one file
+  V.armed = null;
+  V.el.classList.remove('is-media');
 
   V.entry = entry;
   V.view = { zoom: 1, fit: 'page', rot: 0 };
@@ -1605,10 +1864,14 @@ async function openViewer(entry) {
   updateWakeLock();
 
   try {
-    const driver = new VIEWER_CLASSES[entry.kind](V.content, V.stage, V.view);
+    if (FORMAT_VIEWERS.has(entry.viewer)) await lib('formats');
+    if (token !== V.openToken) return;
+    const driver = new VIEWER_CLASSES[entry.viewer](V.content, V.stage, V.view);
+    driver.entry = entry;
     V.view.fit = driver.defaultFit;
     driver.onChange = updateBar;
     V.driver = driver;
+    V.el.classList.toggle('is-media', driver.isMedia);
     await driver.open(entry.file);
     if (token !== V.openToken) return;
     showMessage('');
@@ -1617,11 +1880,13 @@ async function openViewer(entry) {
     if (token !== V.openToken) return;
     console.error(err);
     const locked = err && err.name === 'PasswordException';
+    const friendly = err && err.friendly;            // formats.js explains its own problems in plain words
     showMessage(
-      locked ? 'This file is password-protected' : 'Could not open this file',
-      locked ? 'Protected files can’t be opened here.' :
+      friendly ? friendly[0] : locked ? 'This file is password-protected' : 'Could not open this file',
+      friendly ? friendly[1] : locked ? 'Protected files can’t be opened here.' :
         'The file may be damaged or saved in an unusual format. Try re-saving it and opening it again.',
       false);
+    updateBar();
   }
 }
 
@@ -1632,6 +1897,8 @@ function closeDriver() {
 
 function closeViewer() {
   V.openToken++;
+  if (window.Pen) Pen.reset();
+  V.armed = null;
   hideCover();
   closeMenu();
   closeOverview();
@@ -1639,6 +1906,7 @@ function closeViewer() {
   setImmersive(false);
   closeDriver();
   V.entry = null;
+  V.el.classList.remove('is-media');
   V.el.hidden = true;
   document.body.classList.remove('viewing');
   updateWakeLock();
@@ -1667,9 +1935,23 @@ function updateBar() {
 
   const atStart = !ready || d.atStart();
   const atEnd = !ready || d.atEnd();
-  $('vFirst').disabled = $('vPrev').disabled = $('vSidePrev').disabled = atStart;
-  $('vNext').disabled = $('vLast').disabled = $('vSideNext').disabled = atEnd;
+  // In the class queue, "next" at the end of a file moves on to the next file, so the button stays usable
+  const prevFile = ready && queueNeighbor(-1), nextFile = ready && queueNeighbor(1);
+  $('vFirst').disabled = atStart;
+  $('vPrev').disabled = $('vSidePrev').disabled = atStart && !prevFile;
+  $('vLast').disabled = atEnd;
+  $('vNext').disabled = $('vSideNext').disabled = atEnd && !nextFile;
   $('vOverview').disabled = !ready || !d.hasOverview || d.count < 2;
+  $('vInk').disabled = !ready || !d.canDraw;
+  $('vInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
+
+  // Video / audio: play button, big play button
+  const media = ready && d.isMedia;
+  $('mPlayIcon').setAttribute('href', media && d.playing ? '#i-pause' : '#i-play');
+  $('mPlay').setAttribute('aria-label', media && d.playing ? 'Pause' : 'Play');
+  $('mediaBig').hidden = !media || d.playing || !d.hasPicture;      // sound only: the button in the bar is enough
+  updateQueueNav();
+  if (window.Pen) Pen.sync();
 
   // “More” menu state
   $('mZoomVal').textContent = Math.round(V.view.zoom * 100) + '%';
@@ -1682,7 +1964,16 @@ function updateBar() {
 }
 
 function navigate(where) {
-  if (!V.driver) return;
+  const d = V.driver;
+  if (!d) return;
+  if (d.isMedia) {                                    // video / audio: Next / Previous = 5 seconds
+    if (where === 'next') { d.skip(5); showToast('+5 s'); }
+    else if (where === 'prev') { d.skip(-5); showToast('−5 s'); }
+    else if (where === 'first') d.skip(-1e9);
+    return;
+  }
+  // Class queue: at the very end (or start) of a file a second press moves to the next (previous) file
+  if (((where === 'next' && d.atEnd()) || (where === 'prev' && d.atStart())) && queueEdge(where)) return;
   V.driver.go(where);
   if (V.immersive && V.el.classList.contains('ui-hidden')) {
     setTimeout(() => showToast(V.driver && V.driver.label()), 60);   // bars are hidden — show where we are
@@ -1858,6 +2149,20 @@ $('vPrev').onclick = $('vSidePrev').onclick = () => navigate('prev');
 $('vNext').onclick = $('vSideNext').onclick = () => navigate('next');
 $('vLast').onclick = () => navigate('last');
 $('vOverview').onclick = () => (V.overviewOpen ? closeOverview() : openOverview());
+$('qPrev').onclick = () => queueStep(-1);
+$('qNext').onclick = () => queueStep(1);
+$('mPlay').onclick = $('mediaBig').onclick = () => { if (V.driver && V.driver.isMedia) V.driver.toggle(); };
+$('mBack').onclick = () => navigate('prev');
+$('mFwd').onclick = () => navigate('next');
+
+/* ----- Pen and marker (the code lives in app/modules/ink.js and loads on first use) ----- */
+async function toggleInk() {
+  if (window.Pen) { Pen.toggle(); return; }
+  if (!V.driver || !V.driver.canDraw) return;
+  try { await lib('ink'); Pen.toggle(); }
+  catch (err) { console.warn(err); showToast('Could not load the pen tools'); }
+}
+$('vInk').onclick = toggleInk;
 
 $('mZoomIn').onclick = () => setZoom(V.view.zoom * 1.25);
 $('mZoomOut').onclick = () => setZoom(V.view.zoom / 1.25);
@@ -1910,13 +2215,20 @@ V.stage.addEventListener('pointerup', (e) => {
   const quick = Date.now() - pointerStart.time < 600;
   pointerStart = null;
   const touch = e.pointerType !== 'mouse';
-  const pageBased = V.driver && !(V.driver instanceof ScrollViewer);
+  const pageBased = V.driver && !(V.driver instanceof ScrollViewer) && !V.driver.isMedia;
 
   if (touch && pageBased && V.view.zoom <= 1 && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
     navigate(dx < 0 ? 'next' : 'prev');
     return;
   }
   if (!quick || Math.abs(dx) > 10 || Math.abs(dy) > 10) return;
+  if (V.driver && V.driver.isMedia) {       // video / audio: edges = 5 seconds, the middle = play / pause
+    const mx = (e.clientX - V.stage.getBoundingClientRect().left) / V.stage.getBoundingClientRect().width;
+    if (mx < 0.22 && (touch || V.immersive)) navigate('prev');
+    else if (mx > 0.78 && (touch || V.immersive)) navigate('next');
+    else { V.driver.toggle(); showUi(); }
+    return;
+  }
   if (!V.immersive && !touch) return;      // with a mouse in a normal window it's just a click on the content
   const rect = V.stage.getBoundingClientRect();
   const x = (e.clientX - rect.left) / rect.width;
@@ -1932,7 +2244,7 @@ const barObserver = new ResizeObserver(() => {
   V.el.style.setProperty('--bt', top.offsetHeight + 'px');
   V.el.style.setProperty('--bb', bottom.offsetHeight + 'px');
   clearTimeout(barTimer);
-  barTimer = setTimeout(() => { if (V.driver && !V.el.hidden) V.driver.refit(); }, 120);
+  barTimer = setTimeout(() => { if (V.driver && !V.el.hidden) { V.driver.refit(); if (window.Pen) Pen.redraw(); } }, 120);
 });
 V.el.querySelectorAll('.vbar').forEach((b) => barObserver.observe(b));
 
@@ -1943,17 +2255,21 @@ new ResizeObserver(() => {
   if (size === lastSize) return;
   lastSize = size;
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { if (V.driver && !V.el.hidden) V.driver.refit(); }, 120);
+  resizeTimer = setTimeout(() => { if (V.driver && !V.el.hidden) { V.driver.refit(); if (window.Pen) Pen.redraw(); } }, 120);
 }).observe(V.stage);
 
 /* ----- Keyboard (letters use e.code, so they work on any keyboard layout) ----- */
 document.addEventListener('keydown', (e) => {
+  // Ctrl/Cmd+Z undoes the last pen stroke
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.altKey && !V.el.hidden && window.Pen && Pen.on) {
+    e.preventDefault(); Pen.undo(); return;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
   /* a dialog is open */
   if (!M.el.hidden) {
     if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
-    else if (e.key === 'Enter' && M.onEnter) { e.preventDefault(); M.onEnter(); }
+    else if (e.key === 'Enter' && M.onEnter && !(e.target.closest && e.target.closest('.q-btn'))) { e.preventDefault(); M.onEnter(); }
     else if (e.key === ' ' && M.spaceCloses) { e.preventDefault(); closeModal(); }
     return;
   }
@@ -1967,11 +2283,35 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (V.menuOpen) return act(closeMenu);
       if (V.overviewOpen) return act(closeOverview);
+      if (window.Pen && Pen.on) return act(() => Pen.toggle());
       // In real fullscreen the browser handles Esc itself; the fake one we handle
       return act(() => (V.immersive ? setImmersive(false) : closeViewer()));
     }
     if (e.code === 'KeyG') return act(() => (V.overviewOpen ? closeOverview() : openOverview()));
     if (V.overviewOpen) return;                               // overview: only click, Esc or G
+
+    // Class queue: [ and ] (or Shift + arrows) move between the files of the queue
+    if (e.code === 'BracketLeft' || (e.shiftKey && e.key === 'ArrowLeft'))  return act(() => queueStep(-1));
+    if (e.code === 'BracketRight' || (e.shiftKey && e.key === 'ArrowRight')) return act(() => queueStep(1));
+
+    // Video / audio: Space plays or pauses, the arrows jump 5 seconds, nothing else
+    if (V.driver && V.driver.isMedia) {
+      switch (e.key) {
+        case ' ': case 'Enter':   return act(() => { V.driver.toggle(); showUi(); });
+        case 'ArrowRight': case 'PageDown': return act(() => navigate('next'));
+        case 'ArrowLeft':  case 'PageUp':   return act(() => navigate('prev'));
+        case 'Home': return act(() => navigate('first'));
+      }
+      if (e.code === 'KeyF') return act(toggleFullscreen);
+      return;
+    }
+
+    if (e.code === 'KeyD') return act(toggleInk);
+    if (window.Pen && Pen.on) {                               // 1 / 2 / 3 choose pen, marker, eraser
+      if (e.key === '1') return act(() => Pen.setTool('pen'));
+      if (e.key === '2') return act(() => Pen.setTool('marker'));
+      if (e.key === '3') return act(() => Pen.setTool('eraser'));
+    }
 
     const pageBased = V.driver && !(V.driver instanceof ScrollViewer);
     switch (e.key) {
@@ -2020,6 +2360,10 @@ document.addEventListener('keydown', (e) => {
       return;
     }
     case '/': e.preventDefault(); $('search').focus(); return;
+  }
+  if (e.code === 'KeyQ') {                       // Q = add / remove the selected file in the class queue
+    const entry = selectedEntry();
+    if (entry) { e.preventDefault(); queueToggle(entry); }
   }
 });
 
