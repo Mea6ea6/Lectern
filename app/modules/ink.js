@@ -22,11 +22,17 @@ const Pen = (function () {
     pen:    { width: 0.0035, min: 2.5, alpha: 1,    cap: 'round', color: '#e5322d' },
     marker: { width: 0.022,  min: 16,  alpha: 0.38, cap: 'butt',  color: '#f5b400' },
   };
-  const ERASER_PX = 20;
+  // three thicknesses per tool: [thin, medium, thick]
+  const SIZES = {
+    pen:    [{ width: 0.0020, min: 1.6 }, { width: 0.0035, min: 2.5 }, { width: 0.0070, min: 5 }],
+    marker: [{ width: 0.012,  min: 9 },   { width: 0.022,  min: 16 },  { width: 0.040,  min: 30 }],
+    eraser: [12, 20, 36],
+  };
+  const level = { pen: 1, marker: 1, eraser: 1 };
 
   const self = {
     on: false, tool: 'pen',
-    pages: new Map(),          // key -> { strokes: [], undo: [] }
+    pages: new Map(),          // key -> { strokes: [], undo: [], redo: [] }
   };
   let drawing = null;          // the stroke being drawn (or the eraser path)
   let frame = 0;
@@ -35,7 +41,7 @@ const Pen = (function () {
   const key = () => (V.driver ? String(V.driver.inkKey()) : '');
   function page() {
     const k = key();
-    if (!self.pages.has(k)) self.pages.set(k, { strokes: [], undo: [] });
+    if (!self.pages.has(k)) self.pages.set(k, { strokes: [], undo: [], redo: [] });
     return self.pages.get(k);
   }
   function rect() {                   // the page element, in canvas (viewport) coordinates
@@ -113,7 +119,7 @@ const Pen = (function () {
       const t = TOOLS[self.tool];
       drawing = {
         tool: self.tool,
-        stroke: { tool: self.tool, color: t.color, alpha: t.alpha, cap: t.cap, w: t.width, min: t.min, pts: [pt] },
+        stroke: { tool: self.tool, color: t.color, alpha: t.alpha, cap: t.cap, w: SIZES[self.tool][level[self.tool]].width, min: SIZES[self.tool][level[self.tool]].min, pts: [pt] },
       };
       redraw();
     }
@@ -137,10 +143,10 @@ const Pen = (function () {
     const d = drawing;
     drawing = null;
     if (d.tool === 'eraser') {
-      if (d.changed) { page().undo.push(d.before); trimUndo(); }
+      if (d.changed) { page().undo.push(d.before); page().redo = []; trimUndo(); }
     } else {
       const pg = page();
-      pg.undo.push(pg.strokes.slice()); trimUndo();
+      pg.undo.push(pg.strokes.slice()); pg.redo = []; trimUndo();
       pg.strokes.push(d.stroke);
     }
     redraw();
@@ -152,7 +158,7 @@ const Pen = (function () {
   function erase(p) {
     const r = rect(), pg = page();
     const keep = pg.strokes.filter((s) => {
-      const lw = Math.max(s.min, s.w * r.w) / 2 + ERASER_PX;
+      const lw = Math.max(s.min, s.w * r.w) / 2 + SIZES.eraser[level.eraser];
       const pts = s.pts;
       for (let i = 0; i < pts.length; i++) {
         const ax = r.x + pts[i][0] * r.w, ay = r.y + pts[i][1] * r.w;
@@ -205,30 +211,69 @@ const Pen = (function () {
     const cur = self.tool === 'eraser' ? null : TOOLS[self.tool].color;
     colorBox.classList.toggle('off', self.tool === 'eraser');
     colorBox.querySelectorAll('.ink-swatch').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.color === cur)));
-    const pg = V.driver ? page() : { strokes: [], undo: [] };
+    const pg = V.driver ? page() : { strokes: [], undo: [], redo: [] };
     $('inkUndo').disabled = !pg.undo.length;
+    $('inkRedo').disabled = !pg.redo.length;
+    bar.querySelectorAll('[data-ink-size]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.inkSize === level[self.tool])));
+    const lbl = V.driver && V.driver.label ? V.driver.label() : '';
+    $('inkPos').textContent = lbl.replace(/^Page /, '').replace(' of ', ' / ');
     $('inkClear').disabled = !pg.strokes.length;
     $('inkSave').disabled = !pg.strokes.length;
     canvas.style.cursor = self.tool === 'eraser' ? 'cell' : 'crosshair';
     $('vInk').setAttribute('aria-pressed', String(self.on));
   }
   bar.querySelectorAll('[data-ink-tool]').forEach((b) => { b.onclick = () => setTool(b.dataset.inkTool); });
+  bar.querySelectorAll('[data-ink-size]').forEach((b) => {
+    b.onclick = () => { level[self.tool] = +b.dataset.inkSize; savePref('fv-ink-size-' + self.tool, String(level[self.tool])); refreshButtons(); };
+  });
+
+  /* ----- the bar can be dragged out of the way (by the grip on its left) ----- */
+  const grip = $('inkGrip');
+  let drag = null;
+  grip.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const b = bar.getBoundingClientRect(), host = bar.offsetParent.getBoundingClientRect();
+    drag = { dx: e.clientX - b.left, dy: e.clientY - b.top, host };
+    bar.classList.add('moving');
+    grip.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const bw = bar.offsetWidth, bh = bar.offsetHeight;
+    const x = clamp(e.clientX - drag.dx - drag.host.left, 4, drag.host.width - bw - 4);
+    const y = clamp(e.clientY - drag.dy - drag.host.top, 4, drag.host.height - bh - 4);
+    bar.style.left = x + 'px'; bar.style.top = y + 'px'; bar.style.bottom = 'auto'; bar.style.transform = 'none';
+  });
+  const dropBar = () => { drag = null; bar.classList.remove('moving'); };
+  grip.addEventListener('pointerup', dropBar);
+  grip.addEventListener('pointercancel', dropBar);
+  function homeBar() { bar.style.left = bar.style.top = bar.style.bottom = bar.style.transform = ''; }
 
   function undo() {
     const pg = page();
     if (!pg.undo.length) return;
+    pg.redo.push(pg.strokes);
     pg.strokes = pg.undo.pop();
+    redraw(); refreshButtons();
+  }
+  function redo() {
+    const pg = page();
+    if (!pg.redo.length) return;
+    pg.undo.push(pg.strokes);
+    pg.strokes = pg.redo.pop();
     redraw(); refreshButtons();
   }
   function clear() {
     const pg = page();
     if (!pg.strokes.length) return;
-    pg.undo.push(pg.strokes.slice()); trimUndo();
+    pg.undo.push(pg.strokes.slice()); pg.redo = []; trimUndo();
     pg.strokes = [];
     redraw(); refreshButtons();
     showToast('Cleared — Undo brings it back');
   }
   $('inkUndo').onclick = undo;
+  $('inkRedo').onclick = redo;
   $('inkClear').onclick = clear;
   $('inkDone').onclick = () => toggle();
   $('inkPrev').onclick = () => navigate('prev');
@@ -286,6 +331,7 @@ const Pen = (function () {
     } else {
       self.on = false;
       drawing = null;
+      homeBar();
       canvas.hidden = true;
       bar.hidden = true;
       V.el.classList.remove('inking');
@@ -307,6 +353,7 @@ const Pen = (function () {
 
   // Remembered choices
   const t = loadPref('fv-ink-tool', 'pen');
+  for (const n of ['pen', 'marker', 'eraser']) { const v = +loadPref('fv-ink-size-' + n, '1'); if (v >= 0 && v <= 2) level[n] = v; }
   if (t === 'pen' || t === 'marker' || t === 'eraser') self.tool = t;
   for (const name of ['pen', 'marker']) {
     const c = loadPref('fv-ink-' + name, '');
@@ -314,7 +361,7 @@ const Pen = (function () {
   }
   refreshButtons();
 
-  Object.assign(self, { toggle, reset, sync, redraw, undo, setTool });
+  Object.assign(self, { toggle, reset, sync, redraw, undo, redo, setTool });
   return self;
 })();
 window.Pen = Pen;

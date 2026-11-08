@@ -1127,11 +1127,14 @@ function renderQueueDialog(first) {
   const close = h('button', 'btn', 'Close');
   close.type = 'button';
   close.onclick = closeModal;
-  const start = h('button', 'btn btn-primary', 'Start');
-  start.type = 'button';
-  start.disabled = !loaded;
-  start.onclick = queueStart;
-  actions.append(close, start);
+  actions.append(close);
+  if (Q.items.length) {                       // nothing to start when the list is empty
+    const start = h('button', 'btn btn-primary', 'Start');
+    start.type = 'button';
+    start.disabled = !loaded;
+    start.onclick = queueStart;
+    actions.append(start);
+  }
   box.appendChild(actions);
 
   if (first) {
@@ -2262,7 +2265,10 @@ new ResizeObserver(() => {
 document.addEventListener('keydown', (e) => {
   // Ctrl/Cmd+Z undoes the last pen stroke
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.altKey && !V.el.hidden && window.Pen && Pen.on) {
-    e.preventDefault(); Pen.undo(); return;
+    e.preventDefault(); if (e.shiftKey) Pen.redo(); else Pen.undo(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY' && !V.el.hidden && window.Pen && Pen.on) {
+    e.preventDefault(); Pen.redo(); return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 

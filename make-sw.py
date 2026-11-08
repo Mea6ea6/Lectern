@@ -2,7 +2,7 @@
 The version number changes automatically, so installed copies refresh themselves."""
 import hashlib, os, json
 root = os.path.dirname(os.path.abspath(__file__))
-skip_dirs = {'Files', 'node_modules', 'docs', 'downloads'}
+skip_dirs = {'Files', 'node_modules', 'docs', 'downloads', 'dist'}
 files = ['./', 'Lectern.html', 'manifest.webmanifest']
 h = hashlib.sha1()
 for d, dirs, names in os.walk(root):

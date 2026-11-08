@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <script>
     /* Applied before the first paint, so there is no flash of the wrong theme or the wrong glass */
-    window.GLASS_DEFAULT = 60;     // fixed look: 0 = full frosted glass … 100 = solid panels
+    window.GLASS_DEFAULT = 80;     // fixed look: 0 = full frosted glass … 100 = solid panels
     window.applyGlass = function (value) {
       var solid = Math.max(0, Math.min(100, value)) / 100, g = 1 - solid, r = document.documentElement.style;
       r.setProperty('--g', g.toFixed(3));                              // how much glass (0 … 1)
@@ -139,7 +139,6 @@
       <svg class="icon"><use href="#i-search"/></svg>
       <input id="search" type="search" placeholder="Search by name" autocomplete="off">
     </label>
-    <div class="chips" id="chips"></div>
     <div class="dd" id="sortDD">
       <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
         <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
@@ -152,6 +151,7 @@
         <button type="button" role="option" data-sort="type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
       </div>
     </div>
+    <div class="chips" id="chips"></div>
   </div>
 
   <main>
@@ -281,20 +281,30 @@
 
   <!-- Drawing tools: appear when Draw is on -->
   <div class="ink-bar" id="inkBar" hidden>
+    <div class="ink-grip" id="inkGrip" title="Drag to move this bar" aria-label="Move the drawing bar"><span></span><span></span><span></span></div>
     <button class="vbtn vbtn-icon" id="inkPrev" type="button" title="Previous page" aria-label="Previous page"><svg class="icon"><use href="#i-prev"/></svg></button>
+    <span class="ink-pos" id="inkPos"></span>
+    <button class="vbtn vbtn-icon" id="inkNext" type="button" title="Next page" aria-label="Next page"><svg class="icon"><use href="#i-next"/></svg></button>
+    <i class="ink-sep"></i>
     <div class="seg" id="inkTools">
-      <button type="button" data-ink-tool="pen" title="Pen (1)"><svg class="icon"><use href="#i-pen"/></svg><span>Pen</span></button>
-      <button type="button" data-ink-tool="marker" title="Marker (2)"><svg class="icon"><use href="#i-marker"/></svg><span>Marker</span></button>
-      <button type="button" data-ink-tool="eraser" title="Eraser (3)"><svg class="icon"><use href="#i-eraser"/></svg><span>Eraser</span></button>
+      <button type="button" data-ink-tool="pen" title="Pen (1)" aria-label="Pen"><svg class="icon"><use href="#i-pen"/></svg></button>
+      <button type="button" data-ink-tool="marker" title="Marker (2)" aria-label="Marker"><svg class="icon"><use href="#i-marker"/></svg></button>
+      <button type="button" data-ink-tool="eraser" title="Eraser (3)" aria-label="Eraser"><svg class="icon"><use href="#i-eraser"/></svg></button>
+    </div>
+    <div class="seg ink-sizes" id="inkSizes" title="Thickness">
+      <button type="button" data-ink-size="0" title="Thin" aria-label="Thin"><i style="--d:5px"></i></button>
+      <button type="button" data-ink-size="1" title="Medium" aria-label="Medium"><i style="--d:9px"></i></button>
+      <button type="button" data-ink-size="2" title="Thick" aria-label="Thick"><i style="--d:14px"></i></button>
     </div>
     <div class="ink-colors" id="inkColors"></div>
+    <i class="ink-sep"></i>
     <div class="ink-actions">
       <button class="vbtn vbtn-icon" id="inkUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="icon"><use href="#i-undo"/></svg></button>
+      <button class="vbtn vbtn-icon" id="inkRedo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg class="icon flip"><use href="#i-undo"/></svg></button>
       <button class="vbtn vbtn-icon" id="inkClear" type="button" title="Clear this page" aria-label="Clear this page"><svg class="icon"><use href="#i-trash"/></svg></button>
       <button class="vbtn vbtn-icon" id="inkSave" type="button" title="Save the drawing as a picture" aria-label="Save as picture"><svg class="icon"><use href="#i-save"/></svg></button>
       <button class="vbtn vbtn-solid" id="inkDone" type="button" title="Finish drawing (D or Esc)"><svg class="icon"><use href="#i-check"/></svg><span>Done</span></button>
     </div>
-    <button class="vbtn vbtn-icon" id="inkNext" type="button" title="Next page" aria-label="Next page"><svg class="icon"><use href="#i-next"/></svg></button>
   </div>
 
   <!-- “More” menu -->

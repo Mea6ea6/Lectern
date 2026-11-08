@@ -46,9 +46,6 @@
   --on-ink:    #ffffff;     /* text on top of --ink (inverted state) */
   --viewer-bg: #050505;     /* the open document always sits on black */
   --wall-bg:   #d6d6d6;
-  --wall:      radial-gradient(60% 45% at 85% 105%, rgba(0,0,0,.14), rgba(0,0,0,0) 70%),
-               radial-gradient(55% 40% at 12% -5%, rgba(255,255,255,.9), rgba(255,255,255,0) 70%),
-               linear-gradient(160deg, #ffffff 0%, #ececec 48%, #d2d2d2 100%);
   --sh-1: 0 1px 2px rgba(0,0,0,.07), 0 2px 8px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,calc(var(--g) * .7));
   --sh-2: 0 2px 4px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,calc(var(--g) * .7));
   --sh-3: 0 4px 10px rgba(0,0,0,.12), 0 16px 40px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,calc(var(--g) * .7));
@@ -77,9 +74,6 @@
   --on-ink:    #0b0b0b;
   --viewer-bg: #050505;
   --wall-bg:   #101010;
-  --wall:      radial-gradient(60% 45% at 14% -5%, rgba(255,255,255,.12), rgba(255,255,255,0) 70%),
-               radial-gradient(55% 45% at 92% 108%, rgba(255,255,255,.08), rgba(255,255,255,0) 70%),
-               linear-gradient(160deg, #272727 0%, #0e0e0e 50%, #1c1c1c 100%);
   --sh-1: 0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,calc(var(--g) * .16));
   --sh-2: 0 2px 4px rgba(0,0,0,.40), 0 8px 24px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,calc(var(--g) * .16));
   --sh-3: 0 4px 10px rgba(0,0,0,.50), 0 16px 40px rgba(0,0,0,.60), inset 0 1px 0 rgba(255,255,255,calc(var(--g) * .18));
@@ -116,17 +110,11 @@ html, body { height: 100%; margin: 0; }
 body {
   font-family: var(--font);
   font-size: 15px;
-  background: var(--wall-bg);
+  background: var(--bg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
-/* The backdrop the glass blurs: soft grey light, invisible when the slider is fully right */
-body::before {
-  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: var(--wall); opacity: var(--wall-o);
-}
-body { background-color: color-mix(in srgb, var(--bg) calc((1 - var(--g)) * 100%), var(--wall-bg)); }
-@supports not (color: color-mix(in srgb, red, blue)) { body { background-color: var(--bg); } }
+body { background-color: var(--bg); }          /* one flat colour, no gradient */
 
 /* Everything that is a glass panel */
 .btn, .chip, .search, .dd-btn, .popover, .dd-menu, .menu, .modal-card, .empty-card, .vbar, .card, .seg, .stepper {
@@ -166,7 +154,6 @@ button:disabled { cursor: default; }
   transition: box-shadow .15s, background .15s, transform .1s;
 }
 .btn:hover { box-shadow: var(--sh-2); }
-.btn:active { transform: translateY(1px); }
 .btn:focus-visible { box-shadow: var(--sh-3); background: var(--surface-2); }
 .btn-primary { background: var(--ink); color: var(--on-ink); }
 .btn-primary:focus-visible { background: var(--ink); opacity: .85; }
@@ -228,7 +215,7 @@ button:disabled { cursor: default; }
 .search:focus-within { box-shadow: var(--sh-2); color: var(--ink); }
 .search input { flex: 1; min-width: 0; color: var(--ink); }
 .search input::placeholder { color: var(--ink-soft); }
-.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; order: 3; flex: 0 0 100%; }
 .chip {
   min-height: 38px; padding: 0 14px;
   border-radius: var(--r-pill);
@@ -237,14 +224,14 @@ button:disabled { cursor: default; }
   text-transform: var(--label-case); letter-spacing: var(--label-track);
 }
 .chip b { margin-left: 6px; font-weight: 600; opacity: .8; }
-/* A small dot in the file-type colour, so filters match the badges on the cards */
+/* A small dot in the file-type colour (the same colour as the badge on the cards) */
 .chip:not(.k-all)::before {
-  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%;
-  background: var(--kc); vertical-align: 1px; box-shadow: 0 0 0 1.5px rgb(255 255 255 / .22);
+  content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 9px; border-radius: 50%;
+  vertical-align: 0; flex: none; background: var(--kc);
 }
 .chip:hover { box-shadow: var(--sh-2); }
 .chip.active { background: var(--ink); color: var(--on-ink); }
-.dd { position: relative; margin-left: auto; }
+.dd { position: relative; }
 .dd-btn { min-height: 42px; padding: 0 12px 0 14px; gap: 10px; font-size: 14px; }
 .dd-cap {
   color: var(--ink-soft); font-size: var(--label-size); font-weight: var(--label-weight);
@@ -709,8 +696,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 .drop-hint.anim-in .drop-frame { animation: card-in .3s var(--ease-out) backwards; }
 
-.btn:active, .chip:active { transform: scale(.97); }
-.btn, .chip { transition: box-shadow .15s, background .15s, transform .15s var(--ease-out); }
 
 /* Theme switch uses the View Transitions API (a cheap GPU cross-fade) */
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; animation-timing-function: ease; }
@@ -773,7 +758,10 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .q-name small { color: var(--ink-soft); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .q-btn { min-height: 40px; min-width: 40px; background: var(--surface-3); }
 .q-btn .icon { width: 20px; height: 20px; }
-.modal-actions .q-clear { margin-right: auto; }
+.queue-dialog .modal-actions { justify-content: center; margin-top: 26px; }
+.queue-dialog .modal-title { text-align: center; }
+.queue-dialog .modal-text { text-align: center; }
+.queue-dialog .q-list + .modal-actions { margin-top: 20px; }
 
 /* ---------- Viewer: top bar with the queue arrows ---------- */
 .vleft { display: flex; align-items: center; gap: 10px; }
@@ -806,25 +794,41 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 /* ---------- Pen and marker ---------- */
 .ink-canvas { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; touch-action: none; cursor: crosshair !important; }
 .ink-bar {
-  position: absolute; left: 50%; bottom: calc(var(--bb) + 12px); z-index: 14; transform: translateX(-50%);
-  width: max-content; max-width: calc(100% - 20px); display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px;
-  padding: 8px 10px; background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
+  position: absolute; left: 50%; bottom: 14px; z-index: 14; transform: translateX(-50%);
+  width: max-content; max-width: calc(100% - 16px); display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px;
+  padding: 6px 10px 6px 4px; background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
   -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd);
+  touch-action: none;
 }
-.ink-bar .seg button { min-height: 44px; }
+.ink-bar .seg button { min-height: 38px; min-width: 40px; padding: 0 10px; }
+.ink-bar .vbtn { min-height: 40px; }
+.ink-bar .vbtn-icon { min-width: 40px; }
+.ink-bar .vbtn-solid { padding: 0 14px; }
+.ink-grip {
+  display: flex; flex-direction: column; justify-content: center; gap: 3px; width: 22px; align-self: stretch;
+  padding: 0 5px; cursor: grab; touch-action: none; opacity: .5;
+}
+.ink-grip:hover { opacity: .85; }
+.ink-bar.moving .ink-grip { cursor: grabbing; }
+.ink-grip span { height: 2px; border-radius: 2px; background: var(--ink); }
+.ink-sep { width: 1px; align-self: stretch; margin: 6px 0; background: var(--ink); opacity: .12; }
+.ink-pos { min-width: 44px; text-align: center; color: var(--ink-soft); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ink-sizes button i { display: block; width: var(--d); height: var(--d); margin: auto; border-radius: 50%; background: currentColor; }
 .ink-colors { display: flex; gap: 8px; padding: 0 4px; transition: opacity .15s; }
 .ink-colors.off { opacity: .3; pointer-events: none; }
 .ink-swatch {
-  width: 36px; height: 36px; border-radius: 50%; background: var(--sw);
-  box-shadow: var(--sh-key); transition: transform .12s, box-shadow .12s;
+  width: 28px; height: 28px; border-radius: 50%; background: var(--sw);
+  box-shadow: var(--sh-key); transition: transform .14s var(--ease-out), box-shadow .14s;
 }
-.ink-swatch[aria-pressed="true"] { transform: scale(1.22); box-shadow: 0 0 0 3px var(--surface-rgb) , 0 0 0 5px rgb(128 128 128), var(--sh-2); box-shadow: 0 0 0 3px rgb(var(--surface-rgb)), 0 0 0 5.5px var(--ink); }
-.ink-actions { display: flex; gap: 8px; }
+.ink-swatch[aria-pressed="true"] { transform: scale(1.32); box-shadow: 0 4px 12px rgb(0 0 0 / .45), 0 1px 3px rgb(0 0 0 / .4); }
+.ink-actions { display: flex; gap: 6px; }
 .ink-bar .vbtn:disabled { opacity: .3; }
-.viewer.immersive.ui-hidden .ink-bar { bottom: 12px; }
-@media (max-width: 720px) {
-  .ink-bar .seg button span { display: none; }
-  .ink-swatch { width: 32px; height: 32px; }
+.icon.flip { transform: scaleX(-1); }
+/* While drawing, the page gets the whole screen: the top and bottom bars step aside */
+.viewer.inking .vbar, .viewer.inking .side { opacity: 0; pointer-events: none; }
+.viewer.inking .content { padding: 0; }
+@media (max-width: 900px) {
+  .ink-swatch { width: 26px; height: 26px; }
 }
 
 /* ---------- Pages of the new text formats ---------- */
@@ -877,3 +881,13 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .epub-page blockquote { margin: 1em 0 1em 1.2em; color: #444; }
 .epub-page table { border-collapse: collapse; } .epub-page td, .epub-page th { padding: 4px 8px; border: 1px solid #ccc; }
 @media (max-width: 720px) { .epub-page, .rtf-page, .zip-page { padding: 24px 20px; } }
+
+/* ---------- Buttons feel real: a little bigger under the pointer, a little smaller when pressed ---------- */
+.btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn {
+  transition: scale .16s var(--ease-out), box-shadow .15s, background .15s, color .15s, opacity .15s, transform .14s var(--ease-out);
+}
+.btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover, .seg button:hover:not(:disabled),
+.card-info:hover, .card-queue:hover, .stepper button:hover:not(:disabled), .ink-swatch:hover { scale: 1.05; }
+.btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .seg button:active:not(:disabled),
+.card-info:active, .card-queue:active, .stepper button:active:not(:disabled), .ink-swatch:active { scale: .95; transition-duration: .08s; }
+@media (hover: none) { .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .seg button:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover { scale: 1; } }
