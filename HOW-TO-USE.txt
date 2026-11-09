@@ -1,4 +1,4 @@
-LECTERN v1.6.0 — offline viewer for the classroom
+LECTERN v1.7.0 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -57,7 +57,8 @@ PEN AND MARKER (any page or slide)
   Press "Draw" (or D). The top and bottom bars step aside, so the page gets the
   whole screen, and one compact bar appears. Choose Pen, Marker (see-through) or
   Eraser, a colour and a thickness (drag the slider; the dot next to it shows the
-  size, and each tool remembers its own). Undo, Redo, Clear and
+  size, and each tool remembers its own). A circle around the pointer shows how
+  thick the line will be. The eraser rubs out only the part of a line you touch. Undo, Redo, Clear and
   "save as picture" are in the same bar. Drag the bar by its grip (the three
   lines on the left) if it covers something. The file is not changed; the
   drawing stays on the screen of that page until you go back to the list.

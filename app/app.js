@@ -1691,12 +1691,150 @@ class ScrollViewer extends BaseViewer {
   }
 }
 
+/* ----- DOCX pagination -----
+   docx-preview starts a new page only at a hard page break, so the text between two breaks is one very tall "page".
+   This cuts such a page into real sheets (the way Word lays them out): paragraphs and table rows that do not fit are
+   moved to the next sheet, a long paragraph is split between two lines (never leaving one line alone), headings stay
+   with the text after them, and a dark gap is drawn between the sheets. Returns how many sheets the page became. */
+const DOCX_GAP = 28;
+function paginateDocx(sec, P) {
+  const articles = sec.querySelectorAll(':scope > article');
+  if (articles.length !== 1) return 1;
+  const art = articles[0];
+  if (art.style.columnCount && art.style.columnCount !== '1') return 1;
+  if (sec.offsetHeight <= P + 3) return 1;
+  const cs = getComputedStyle(sec);
+  const padT = parseFloat(cs.paddingTop) || 0, padB = parseFloat(cs.paddingBottom) || 0;
+  const G = DOCX_GAP, pitch = P + G;
+  if (P - padT - padB < 120) return 1;
+  const secTop = () => sec.getBoundingClientRect().top;
+  const rel = (el) => { const r = el.getBoundingClientRect(), t = secTop(); return { top: r.top - t, bottom: r.bottom - t }; };
+  const contentTop = (k) => k * pitch + padT;
+  const contentBottom = (k) => k * pitch + P - padB;
+
+  // The lines of a paragraph, measured on the screen: [{ top, bottom }]
+  function lineBoxes(el) {
+    const hidden = Array.from(el.querySelectorAll('[data-dx-abs]'));
+    hidden.forEach((a) => { a.dataset.dxDisp = a.style.display; a.style.display = 'none'; });
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const t0 = secTop();
+    const rects = Array.from(range.getClientRects()).filter((r) => r.height > 2).sort((a, b) => a.top - b.top || a.left - b.left);
+    hidden.forEach((a) => { a.style.display = a.dataset.dxDisp; delete a.dataset.dxDisp; });
+    const lines = [];
+    for (const r of rects) {
+      const top = r.top - t0, bottom = r.bottom - t0, last = lines[lines.length - 1];
+      if (last && top < last.top + (last.bottom - last.top) * 0.6) { last.top = Math.min(last.top, top); last.bottom = Math.max(last.bottom, bottom); }
+      else lines.push({ top, bottom });
+    }
+    // Glyph boxes of neighbouring lines can overlap (single line spacing): use evenly spaced line boxes instead
+    if (lines.length > 1) {
+      const gaps = lines.slice(1).map((l, i) => l.top - lines[i].top).filter((g) => g > 1).sort((a, b) => a - b);
+      const d = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+      if (d) lines.forEach((l) => { if (l.bottom - l.top <= d * 1.3) { const c = (l.top + l.bottom) / 2; l.top = c - d / 2; l.bottom = c + d / 2; } });
+    }
+    return lines;
+  }
+  const mk = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
+  // Put `el` (with a spacer in front of it) exactly at `target` (px from the top of the section)
+  function placeAt(el, spacer, target) {
+    spacer.style.height = '0px';
+    let t = rel(el).top;
+    spacer.style.height = Math.max(0, target - t) + 'px';
+    t = rel(el).top;
+    if (Math.abs(t - target) > 0.5) spacer.style.height = Math.max(0, parseFloat(spacer.style.height) + target - t) + 'px';
+  }
+
+  const units = [];
+  for (const el of Array.from(art.children)) {
+    if (el.tagName === 'TABLE') Array.from(el.rows).forEach((tr) => units.push({ kind: 'row', box: tr }));
+    else units.push({ kind: el.tagName === 'P' ? 'p' : 'block', box: el, src: el, off: 0 });
+  }
+  const isHeading = (u) => u.kind === 'p' && /heading|title|заголов/i.test(u.box.className + ' ' + (u.box.getAttribute('data-style') || ''));
+
+  let k = 0;
+  for (let i = 0; i < units.length; i++) {
+    let u = units[i];
+    for (let guard = 0; guard < 300; guard++) {
+      const r = rel(u.box), bottom = contentBottom(k);
+      const atTop = r.top <= contentTop(k) + 2;
+      let fits = r.bottom <= bottom + 0.5;
+      // a heading must not be the last thing on a sheet: its first line of text has to fit as well
+      if (fits && isHeading(u) && i + 1 < units.length && !atTop) {
+        const nx = units[i + 1], nb = nx.kind === 'p' ? (lineBoxes(nx.box)[0] || rel(nx.box)).bottom : rel(nx.box).bottom;
+        if (nb > bottom + 0.5) fits = false;
+      }
+      if (fits) break;
+
+      if (u.kind === 'p') {
+        const all = lineBoxes(u.src), br = rel(u.box);
+        const lines = all.filter((l) => l.top >= br.top - 1 && l.top < br.bottom - 1);
+        const L = lines.length;
+        let m = lines.filter((l) => l.bottom <= bottom + 0.5).length;
+        if (L >= 4) { if (m < 2 && !atTop) m = 0; else if (L - m < 2) m = L - 2; }
+        else if (!atTop) m = 0;
+        if (m >= 1 && m < L) {                              // split between line m-1 and line m
+          const cut = (lines[m - 1].bottom + lines[m].top) / 2;
+          const hA = cut - br.top, hB = br.bottom - cut;
+          const clone = u.src.cloneNode(true);
+          clone.removeAttribute('id');
+          clone.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
+          clone.querySelectorAll('[data-dx-abs]').forEach((e) => e.remove());
+          clone.classList.add('dx-clone');
+          const mb = u.mb !== undefined ? u.mb : (parseFloat(getComputedStyle(u.box).marginBottom) || 0);
+          Object.assign(clone.style, { marginTop: (u.off - hA) + 'px', marginBottom: '0px', boxSizing: 'border-box' });
+          const wrap = mk('div', 'dx-part');
+          Object.assign(wrap.style, { overflow: 'hidden', height: hB + 'px', marginBottom: mb + 'px' });
+          wrap.appendChild(clone);
+          const spacer = mk('div', 'dx-sp');
+          Object.assign(u.box.style, { boxSizing: 'border-box', height: hA + 'px', overflow: 'hidden', marginBottom: '0px' });
+          u.box.after(spacer, wrap);
+          k++;
+          placeAt(wrap, spacer, contentTop(k));
+          u = units[i] = { kind: 'p', box: wrap, src: clone, off: u.off - hA, mb };
+          continue;
+        }
+        if (m === 0 && atTop) break;                        // does not fit even on an empty sheet: leave it
+      } else if (atTop) break;                              // taller than a whole sheet: leave it
+
+      // move the whole unit to the next sheet
+      const spacer = u.kind === 'row' ? mk('tr', 'dx-sp') : mk('div', 'dx-sp');
+      if (u.kind === 'row') {
+        const td = document.createElement('td');
+        td.colSpan = 99; td.style.cssText = 'padding:0;border:0;height:0';
+        spacer.appendChild(td);
+      } else u.box.style.marginTop = '0px';
+      u.box.before(spacer);
+      k++;
+      if (u.kind === 'row') {
+        const td = spacer.firstChild;
+        const t0 = rel(u.box).top;
+        td.style.height = Math.max(0, contentTop(k) - t0) + 'px';
+        const t1 = rel(u.box).top;
+        if (Math.abs(t1 - contentTop(k)) > 0.5) td.style.height = Math.max(0, parseFloat(td.style.height) + contentTop(k) - t1) + 'px';
+      } else placeAt(u.box, spacer, contentTop(k));
+    }
+  }
+  const pages = k + 1;
+  if (pages > 1) {
+    sec.style.minHeight = (pages * P + k * G) + 'px';
+    for (let j = 0; j < k; j++) {
+      const band = mk('div', 'dx-gap');
+      Object.assign(band.style, { top: (j * pitch + P) + 'px', height: G + 'px' });
+      sec.appendChild(band);
+    }
+  }
+  sec.dataset.dxPages = String(pages);
+  sec.dataset.dxPitch = String(pitch);
+  return pages;
+}
+
 /* ----- DOCX: one long scrolling document ----- */
 class DocxViewer extends ScrollViewer {
   constructor(...args) {
     super(...args);
     this.canFit = true; this.hasOverview = true;
-    this.defaultFit = 'width';
+    this.defaultFit = 'page';
   }
 
   async open(file) {
@@ -1707,21 +1845,25 @@ class DocxViewer extends ScrollViewer {
     await docx.renderAsync(buf, this.host, null, {
       className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false,
     });
-    // A Word page that is only part of a "section" (long text between two hard page breaks) is still several pages:
-    // the section is cut into page-high pieces, so the count and the page numbers match what Word shows
+    // A Word page that is only part of a "section" (long text between two hard page breaks) is cut into real sheets
     const sections = Array.from(this.host.querySelectorAll('section.docx'));
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) { /* fine */ }
+    await Promise.all(Array.from(this.host.querySelectorAll('img')).map((im) => (im.decode ? im.decode().catch(() => {}) : null)));
     this.natural = Math.max(...sections.map((p) => p.offsetWidth), 300);                 // page width at 100%
     const nominal = parseFloat(sections[0] && getComputedStyle(sections[0]).minHeight) || Math.min(...sections.map((p) => p.offsetHeight), 1123);
     this.pageH = Math.max(nominal, 300);
     const self = this;
     this.pages = [];
     for (const sec of sections) {
-      const n = Math.max(1, Math.ceil((sec.offsetHeight - 3) / this.pageH));
+      let n = 1, pitch = this.pageH;
+      try { n = paginateDocx(sec, this.pageH); } catch (err) { console.warn('Page layout failed', err); n = 1; }
+      if (n > 1) pitch = Number(sec.dataset.dxPitch) || this.pageH;
+      else if (sec.offsetHeight > this.pageH + 3) n = Math.ceil((sec.offsetHeight - 3) / this.pageH);   // could not be cut: count by height
       for (let k = 0; k < n; k++) {
         this.pages.push({
-          sec, k,
+          sec, k, pitch,
           getBoundingClientRect() {
-            const r = sec.getBoundingClientRect(), z = parseFloat(self.host.style.zoom) || 1, top = r.top + k * self.pageH * z;
+            const r = sec.getBoundingClientRect(), z = parseFloat(self.host.style.zoom) || 1, top = r.top + k * pitch * z;
             return { top, bottom: top + self.pageH * z, left: r.left, right: r.right, width: r.width, height: self.pageH * z };
           },
         });
@@ -1739,7 +1881,7 @@ class DocxViewer extends ScrollViewer {
     const before = this.scrollRatio();
     const free = this.free();
     const byWidth = free.w / this.natural;
-    const fit = this.view.fit === 'width' ? byWidth : Math.min(byWidth, free.h / this.pageH);
+    const fit = this.view.fit === 'width' ? byWidth : Math.min(byWidth, free.h / (this.pageH + 24));
     this.host.style.zoom = Math.min(fit, 3) * this.view.zoom;
     this.stage.scrollTop = before * (this.stage.scrollHeight - this.stage.clientHeight);
     this.onChange();
@@ -1774,7 +1916,7 @@ class DocxViewer extends ScrollViewer {
     if (!pg) return;
     const wrapper = h('div', 'docx-wrapper');
     const clone = pg.sec.cloneNode(true);
-    clone.style.cssText += ';margin:' + (-pg.k * this.pageH) + 'px 0 0 0;box-shadow:none';
+    clone.style.cssText += ';margin:' + (-pg.k * pg.pitch) + 'px 0 0 0;box-shadow:none';
     wrapper.appendChild(clone);
     const host = h('div', 'clone-host docx-host');
     host.style.width = this.natural + 'px';

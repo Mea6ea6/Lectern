@@ -984,3 +984,20 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .ink-size input[type="range"]:active::-webkit-slider-thumb { scale: .94; }
 .ink-dot-box { display: grid; place-items: center; width: 28px; height: 28px; flex: none; }
 .ink-dot-box i { display: block; border-radius: 50%; background: var(--ink); width: 6px; height: 6px; }
+
+/* DOCX: gaps between the sheets of one long page */
+.docx-host .dx-gap { position: absolute; left: 0; right: 0; z-index: 6; background: var(--viewer-bg); pointer-events: none; }
+.docx-host .dx-sp { display: block; margin: 0; padding: 0; border: 0; }
+.docx-host tr.dx-sp { display: table-row; }
+.docx-host .dx-clone { counter-increment: none !important; }
+.page-thumb .dx-gap, .clone-host .dx-gap { display: none; }
+
+/* Drawing: the circle around the pointer shows the thickness of the line (made of shadows, not an outline) */
+.ink-canvas.ring-on { cursor: none !important; }
+.ink-ring {
+  position: fixed; left: 0; top: 0; z-index: 70; pointer-events: none; border-radius: 50%;
+  background: rgba(var(--rc, 255,255,255), var(--ra, .4));
+  box-shadow: 0 0 0 1px rgba(255,255,255,.95), 0 0 0 2px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.35);
+}
+.ink-ring::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
+.ink-ring.eraser { background: rgba(255,255,255,.12); }

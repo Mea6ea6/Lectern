@@ -184,6 +184,40 @@ const Pen = (function () {
     if (touched) { pg.strokes = out; drawing.changed = true; redraw(); }
   }
 
+
+  /* ----- a circle around the pointer that shows how thick the line will be ----- */
+  const ring = document.createElement('div');
+  ring.className = 'ink-ring';
+  ring.hidden = true;
+  document.body.appendChild(ring);
+  let ringAt = null;                                       // last pointer position on the screen
+  const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255); };
+  function ringDiameter() {
+    if (self.tool === 'eraser') return sizeOf('eraser').radius * 2;
+    const z = sizeOf(self.tool);
+    return Math.max(z.min, z.width * (V.driver ? rect().w : 1000));
+  }
+  function ringUpdate() {
+    const d = Math.max(5, ringDiameter());
+    ring.style.width = ring.style.height = d + 'px';
+    ring.classList.toggle('eraser', self.tool === 'eraser');
+    ring.style.setProperty('--rc', self.tool === 'eraser' ? '255,255,255' : rgb(TOOLS[self.tool].color));
+    ring.style.setProperty('--ra', self.tool === 'marker' ? '.32' : self.tool === 'eraser' ? '.12' : '.55');
+    if (ringAt) ring.style.transform = 'translate(' + (ringAt.x - d / 2) + 'px,' + (ringAt.y - d / 2) + 'px)';
+  }
+  function ringShow(e) {
+    if (!self.on || e.pointerType === 'touch') return;
+    ringAt = { x: e.clientX, y: e.clientY };
+    ring.hidden = false;
+    canvas.classList.add('ring-on');
+    ringUpdate();
+  }
+  function ringHide() { ring.hidden = true; ringAt = null; canvas.classList.remove('ring-on'); }
+  canvas.addEventListener('pointermove', ringShow);
+  canvas.addEventListener('pointerenter', ringShow);
+  canvas.addEventListener('pointerleave', ringHide);
+  canvas.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') ringHide(); });
+
   canvas.addEventListener('pointerdown', down);
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
@@ -234,6 +268,7 @@ const Pen = (function () {
     $('inkClear').disabled = !pg.strokes.length;
     $('inkSave').disabled = !pg.strokes.length;
     canvas.style.cursor = self.tool === 'eraser' ? 'cell' : 'crosshair';
+    if (!ring.hidden) ringUpdate();
     $('vInk').setAttribute('aria-pressed', String(self.on));
   }
   bar.querySelectorAll('[data-ink-tool]').forEach((b) => { b.onclick = () => setTool(b.dataset.inkTool); });
@@ -343,6 +378,7 @@ const Pen = (function () {
     } else {
       self.on = false;
       drawing = null;
+      ringHide();
       homeBar();
       canvas.hidden = true;
       bar.hidden = true;
