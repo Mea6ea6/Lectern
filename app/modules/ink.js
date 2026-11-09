@@ -27,9 +27,9 @@ const Pen = (function () {
   const lerp = (a, b, t) => a + (b - a) * t;
   function sizeOf(tool) {
     const t = clamp(level[tool], 0, 100) / 100;
-    if (tool === 'marker') return { width: lerp(0.008, 0.06, t), min: lerp(6, 36, t) };
+    if (tool === 'marker') return { width: lerp(0.008, 0.14, t), min: lerp(6, 80, t) };
     if (tool === 'eraser') return { radius: lerp(8, 60, t) };
-    return { width: lerp(0.0015, 0.012, t), min: lerp(1.2, 9, t) };
+    return { width: lerp(0.0015, 0.03, t), min: lerp(1.2, 22, t) };
   }
 
   const self = {
@@ -156,25 +156,32 @@ const Pen = (function () {
   }
   function trimUndo() { const u = page().undo; while (u.length > 60) u.shift(); }
 
-  // Removes every stroke the eraser touches (measured on the screen, so it feels the same at any zoom)
+  // Rubs out only the part of a line under the eraser: the line is cut into two (or more) pieces.
+  // Measured on the screen, so it feels the same at any zoom.
   function erase(p) {
-    const r = rect(), pg = page();
-    const keep = pg.strokes.filter((s) => {
-      const lw = Math.max(s.min, s.w * r.w) / 2 + sizeOf('eraser').radius;
-      const pts = s.pts;
-      for (let i = 0; i < pts.length; i++) {
-        const ax = r.x + pts[i][0] * r.w, ay = r.y + pts[i][1] * r.w;
-        if (Math.hypot(ax - p.x, ay - p.y) <= lw) return false;
-        if (i) {
-          const bx = r.x + pts[i - 1][0] * r.w, by = r.y + pts[i - 1][1] * r.w;
-          const dx = ax - bx, dy = ay - by, len2 = dx * dx + dy * dy;
-          const t = len2 ? clamp(((p.x - bx) * dx + (p.y - by) * dy) / len2, 0, 1) : 0;
-          if (Math.hypot(bx + t * dx - p.x, by + t * dy - p.y) <= lw) return false;
-        }
+    const r = rect(), pg = page(), rad = sizeOf('eraser').radius;
+    const out = [];
+    let touched = false;
+    for (const s of pg.strokes) {
+      const half = Math.max(s.min, s.w * r.w) / 2, hit = rad + Math.min(half, rad * 0.6);   // the line's own width counts a little
+      const X = (pt) => r.x + pt[0] * r.w, Y = (pt) => r.y + pt[1] * r.w;
+      // add points along long segments so a cut can fall between two stored points
+      const pts = [s.pts[0]];
+      for (let i = 1; i < s.pts.length; i++) {
+        const a = s.pts[i - 1], b = s.pts[i], len = Math.hypot((b[0] - a[0]) * r.w, (b[1] - a[1]) * r.w);
+        const n = Math.min(60, Math.floor(len / Math.max(2, rad / 3)));
+        for (let k = 1; k <= n; k++) pts.push([a[0] + (b[0] - a[0]) * k / (n + 1), a[1] + (b[1] - a[1]) * k / (n + 1)]);
+        pts.push(b);
       }
-      return true;
-    });
-    if (keep.length !== pg.strokes.length) { pg.strokes = keep; drawing.changed = true; redraw(); }
+      const inside = pts.map((pt) => Math.hypot(X(pt) - p.x, Y(pt) - p.y) <= hit);
+      if (!inside.some(Boolean)) { out.push(s); continue; }
+      touched = true;
+      let run = [];
+      const flush = () => { if (run.length > 1) out.push(Object.assign({}, s, { pts: run })); run = []; };
+      pts.forEach((pt, i) => { if (inside[i]) flush(); else run.push(pt); });
+      flush();
+    }
+    if (touched) { pg.strokes = out; drawing.changed = true; redraw(); }
   }
 
   canvas.addEventListener('pointerdown', down);
@@ -219,7 +226,7 @@ const Pen = (function () {
     $('inkRedo').disabled = !pg.redo.length;
     sizeInput.value = String(level[self.tool]);
     sizeInput.style.setProperty('--fill', level[self.tool] + '%');
-    const dot = sizeDot.style, dm = { pen: [2, 14], marker: [6, 26], eraser: [6, 26] }[self.tool];
+    const dot = sizeDot.style, dm = { pen: [2, 26], marker: [6, 26], eraser: [6, 26] }[self.tool];
     dot.width = dot.height = lerp(dm[0], dm[1], level[self.tool] / 100) + 'px';
     dot.opacity = self.tool === 'marker' ? '.45' : '1';
     const lbl = V.driver && V.driver.label ? V.driver.label() : '';

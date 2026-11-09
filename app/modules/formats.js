@@ -294,6 +294,55 @@ class HeicViewer extends ImageViewer {
 
 
 /* ---------------------------------------------------------------------
+   3b. TIFF (scans, old photos). Browsers (except Safari) can't show them, so a small decoder
+   (UTIF + pako, loaded only now) draws the first page onto a canvas and the picture is shown as a PNG.
+   --------------------------------------------------------------------- */
+async function tiffCanvas(file) {
+  await lib('tiff');
+  const buf = await file.arrayBuffer();
+  const ifds = UTIF.decode(buf);
+  if (!ifds.length) throw new Error('empty TIFF');
+  UTIF.decodeImage(buf, ifds[0], ifds);
+  const rgba = UTIF.toRGBA8(ifds[0]);
+  const canvas = document.createElement('canvas');
+  canvas.width = ifds[0].width; canvas.height = ifds[0].height;
+  canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.length), canvas.width, canvas.height), 0, 0);
+  return { canvas, pages: ifds.length };
+}
+
+class TiffViewer extends ImageViewer {
+  async open(file) {
+    let blob;
+    try {
+      const { canvas } = await tiffCanvas(file);
+      blob = await new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error('toBlob'))), 'image/png'));
+    } catch (err) {
+      console.warn(err);
+      throw friendly('Could not open this TIFF picture', 'The file may be damaged or use a compression this viewer doesn’t know. Open it in another program and save it as PNG or JPEG.');
+    }
+    return super.open(blob);
+  }
+
+  static async thumb(entry) {
+    const { canvas } = await tiffCanvas(entry.file);
+    const w = Math.min(420, canvas.width), hh = Math.round(w * canvas.height / canvas.width);
+    const out = document.createElement('canvas');
+    out.width = w; out.height = hh;
+    out.getContext('2d').drawImage(canvas, 0, 0, w, hh);
+    entry.thumbNode = out;
+  }
+
+  static async details(entry, add) {
+    try {
+      const { canvas, pages } = await tiffCanvas(entry.file);
+      add('Dimensions', canvas.width + ' × ' + canvas.height + ' px');
+      if (pages > 1) add('Pictures in file', pages + ' (the first is shown)');
+    } catch (e) { /* no details */ }
+  }
+}
+
+
+/* ---------------------------------------------------------------------
    4. OPENDOCUMENT (odt, odp)
    An ODF file is a zip with content.xml (the text and shapes), styles.xml and meta.xml.
    This is a compact reader for what classrooms need: text, headings, lists, tables, pictures,
@@ -1584,6 +1633,6 @@ class EpubViewer extends ScrollViewer {
 
 // Hand the viewers over to app.js
 Object.assign(VIEWER_CLASSES, {
-  media: MediaViewer, heic: HeicViewer, odp: OdpViewer, odt: OdtViewer, rtf: RtfViewer,
+  media: MediaViewer, heic: HeicViewer, tiff: TiffViewer, odp: OdpViewer, odt: OdtViewer, rtf: RtfViewer,
   zip: ZipViewer, json: JsonViewer, epub: EpubViewer,
 });

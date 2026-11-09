@@ -20,14 +20,15 @@
 
 // File extension -> the kind of file (decides the badge colour, the filter and the thumbnail)
 const EXT_TO_KIND = {
-  pptx: 'pptx', ppsx: 'pptx', odp: 'pptx',
+  pptx: 'pptx', ppsx: 'pptx', pptm: 'pptx', ppsm: 'pptx', potx: 'pptx', odp: 'pptx',
   pdf: 'pdf',
   docx: 'docx', odt: 'docx', rtf: 'docx',
-  xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xlsx', ods: 'xlsx', csv: 'xlsx',
-  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image', avif: 'image',
+  xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xlsx', ods: 'xlsx', csv: 'xlsx', tsv: 'xlsx',
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image', avif: 'image', apng: 'image', ico: 'image', jfif: 'image', jpe: 'image',
+  tif: 'image', tiff: 'image',
   heic: 'image', heif: 'image',
   txt: 'text', md: 'text', log: 'text',
-  mp4: 'video', m4v: 'video', webm: 'video', mov: 'video', ogv: 'video',
+  mp4: 'video', m4v: 'video', webm: 'video', mov: 'video', ogv: 'video', mkv: 'video',
   mp3: 'audio', wav: 'audio', ogg: 'audio', oga: 'audio', m4a: 'audio', aac: 'audio', flac: 'audio', opus: 'audio',
   zip: 'archive',
   json: 'code', html: 'code', htm: 'code',
@@ -37,14 +38,14 @@ const EXT_TO_KIND = {
 // Extension -> which viewer opens it (when it is not simply the same as the kind)
 const EXT_TO_VIEWER = {
   odp: 'odp', odt: 'odt', rtf: 'rtf', ods: 'xlsx',
-  heic: 'heic', heif: 'heic',
-  mp4: 'media', m4v: 'media', webm: 'media', mov: 'media', ogv: 'media',
+  heic: 'heic', heif: 'heic', tif: 'tiff', tiff: 'tiff',
+  mp4: 'media', m4v: 'media', webm: 'media', mov: 'media', ogv: 'media', mkv: 'media',
   mp3: 'media', wav: 'media', ogg: 'media', oga: 'media', m4a: 'media', aac: 'media', flac: 'media', opus: 'media',
   zip: 'zip', json: 'json', html: 'text', htm: 'text', epub: 'epub',
 };
 
 // These viewers live in app/modules/formats.js, which is loaded the first time one of them is needed
-const FORMAT_VIEWERS = new Set(['odp', 'odt', 'rtf', 'heic', 'media', 'zip', 'json', 'epub']);
+const FORMAT_VIEWERS = new Set(['odp', 'odt', 'rtf', 'heic', 'tiff', 'media', 'zip', 'json', 'epub']);
 function viewerKey(entry) { return EXT_TO_VIEWER[entry.ext] || entry.kind; }
 
 // Old Office formats can't be opened — we only count them to tell the user
@@ -91,6 +92,7 @@ const LIB_FILES = {
   pptx: ['jszip.min.js', 'pptx-preview.umd.js'],
   xlsx: ['xlsx.full.min.js'],
   heic: ['heic2any.min.js'],
+  tiff: ['pako_inflate.min.js', 'UTIF.js'],
   // Lectern's own code that is only needed sometimes (a name with a "/" is looked up inside app/, not app/lib/)
   formats: ['jszip.min.js', 'modules/formats.js'],
   ink:     ['modules/ink.js'],
@@ -800,6 +802,8 @@ const KIND_NAMES = {
   bmp: 'BMP image', svg: 'SVG image', avif: 'AVIF image',
   txt: 'Plain text', md: 'Markdown text', log: 'Log file',
   odp: 'OpenDocument presentation', odt: 'OpenDocument text', ods: 'OpenDocument spreadsheet', rtf: 'Rich Text document',
+  tif: 'TIFF picture', tiff: 'TIFF picture', ico: 'Icon image', apng: 'Animated PNG', jfif: 'JPEG image', jpe: 'JPEG image',
+  mkv: 'Matroska video', tsv: 'Tab-separated table', pptm: 'PowerPoint show (macros)', ppsm: 'PowerPoint slide show', potx: 'PowerPoint template',
   heic: 'HEIC photo (iPhone)', heif: 'HEIF image',
   mp4: 'MP4 video', m4v: 'MP4 video', webm: 'WebM video', mov: 'QuickTime video', ogv: 'Ogg video',
   mp3: 'MP3 audio', wav: 'WAV audio', ogg: 'Ogg audio', oga: 'Ogg audio', m4a: 'M4A audio', aac: 'AAC audio', flac: 'FLAC audio', opus: 'Opus audio',
@@ -1257,7 +1261,7 @@ async function thumbDocxPage(entry) {
       { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false });
     const page = host.querySelector('section.docx');
     if (!page || !page.offsetWidth || !page.offsetHeight) return false;
-    const W = page.offsetWidth, H = page.offsetHeight;
+    const W = page.offsetWidth, H = parseFloat(getComputedStyle(page).minHeight) || page.offsetHeight;
     const copy = host.cloneNode(true);                                   // keeps docx-preview's own <style> with it
     copy.style.cssText = 'width:' + W + 'px;height:' + H + 'px';
     copy.querySelectorAll('section.docx').forEach((sec, i) => { if (i) sec.remove(); });
@@ -1703,9 +1707,26 @@ class DocxViewer extends ScrollViewer {
     await docx.renderAsync(buf, this.host, null, {
       className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false,
     });
-    this.pages = Array.from(this.host.querySelectorAll('section.docx'));
-    this.natural = Math.max(...this.pages.map((p) => p.offsetWidth), 300);   // page width at 100%
-    this.pageH = Math.max(...this.pages.map((p) => p.offsetHeight), 300);
+    // A Word page that is only part of a "section" (long text between two hard page breaks) is still several pages:
+    // the section is cut into page-high pieces, so the count and the page numbers match what Word shows
+    const sections = Array.from(this.host.querySelectorAll('section.docx'));
+    this.natural = Math.max(...sections.map((p) => p.offsetWidth), 300);                 // page width at 100%
+    const nominal = parseFloat(sections[0] && getComputedStyle(sections[0]).minHeight) || Math.min(...sections.map((p) => p.offsetHeight), 1123);
+    this.pageH = Math.max(nominal, 300);
+    const self = this;
+    this.pages = [];
+    for (const sec of sections) {
+      const n = Math.max(1, Math.ceil((sec.offsetHeight - 3) / this.pageH));
+      for (let k = 0; k < n; k++) {
+        this.pages.push({
+          sec, k,
+          getBoundingClientRect() {
+            const r = sec.getBoundingClientRect(), z = parseFloat(self.host.style.zoom) || 1, top = r.top + k * self.pageH * z;
+            return { top, bottom: top + self.pageH * z, left: r.left, right: r.right, width: r.width, height: self.pageH * z };
+          },
+        });
+      }
+    }
     this.listenScroll();
     this.refit();
   }
@@ -1749,14 +1770,16 @@ class DocxViewer extends ScrollViewer {
   }
 
   async renderThumb(i, el) {
-    const src = this.pages[i];
-    if (!src) return;
+    const pg = this.pages[i];
+    if (!pg) return;
     const wrapper = h('div', 'docx-wrapper');
-    const clone = src.cloneNode(true);
-    clone.style.cssText += ';margin:0;box-shadow:none';
+    const clone = pg.sec.cloneNode(true);
+    clone.style.cssText += ';margin:' + (-pg.k * this.pageH) + 'px 0 0 0;box-shadow:none';
     wrapper.appendChild(clone);
     const host = h('div', 'clone-host docx-host');
     host.style.width = this.natural + 'px';
+    host.style.height = this.pageH + 'px';
+    host.style.overflow = 'hidden';
     host.style.transform = 'scale(' + ((el.clientWidth || 220) / this.natural) + ')';
     host.appendChild(wrapper);
     el.replaceChildren(host);
@@ -2054,9 +2077,6 @@ function navigate(where) {
   // Class queue: at the very end (or start) of a file a second press moves to the next (previous) file
   if (((where === 'next' && d.atEnd()) || (where === 'prev' && d.atStart())) && queueEdge(where)) return;
   V.driver.go(where);
-  if (V.immersive && V.el.classList.contains('ui-hidden')) {
-    setTimeout(() => showToast(V.driver && V.driver.label()), 60);   // bars are hidden — show where we are
-  }
 }
 
 /* ----- Zoom, fit, rotate ----- */
@@ -2535,110 +2555,6 @@ const Tip = (function () {
   }
   return { hide };
 })();
-
-/* =====================================================================
-   Lesson timer: a countdown (5 – 240 min) or a stopwatch. It keeps running while files are
-   opened and closed; a small clock shows in the header and in the viewer's top bar.
-   ===================================================================== */
-const Timer = { mode: 'down', minutes: 45, total: 0, startedAt: 0, before: 0, running: false, active: false, done: false, big: null };
-function timerMs() {
-  const spent = Timer.before + (Timer.running ? Date.now() - Timer.startedAt : 0);
-  return Timer.mode === 'down' ? Timer.total - spent : spent;
-}
-function timerText(ms) {
-  const sec = Timer.mode === 'down' ? Math.max(0, Math.ceil(ms / 1000)) : Math.floor(ms / 1000);
-  const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60;
-  return (hh ? hh + ':' + String(mm).padStart(2, '0') : String(mm)) + ':' + String(ss).padStart(2, '0');
-}
-function chime() {
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC();
-    [0, 0.24, 0.48].forEach((t, i) => {
-      const o = ctx.createOscillator(), g = ctx.createGain(), at = ctx.currentTime + t;
-      o.type = 'sine'; o.frequency.value = [880, 1109, 1319][i];
-      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.22, at + 0.02); g.gain.exponentialRampToValueAtTime(0.001, at + 0.8);
-      o.connect(g).connect(ctx.destination); o.start(at); o.stop(at + 0.85);
-    });
-    setTimeout(() => ctx.close(), 2000);
-  } catch (e) { /* no sound: the clock still flashes */ }
-}
-function timerRender() {
-  const text = Timer.active ? timerText(timerMs()) : '';
-  $('timerText').textContent = Timer.active ? text : 'Timer';
-  $('btnTimer').classList.toggle('done', Timer.done);
-  $('vTimer').hidden = !Timer.active;
-  $('vTimerText').textContent = text;
-  $('vTimer').classList.toggle('done', Timer.done);
-  if (Timer.big && Timer.big.isConnected) { Timer.big.textContent = text; Timer.big.classList.toggle('done', Timer.done); }
-}
-setInterval(() => {
-  if (!Timer.active) return;
-  if (Timer.running && Timer.mode === 'down' && timerMs() <= 0) {
-    Timer.running = false; Timer.done = true; Timer.before = Timer.total;
-    chime(); showToast('Time is up');
-    if (!M.el.hidden && M.body.classList.contains('timer-dialog')) renderTimerDialog();
-  }
-  timerRender();
-}, 250);
-
-function timerStart(mode) {
-  Timer.mode = mode;
-  Timer.total = Timer.minutes * 60000;
-  Timer.before = 0; Timer.startedAt = Date.now();
-  Timer.running = true; Timer.active = true; Timer.done = false;
-  timerRender(); renderTimerDialog();
-}
-function timerPause() {
-  if (Timer.running) { Timer.before += Date.now() - Timer.startedAt; Timer.running = false; }
-  else { Timer.startedAt = Date.now(); Timer.running = true; }
-  timerRender(); renderTimerDialog();
-}
-function timerReset() {
-  Timer.active = false; Timer.running = false; Timer.done = false; Timer.before = 0;
-  timerRender(); renderTimerDialog();
-}
-function openTimer() {
-  closeMenu();
-  renderTimerDialog(M.el.hidden);
-}
-function renderTimerDialog(first) {
-  if (!first && !(!M.el.hidden && M.body.classList.contains('timer-dialog'))) return;
-  const box = h('div');
-  box.appendChild(h('h2', 'modal-title', 'Lesson timer'));
-  const btn = (label, fn, cls) => { const b = h('button', 'btn' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = fn; return b; };
-  const actions = h('div', 'modal-actions');
-  if (Timer.active) {
-    Timer.big = h('div', 'timer-big', timerText(timerMs()));
-    box.appendChild(Timer.big);
-    if (!Timer.done) actions.appendChild(btn(Timer.running ? 'Pause' : 'Resume', timerPause));
-    actions.append(btn('Reset', timerReset), btn('Close', closeModal, 'btn-primary'));
-  } else {
-    Timer.big = null;
-    const presets = h('div', 'timer-presets');
-    [5, 10, 15, 30, 45, 80].forEach((m) => {
-      const b = btn(m + ' min', () => { Timer.minutes = m; renderTimerDialog(); });
-      b.setAttribute('aria-pressed', String(Timer.minutes === m));
-      presets.appendChild(b);
-    });
-    box.appendChild(presets);
-    const custom = h('div', 'timer-custom');
-    const out = h('output', '', Timer.minutes + ' min');
-    const step = (d) => () => { Timer.minutes = clamp(Timer.minutes + d, 1, 240); renderTimerDialog(); };
-    const minus = btn('−', step(-5)), plus = btn('+', step(5));
-    minus.setAttribute('aria-label', 'Less time'); plus.setAttribute('aria-label', 'More time');
-    custom.append(minus, out, plus);
-    box.appendChild(custom);
-    actions.append(btn('Close', closeModal), btn('Stopwatch', () => timerStart('up')), btn('Start', () => timerStart('down'), 'btn-primary'));
-  }
-  box.appendChild(actions);
-  const onEnter = () => { if (!Timer.active) timerStart('down'); else if (!Timer.done) timerPause(); else closeModal(); };
-  if (first) openModal(box, { onEnter, cls: 'timer-dialog' });
-  else { M.body.replaceChildren(box); M.onEnter = onEnter; }
-}
-$('btnTimer').onclick = openTimer;
-$('vTimer').onclick = openTimer;
-$('mTimer').onclick = openTimer;
 
 /* =====================================================================
    Bookmarks: M marks or unmarks the current page; , and . jump to the previous / next mark.

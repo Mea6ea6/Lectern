@@ -1,6 +1,6 @@
 /* Lectern service worker — keeps the whole app in the browser, so it opens with no internet at all.
    Generated from sw.template.js by make-sw.py (do not edit sw.js by hand). */
-const CACHE = 'lectern-3b2d368463';
+const CACHE = 'lectern-7785f4ce3d';
 const FILES = [
   "./",
   "Lectern.html",
@@ -12,9 +12,11 @@ const FILES = [
   "app/fonts/inter-cyrillic-wght-normal.woff2",
   "app/fonts/inter-latin-ext-wght-normal.woff2",
   "app/fonts/inter-latin-wght-normal.woff2",
+  "app/lib/UTIF.js",
   "app/lib/docx-preview.min.js",
   "app/lib/heic2any.min.js",
   "app/lib/jszip.min.js",
+  "app/lib/pako_inflate.min.js",
   "app/lib/pdf.min.js",
   "app/lib/pdf.worker.min.js",
   "app/lib/pptx-preview.umd.js",

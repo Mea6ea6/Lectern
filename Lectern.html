@@ -67,7 +67,6 @@
     <symbol id="i-chev"     viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
     <symbol id="i-install"  viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
     <symbol id="i-black"    viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4M12 7.6v3.2M9.6 8.8a3.6 3.6 0 1 0 4.8 0"/></symbol>
-    <symbol id="i-timer"    viewBox="0 0 24 24"><path d="M12 8v5l3 2M9.5 2.5h5M12 2.5V5"/><circle cx="12" cy="13.5" r="7.5"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6.5 3.5h11v17L12 16.6l-5.5 3.9z"/></symbol>
     <symbol id="i-notes"    viewBox="0 0 24 24"><path d="M4.5 4.5h15v11h-9l-4 4v-4h-2zM8 9h8M8 12.5h5"/></symbol>
     <symbol id="i-pen"      viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM14.5 6.5l3 3"/></symbol>
@@ -115,9 +114,6 @@
         <svg class="icon"><use href="#i-addfile"/></svg><span>Add files</span>
       </button>
      </div>
-      <button class="btn" id="btnTimer" type="button" title="Lesson timer">
-        <svg class="icon"><use href="#i-timer"/></svg><span id="timerText">Timer</span>
-      </button>
       <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
         <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
       </button>
@@ -227,9 +223,6 @@
     </div>
     <div class="vtitle" id="vTitle"></div>
     <div class="vright">
-    <button class="vbtn timer-pill" id="vTimer" type="button" hidden title="Lesson timer">
-      <svg class="icon"><use href="#i-timer"/></svg><span id="vTimerText"></span>
-    </button>
     <button class="vbtn vbtn-solid" id="vFull" type="button" title="Fullscreen (F)">
       <svg class="icon"><use id="vFullIcon" href="#i-full"/></svg><span id="vFullText">Fullscreen</span>
     </button>
@@ -355,9 +348,6 @@
     </div>
     <button class="menu-item" id="mNotes" type="button">
       <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
-    </button>
-    <button class="menu-item" id="mTimer" type="button">
-      <svg class="icon"><use href="#i-timer"/></svg><span class="grow">Lesson timer</span>
     </button>
     <button class="menu-item" id="mBlack" type="button">
       <svg class="icon"><use href="#i-black"/></svg><span class="grow">Black screen</span><kbd>B</kbd>

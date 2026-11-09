@@ -884,14 +884,14 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 /* ---------- Buttons feel real: the press is the main feedback, the hover is only a hint ---------- */
 .btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn, .menu-item {
-  transition: scale .24s cubic-bezier(.34, 1.45, .64, 1), box-shadow .15s, background .15s, color .15s, opacity .15s, transform .14s var(--ease-out);
+  transition: scale .1s ease-out, box-shadow .09s, background .09s, color .09s, opacity .09s, transform .09s ease-out;
 }
 .btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover { scale: 1.02; }
 .btn-icon:hover:not(:disabled), .vbtn-icon:hover:not(:disabled), .card-info:hover, .card-queue:hover,
 .stepper button:hover:not(:disabled), .ink-swatch:hover { scale: 1.07; }
 .btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .card-info:active, .card-queue:active,
-.stepper button:active:not(:disabled), .ink-swatch:active { scale: .95; transition-duration: .07s; }
-.seg button:active:not(:disabled), .menu-item:active { scale: .97; transition-duration: .07s; }
+.stepper button:active:not(:disabled), .ink-swatch:active { scale: .95; transition-duration: .04s; }
+.seg button:active:not(:disabled), .menu-item:active { scale: .97; transition-duration: .04s; }
 @media (hover: none) { .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover { scale: 1; } }
 
 /* Filter chips: sentence case, lighter than the small caps labels elsewhere */
@@ -914,24 +914,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
   background: rgb(255 255 255 / .16); color: #fff; box-shadow: none;
 }
 
-/* ---------- Timer ---------- */
-.vright { display: flex; align-items: center; gap: 10px; }
-.timer-pill { font-variant-numeric: tabular-nums; min-width: 0; }
-.timer-pill.done, #btnTimer.done { background: var(--ink); color: var(--on-ink); animation: timer-pulse 1s ease-in-out infinite; }
-@keyframes timer-pulse { 50% { opacity: .55; } }
-#btnTimer.running span, .timer-pill span { font-variant-numeric: tabular-nums; }
-.timer-dialog { text-align: center; }
-.timer-dialog .modal-title { text-align: center; }
-.timer-big { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; margin: 8px 0 22px; font-variant-numeric: tabular-nums; }
-.timer-big.done { opacity: .6; }
-.timer-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 auto 16px; max-width: 360px; }
-.timer-presets .btn { min-height: 40px; padding: 0 16px; background: var(--surface-2); }
-.timer-presets .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
-.timer-custom { display: inline-flex; align-items: center; gap: 4px; padding: 4px; margin-bottom: 4px; background: var(--surface-2); border-radius: var(--r-md); }
-.timer-custom button { min-width: 44px; min-height: 40px; border-radius: 8px; background: transparent; }
-.timer-custom button:hover { background: var(--surface-3); }
-.timer-custom output { min-width: 96px; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
-.timer-dialog .modal-actions { justify-content: center; margin-top: 22px; }
 
 /* ---------- Bookmarks ---------- */
 .scrub-marks { position: absolute; left: 14px; right: 14px; top: 0; height: 100%; pointer-events: none; }

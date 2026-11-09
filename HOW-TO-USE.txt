@@ -1,4 +1,4 @@
-LECTERN v1.5.1 — offline viewer for the classroom
+LECTERN v1.6.0 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -29,12 +29,12 @@ HOW TO START FROM A FLASH DRIVE
      button on the card) shows details. Esc goes back.
 
 SUPPORTED FILES
-  Presentations   PPTX, PPSX, ODP            (no animations or transitions)
+  Presentations   PPTX, PPSX, PPTM, PPSM, POTX, ODP          (no animations or transitions)
   PDF             PDF
   Documents       DOCX, ODT, RTF
-  Spreadsheets    XLSX, XLS, CSV, ODS
-  Images          PNG, JPG, GIF, WEBP, BMP, SVG, AVIF, HEIC (iPhone photos)
-  Video           MP4, M4V, WEBM, MOV, OGV
+  Spreadsheets    XLSX, XLS, CSV, TSV, ODS
+  Images          PNG, JPG, GIF, WEBP, BMP, SVG, AVIF, APNG, ICO, TIFF, HEIC (iPhone photos)
+  Video           MP4, M4V, WEBM, MOV, OGV, MKV (if the browser knows its codec)
   Audio           MP3, WAV, OGG, M4A, AAC, FLAC, OPUS
   Books           EPUB
   Text            TXT, MD, LOG (UTF-8 and Windows-1251)
@@ -83,11 +83,6 @@ SPEAKER NOTES (PPTX and ODP)
   Press N (or More - Speaker notes) to open the notes of the slide on screen in a
   side panel. They change with the slide.
 
-LESSON TIMER
-  The "Timer" button in the top bar: pick 5 - 80 minutes (or set your own) and
-  Start, or use the Stopwatch. The clock stays in the top bar, also while a file
-  is open, and flashes with a soft chime when time is up.
-
 KEYBOARD
   List     Arrows select    Enter open    Space details    / search    Q queue
   Viewer   → ↓ Space Enter = next        ← ↑ Backspace = previous
@@ -104,5 +99,5 @@ BROWSERS
 
 LICENSES OF THE PARTS INSIDE
   PDF.js (Apache-2.0), docx-preview (Apache-2.0), pptx-preview (ISC), SheetJS
-  (Apache-2.0), JSZip (MIT), heic2any (MIT; contains libheif, LGPL-3.0),
+  (Apache-2.0), JSZip (MIT), UTIF and pako (MIT), heic2any (MIT; contains libheif, LGPL-3.0),
   Inter font (SIL OFL 1.1). Details: README on GitHub.
