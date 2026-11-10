@@ -1,4 +1,4 @@
-LECTERN v1.7.1 — offline viewer for the classroom
+LECTERN v1.7.2 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no

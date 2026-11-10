@@ -624,7 +624,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .modal-text { margin: 0 0 14px; color: var(--ink-soft); line-height: 1.55; }
 .modal-text b { color: var(--ink); font-weight: 600; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-.modal-hint { margin-top: 14px; text-align: right; color: var(--ink-soft); font-size: 12px; }
 .modal-card .menu-item { min-height: 52px; padding: 0 16px; margin: 8px 0 4px; background: var(--surface-2); border-radius: var(--r-md); }
 
 .modal-card.about {
@@ -746,6 +745,8 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 /* ---------- Class queue window ---------- */
 .modal-card.queue-dialog { width: min(600px, 100%); }
+/* The list is redrawn on every click: a blurred background would be recomputed each time, so this window has a plain dimmed one */
+.modal:has(.queue-dialog) { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0,0,0,.6); }
 .q-list { display: flex; flex-direction: column; gap: 6px; max-height: min(52vh, 460px); overflow: auto; margin: 4px -4px 0; padding: 4px; }
 .q-row {
   display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px;

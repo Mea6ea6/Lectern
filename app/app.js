@@ -46,7 +46,6 @@ const EXT_TO_VIEWER = {
 
 // These viewers live in app/modules/formats.js, which is loaded the first time one of them is needed
 const FORMAT_VIEWERS = new Set(['odp', 'odt', 'rtf', 'heic', 'tiff', 'media', 'zip', 'json', 'epub']);
-function viewerKey(entry) { return EXT_TO_VIEWER[entry.ext] || entry.kind; }
 
 // Old Office formats can't be opened — we only count them to tell the user
 const LEGACY_EXT = ['ppt', 'pps', 'doc'];
@@ -561,6 +560,7 @@ function createCard(entry) {
   card.onpointerenter = (e) => { if (e.pointerType === 'mouse') select(entry.id, false); };
 
   entry.card = card;
+  entry.qMark = undefined;          // a new card has to be marked even if the place did not change
   markQueue(entry);
   if (entry.thumbNode) putThumb(entry);
   return card;
@@ -985,8 +985,6 @@ const Q = { items: [] };      // { path, name, size, modified, ext, entry }   (e
 
 try { localStorage.removeItem('fv-queue'); } catch (e) { /* the queue of older versions is forgotten: it only ever lives while the page is open */ }
 
-function saveQueue() { /* the queue lives only while this page is open */ }
-
 // Connects every remembered item with the loaded file that is the same one (same place and size, or same name and size)
 function relinkQueue() {
   if (!Q.items.length) return;
@@ -1011,11 +1009,8 @@ function queueToggle(entry) {
   queueChanged();
 }
 function queueChanged() {
-  saveQueue();
-  document.querySelectorAll('#grid .card').forEach((card) => {
-    const entry = state.files.find((e) => e.id === Number(card.dataset.id));
-    if (entry) markQueue(entry);
-  });
+  const place = new Map(Q.items.map((it, i) => [it.entry, i]));
+  for (const e of state.files) markQueue(e, place.has(e) ? place.get(e) : -1);   // only cards whose place changed are touched
   $('btnQueue').hidden = !state.files.length && !Q.items.length;
   $('qCount').textContent = Q.items.length ? String(Q.items.length) : '';
   if (!M.el.hidden && M.body.classList.contains('queue-dialog')) renderQueueDialog();
@@ -1023,10 +1018,10 @@ function queueChanged() {
 }
 
 // The little button on a card: "+" when it is not in the queue, its place number when it is
-function markQueue(entry) {
-  if (!entry.card) return;
+function markQueue(entry, i = queueIndexOf(entry)) {
+  if (!entry.card || entry.qMark === i) return;
+  entry.qMark = i;
   const btn = entry.card.querySelector('.card-queue');
-  const i = queueIndexOf(entry);
   entry.card.classList.toggle('queued', i >= 0);
   btn.replaceChildren(i >= 0 ? document.createTextNode(String(i + 1)) : icon('i-plus'));
   btn.title = i >= 0 ? 'In the class queue (place ' + (i + 1) + ') — click to remove (Q)' : 'Add to the class queue (Q)';
