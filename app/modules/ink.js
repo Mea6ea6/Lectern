@@ -64,10 +64,20 @@ const Pen = (function () {
     return { w, h: hh };
   }
 
-  // Draws one stroke into any 2D context. o = top-left of the page, W = page width in that context's pixels
-  function paintStroke(c, s, o, W) {
-    const pts = s.pts;
-    if (!pts.length) return;
+  // Draws strokes into any 2D context. o = top-left of the page, W = page width in that context's pixels.
+  // Pieces that came from one stroke (the eraser cuts a stroke into pieces) are drawn as ONE path,
+  // so a see-through marker keeps the same colour where the pieces overlap.
+  let strokeId = 0;
+  function paintStrokes(c, list, o, W) {
+    for (let i = 0; i < list.length;) {
+      let j = i + 1;
+      while (j < list.length && list[j].g !== undefined && list[j].g === list[i].g) j++;
+      paintGroup(c, list.slice(i, j), o, W);
+      i = j;
+    }
+  }
+  function paintGroup(c, group, o, W) {
+    const s = group[0];
     c.save();
     c.globalAlpha = s.alpha;
     c.strokeStyle = s.color; c.fillStyle = s.color;
@@ -75,18 +85,23 @@ const Pen = (function () {
     const lw = Math.max(s.min, s.w * W);
     c.lineWidth = lw;
     const X = (p) => o.x + p[0] * W, Y = (p) => o.y + p[1] * W;
-    if (pts.length === 1) {
-      c.beginPath(); c.arc(X(pts[0]), Y(pts[0]), lw / 2, 0, Math.PI * 2); c.fill();
-    } else {
-      c.beginPath();
+    c.beginPath();
+    let lines = false;
+    const dots = [];
+    for (const g of group) {
+      const pts = g.pts;
+      if (!pts.length) continue;
+      if (pts.length === 1) { dots.push(pts[0]); continue; }
+      lines = true;
       c.moveTo(X(pts[0]), Y(pts[0]));
-      for (let i = 1; i < pts.length - 1; i++) {        // smooth curve through the midpoints
-        const mx = (X(pts[i]) + X(pts[i + 1])) / 2, my = (Y(pts[i]) + Y(pts[i + 1])) / 2;
-        c.quadraticCurveTo(X(pts[i]), Y(pts[i]), mx, my);
+      for (let k = 1; k < pts.length - 1; k++) {        // smooth curve through the midpoints
+        const mx = (X(pts[k]) + X(pts[k + 1])) / 2, my = (Y(pts[k]) + Y(pts[k + 1])) / 2;
+        c.quadraticCurveTo(X(pts[k]), Y(pts[k]), mx, my);
       }
       c.lineTo(X(pts[pts.length - 1]), Y(pts[pts.length - 1]));
-      c.stroke();                                      // one path: a see-through marker doesn't darken where it crosses itself
     }
+    if (lines) c.stroke();                               // one path: a see-through marker doesn't darken where it crosses itself
+    for (const d of dots) { c.beginPath(); c.arc(X(d), Y(d), lw / 2, 0, Math.PI * 2); c.fill(); }
     c.restore();
   }
 
@@ -99,8 +114,8 @@ const Pen = (function () {
     ctx.clearRect(0, 0, s.w, s.h);
     if (!self.on || !V.driver) return;
     const r = rect();
-    for (const st of page().strokes) paintStroke(ctx, st, r, r.w);
-    if (drawing && drawing.tool !== 'eraser') paintStroke(ctx, drawing.stroke, r, r.w);
+    paintStrokes(ctx, page().strokes, r, r.w);
+    if (drawing && drawing.tool !== 'eraser') paintStrokes(ctx, [drawing.stroke], r, r.w);
   }
 
   /* ----- pointer ----- */
@@ -121,7 +136,7 @@ const Pen = (function () {
       const t = TOOLS[self.tool], z = sizeOf(self.tool);
       drawing = {
         tool: self.tool,
-        stroke: { tool: self.tool, color: t.color, alpha: t.alpha, cap: t.cap, w: z.width, min: z.min, pts: [pt] },
+        stroke: { g: ++strokeId, tool: self.tool, color: t.color, alpha: t.alpha, cap: t.cap, w: z.width, min: z.min, pts: [pt] },
       };
       redraw();
     }
@@ -348,13 +363,13 @@ const Pen = (function () {
     }
     if (withPage) {
       const c = out.getContext('2d');
-      for (const s of pg.strokes) paintStroke(c, s, { x: 0, y: 0 }, out.width);
+      paintStrokes(c, pg.strokes, { x: 0, y: 0 }, out.width);
     } else {
       const dpr = 2, w = canvas.clientWidth, hh = canvas.clientHeight;
       out.width = w * dpr; out.height = hh * dpr;
       const c = out.getContext('2d');
       c.scale(dpr, dpr);
-      for (const s of pg.strokes) paintStroke(c, s, r, r.w);
+      paintStrokes(c, pg.strokes, r, r.w);
     }
     const blob = await new Promise((ok) => out.toBlob(ok, 'image/png'));
     if (!blob) { showToast('Could not save the picture'); return; }

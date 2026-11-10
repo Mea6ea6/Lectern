@@ -1261,6 +1261,7 @@ async function thumbDocxPage(entry) {
       { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false });
     const page = host.querySelector('section.docx');
     if (!page || !page.offsetWidth || !page.offsetHeight) return false;
+    placeAnchors(page);
     const W = page.offsetWidth, H = parseFloat(getComputedStyle(page).minHeight) || page.offsetHeight;
     const copy = host.cloneNode(true);                                   // keeps docx-preview's own <style> with it
     copy.style.cssText = 'width:' + W + 'px;height:' + H + 'px';
@@ -1697,11 +1698,19 @@ class ScrollViewer extends BaseViewer {
    moved to the next sheet, a long paragraph is split between two lines (never leaving one line alone), headings stay
    with the text after them, and a dark gap is drawn between the sheets. Returns how many sheets the page became. */
 const DOCX_GAP = 28;
+// Pictures anchored to a paragraph ("relative to paragraph"): put them at the paragraph's top + the offset
+function placeAnchors(sec) {
+  const list = sec.querySelectorAll('[data-dx-para]');
+  if (!list.length) return;
+  const t0 = sec.getBoundingClientRect().top;
+  list.forEach((a) => {
+    const p = a.closest('p');
+    if (p) a.style.top = 'calc(' + (p.getBoundingClientRect().top - t0) + 'px + ' + a.getAttribute('data-dx-para') + ')';
+  });
+}
 function paginateDocx(sec, P) {
-  const articles = sec.querySelectorAll(':scope > article');
-  if (articles.length !== 1) return 1;
-  const art = articles[0];
-  if (art.style.columnCount && art.style.columnCount !== '1') return 1;
+  const articles = Array.from(sec.querySelectorAll(':scope > article'));
+  if (!articles.length) return 1;
   if (sec.offsetHeight <= P + 3) return 1;
   const cs = getComputedStyle(sec);
   const padT = parseFloat(cs.paddingTop) || 0, padB = parseFloat(cs.paddingBottom) || 0;
@@ -1746,9 +1755,12 @@ function paginateDocx(sec, P) {
   }
 
   const units = [];
-  for (const el of Array.from(art.children)) {
-    if (el.tagName === 'TABLE') Array.from(el.rows).forEach((tr) => units.push({ kind: 'row', box: tr }));
-    else units.push({ kind: el.tagName === 'P' ? 'p' : 'block', box: el, src: el, off: 0 });
+  for (const art of articles) {
+    if (art.style.columnCount && art.style.columnCount !== '1') { units.push({ kind: 'block', box: art, src: art, off: 0 }); continue; }   // text in columns stays whole
+    for (const el of Array.from(art.children)) {
+      if (el.tagName === 'TABLE') Array.from(el.rows).forEach((tr) => units.push({ kind: 'row', box: tr }));
+      else units.push({ kind: el.tagName === 'P' ? 'p' : 'block', box: el, src: el, off: 0 });
+    }
   }
   const isHeading = (u) => u.kind === 'p' && /heading|title|заголов/i.test(u.box.className + ' ' + (u.box.getAttribute('data-style') || ''));
 
@@ -1857,6 +1869,7 @@ class DocxViewer extends ScrollViewer {
     for (const sec of sections) {
       let n = 1, pitch = this.pageH;
       try { n = paginateDocx(sec, this.pageH); } catch (err) { console.warn('Page layout failed', err); n = 1; }
+      placeAnchors(sec);
       if (n > 1) pitch = Number(sec.dataset.dxPitch) || this.pageH;
       else if (sec.offsetHeight > this.pageH + 3) n = Math.ceil((sec.offsetHeight - 3) / this.pageH);   // could not be cut: count by height
       for (let k = 0; k < n; k++) {
