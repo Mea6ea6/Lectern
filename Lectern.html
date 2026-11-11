@@ -103,6 +103,7 @@
       <p id="status">No files selected</p>
     </div>
     <div class="actions">
+      <button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button>
      <div class="actions-files" id="headFiles" hidden>
       <button class="btn reopen-btn" type="button" hidden>
         <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
@@ -224,7 +225,7 @@
         <button class="vbtn vbtn-icon" id="qNext" type="button" title="Next file in the queue (] or Shift+→)" aria-label="Next file"><svg class="icon"><use href="#i-next"/></svg></button>
       </div>
     </div>
-    <div class="vtitle" id="vTitle"></div>
+    <div class="vtitle-wrap"><div class="vtitle" id="vTitle"></div><button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button></div>
     <div class="vright">
     <button class="vbtn vbtn-solid" id="vFull" type="button" title="Fullscreen (F)">
       <svg class="icon"><use id="vFullIcon" href="#i-full"/></svg><span id="vFullText">Fullscreen</span>
@@ -245,8 +246,8 @@
     <!-- Pen / marker layer: lives only on the screen, the file is never changed -->
     <canvas class="ink-canvas" id="inkCanvas" hidden></canvas>
 
-    <!-- Timer readout (stays on screen while the bars hide) and the laser dot -->
-    <button class="timer-chip" id="timerChip" type="button" title="Timer (T)" hidden></button>
+    <!-- The laser dot and its short trail -->
+    <canvas class="laser-trail" id="laserTrail" hidden></canvas>
     <div class="laser-dot" id="laserDot" hidden></div>
 
     <!-- Video / audio: one big button in the middle while paused -->
@@ -353,22 +354,23 @@
         <button type="button" id="mRotR" title="Rotate right (R)"><svg class="icon"><use href="#i-rotr"/></svg>Right</button>
       </div>
     </div>
-    <button class="menu-item" id="mNotes" type="button">
-      <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
-    </button>
-    <button class="menu-item" id="mBlack" type="button">
-      <svg class="icon"><use href="#i-black"/></svg><span class="grow">Black screen</span><kbd>B</kbd>
-    </button>
+    <div class="menu-gap"></div>
     <button class="menu-item" id="mLaser" type="button" aria-pressed="false">
       <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
     </button>
     <button class="menu-item" id="mTimer" type="button">
       <svg class="icon"><use href="#i-timer"/></svg><span class="grow">Timer</span><kbd>T</kbd>
     </button>
+    <button class="menu-item" id="mBlack" type="button">
+      <svg class="icon"><use href="#i-black"/></svg><span class="grow">Black screen</span><kbd>B</kbd>
+    </button>
+    <button class="menu-item" id="mNotes" type="button">
+      <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
+    </button>
+    <div class="menu-gap"></div>
     <button class="menu-item" id="mAwake" type="button" aria-pressed="true">
       <svg class="icon"><use href="#i-screen"/></svg><span class="grow" id="mAwakeText">Keep screen on</span><span class="switch"></span>
     </button>
-    <div class="menu-gap"></div>
     <div class="menu-row">
       <span class="menu-label">Theme</span>
       <div class="seg">

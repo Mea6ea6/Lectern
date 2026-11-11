@@ -2418,7 +2418,8 @@ async function toggleInk() {
 $('vInk').onclick = toggleInk;
 
 /* ----- Laser pointer: a red dot that follows the mouse (or a finger on a touch screen). Nothing is drawn ----- */
-const Laser = { on: false, dot: $('laserDot') };
+const Laser = { on: false, dot: $('laserDot'), trail: $('laserTrail'), pts: [], raf: 0 };
+const TRAIL_MS = 450;                   // how long the trail lives
 function setLaser(on) {
   on = !!on;
   if (on === Laser.on) return;
@@ -2426,15 +2427,39 @@ function setLaser(on) {
   Laser.on = on;
   V.el.classList.toggle('laser-on', on);
   $('mLaser').setAttribute('aria-pressed', String(on));
-  if (!on) Laser.dot.hidden = true;
+  Laser.trail.hidden = !on;
+  if (!on) { Laser.dot.hidden = true; Laser.pts.length = 0; }
   showToast(on ? 'Laser pointer on' : 'Laser pointer off');
 }
 function laserAim(e) {
   if (!Laser.on) return;
   // the dot is only for the page: not over the bars, the menu, the notes, the overview or a dialog
-  if (e.target.closest && e.target.closest('.vbar, .menu, .notes, .overview, .modal, .timer-chip')) { Laser.dot.hidden = true; return; }
+  if (e.target.closest && e.target.closest('.vbar, .menu, .notes, .overview, .modal, .timer-pill')) { Laser.dot.hidden = true; return; }
   Laser.dot.hidden = false;
   Laser.dot.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px)';
+  Laser.pts.push({ x: e.clientX, y: e.clientY, t: performance.now(), start: e.type === 'pointerdown' });
+  if (Laser.pts.length > 80) Laser.pts.shift();
+  if (!Laser.raf) Laser.raf = requestAnimationFrame(laserDraw);
+}
+// The trail: short line segments that get thinner and fainter with age, then disappear
+function laserDraw() {
+  Laser.raf = 0;
+  const c = Laser.trail, dpr = window.devicePixelRatio || 1, W = window.innerWidth, H = window.innerHeight;
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const now = performance.now(), pts = Laser.pts;
+  while (pts.length && now - pts[0].t > TRAIL_MS) pts.shift();
+  g.lineCap = 'round';
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].start) continue;                                  // a new touch does not connect to the previous one
+    const k = 1 - (now - pts[i].t) / TRAIL_MS;                   // 1 = fresh, 0 = gone
+    g.strokeStyle = 'rgba(255,45,32,' + (k * 0.55).toFixed(3) + ')';
+    g.lineWidth = 1 + 3 * k;
+    g.beginPath(); g.moveTo(pts[i - 1].x, pts[i - 1].y); g.lineTo(pts[i].x, pts[i].y); g.stroke();
+  }
+  if (pts.length) Laser.raf = requestAnimationFrame(laserDraw);
 }
 function laserLose(e) { if (Laser.on && (e.type === 'pointerleave' || e.pointerType !== 'mouse')) Laser.dot.hidden = true; }
 V.el.addEventListener('pointermove', laserAim);
@@ -2474,15 +2499,17 @@ function timerReadout() {
   return { text, reached };
 }
 function timerTick() {
-  const chip = $('timerChip');
-  chip.hidden = !Timer.active;
-  if (!Timer.active) return;
-  const r = timerReadout();
-  if (chip.textContent !== r.text) chip.textContent = r.text;
-  chip.classList.toggle('over', r.reached);
-  chip.classList.toggle('paused', !Timer.running);
+  const r = Timer.active ? timerReadout() : null;
+  document.querySelectorAll('.timer-pill').forEach((p) => {       // one in the viewer's top bar, one in the file list's header
+    p.hidden = !Timer.active;
+    if (!r) return;
+    const t = p.querySelector('.tp-text');
+    if (t.textContent !== r.text) t.textContent = r.text;
+    p.classList.toggle('over', r.reached);
+    p.classList.toggle('paused', !Timer.running);
+  });
   const live = $('timerLive');
-  if (live) { live.textContent = r.text; live.classList.toggle('over', r.reached); }
+  if (live && r) { live.textContent = r.text; live.classList.toggle('over', r.reached); }
 }
 function timerRun(on) {
   clearInterval(Timer.tick);
@@ -2509,17 +2536,18 @@ function closeTimerDialog() {
   TD.el.hidden = true;
   TD.onEnter = null;
   setTimeout(() => { if (TD.el.hidden) TD.body.replaceChildren(); }, 260);
-  showUi();
+  if (!V.el.hidden) showUi();
 }
 function openTimerDialog() {
-  closeMenu();
-  closeOverview();
+  const host = V.el.hidden ? document.body : V.el;               // the window also opens from the file list
+  if (TD.el.parentNode !== host) host.appendChild(TD.el);
+  if (!V.el.hidden) { closeMenu(); closeOverview(); }
   TD.body.replaceChildren(Timer.active ? timerRunningView() : timerSetupView());
   TD.el.hidden = false;
 }
 TD.el.addEventListener('pointerdown', (e) => { if (e.target === TD.el) closeTimerDialog(); });
 TD.el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) b.blur(); });
-$('timerChip').onclick = openTimerDialog;
+document.querySelectorAll('.timer-pill').forEach((p) => { p.onclick = openTimerDialog; });
 $('mTimer').onclick = openTimerDialog;
 
 function timerSetupView() {
@@ -2638,8 +2666,8 @@ function timerSetupView() {
   box.append(labels, ups, digits, downs, hint);
   say(HINTS[mode]);
 
-  const actions = h('div', 'modal-actions timer-actions');
-  const cancel = h('button', 'btn', 'Cancel');
+  const actions = h('div', 'modal-actions');
+  const cancel = h('button', 'btn', 'Close');
   cancel.type = 'button';
   cancel.onclick = closeTimerDialog;
   start.onclick = () => {
@@ -2670,14 +2698,17 @@ function timerRunningView() {
   live.classList.toggle('over', r.reached);
   box.appendChild(live);
 
-  const actions = h('div', 'modal-actions timer-actions');
-  const cancel = h('button', 'btn', 'Cancel');
-  cancel.type = 'button';
-  cancel.onclick = () => { timerStop(); closeTimerDialog(); };
+  const actions = h('div', 'modal-actions');
+  const close = h('button', 'btn', 'Close');                      // like every window: the left button only closes it
+  close.type = 'button';
+  close.onclick = closeTimerDialog;
+  const stop = h('button', 'btn', 'Stop');
+  stop.type = 'button';
+  stop.onclick = () => { timerStop(); closeTimerDialog(); };
   const pause = h('button', 'btn btn-primary', Timer.running ? 'Pause' : 'Resume');
   pause.type = 'button';
   pause.onclick = () => { timerTogglePause(); pause.textContent = Timer.running ? 'Pause' : 'Resume'; };
-  actions.append(cancel, pause);
+  actions.append(close, stop, pause);
   box.appendChild(actions);
   TD.onEnter = () => pause.onclick();
   return box;
@@ -2817,6 +2848,13 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+  /* the timer window (on any screen): Esc closes, Enter = its main button, the rest is typing */
+  if (timerDialogOpen()) {
+    if (e.key === 'Escape') { e.preventDefault(); closeTimerDialog(); }
+    else if (e.key === 'Enter' && TD.onEnter && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); TD.onEnter(); }
+    return;
+  }
+
   /* a dialog is open */
   if (!M.el.hidden) {
     if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
@@ -2829,11 +2867,6 @@ document.addEventListener('keydown', (e) => {
   if (!V.el.hidden) {
     const act = (fn) => { e.preventDefault(); fn(); };
 
-    if (timerDialogOpen()) {                                  // the timer window: Esc closes, Enter = its main button, the rest is typing
-      if (e.key === 'Escape') act(closeTimerDialog);
-      else if (e.key === 'Enter' && TD.onEnter && !(e.target.closest && e.target.closest('button'))) act(TD.onEnter);
-      return;
-    }
 
     if (V.cover) return act(hideCover);                       // any key brings the slide back
 

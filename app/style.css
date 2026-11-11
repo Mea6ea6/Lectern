@@ -957,8 +957,8 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 /* Queue dialog: "Remove all" is a quiet text link, not a third button */
 .q-clear-row { display: flex; justify-content: flex-end; margin-top: 8px; }
-.q-clear { padding: 6px 4px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-radius: 6px; }
-.q-clear:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.q-clear { padding: 6px 10px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-radius: var(--r-md); transition: background .15s, box-shadow .15s, color .15s; }
+.q-clear:hover { color: var(--ink); background: var(--surface-2); box-shadow: var(--sh-1); }
 .viewer.inking.notes-open .stagewrap { right: 0; }
 
 /* Thickness slider in the drawing bar */
@@ -1012,49 +1012,53 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 /* Laser pointer: the only red in the UI, because a laser is red */
 .laser-dot { position: fixed; left: 0; top: 0; z-index: 60; width: 0; height: 0; pointer-events: none; }
 .laser-dot::before {
-  content: ""; position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%;
-  background: radial-gradient(circle, #ff9a92 0, #ff2d20 45%, #e5120a 100%);
-  box-shadow: 0 0 0 5px rgba(255,45,32,.28), 0 0 22px 8px rgba(255,45,32,.5);
+  content: ""; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle, #ff9a92 0, #ff2d20 50%, #e5120a 100%);
+  box-shadow: 0 0 0 3px rgba(255,45,32,.25), 0 0 12px 3px rgba(255,45,32,.45);
 }
+.laser-trail { position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: 59; pointer-events: none; }
 .viewer.laser-on .stage { cursor: none; touch-action: none; }
 
-/* Timer readout on the page (stays when the bars hide) */
-.timer-chip {
-  position: absolute; z-index: 7; left: 14px; top: calc(var(--bt) + 10px);
-  min-height: 44px; padding: 0 18px; border-radius: var(--r-pill);
-  background: var(--surface); color: var(--ink); box-shadow: var(--sh-2);
-  font-size: 22px; font-weight: 600; letter-spacing: .02em; font-variant-numeric: tabular-nums;
-  -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd);
-  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+/* Timer: a quiet readout in the top bar of the viewer and in the header of the file list */
+.vtitle-wrap { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.vtitle-wrap .vtitle { flex: 0 1 auto; }
+.timer-pill {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; height: 28px; padding: 0 10px; border-radius: var(--r-md);
+  color: var(--ink-soft); font-size: 13px; font-weight: 600; letter-spacing: .02em; font-variant-numeric: tabular-nums;
+  transition: background .15s, color .15s;
 }
-.viewer.immersive.ui-hidden .timer-chip { top: 14px; }
-.timer-chip.paused { opacity: .6; }
-.timer-chip.over, .timer-live.over { color: #e5322d; }
-.timer-chip.over { background: #e5322d; color: #fff; }
+.timer-pill .icon { width: 15px; height: 15px; }
+.timer-pill:hover { background: var(--surface-2); color: var(--ink); }
+.timer-pill.paused { opacity: .6; }
+.timer-pill.over, .timer-pill.over:hover, .timer-live.over { color: #e5322d; }
 
-/* Timer window */
-.timer-dialog { width: min(520px, 100%); padding: 26px 26px 22px; }
-.timer-mode { display: flex; width: 100%; }
+/* Timer window: same width, padding, title and buttons as the other windows */
+.timer-dialog { width: min(380px, 100%); padding: 26px 28px 22px; text-align: center; }
+/* The seconds tick inside this window, so the page behind it is neither dimmed nor blurred as a whole (that was recomputed on every tick and made it lag).
+   Only the window itself is frosted glass, like the More menu */
+.modal:has(.timer-dialog) { -webkit-backdrop-filter: none; backdrop-filter: none; background: transparent; }
+.timer-box .modal-title { text-align: center; }
+.timer-box .modal-actions { justify-content: center; margin-top: 18px; }
+.timer-mode { display: flex; width: 100%; margin-top: 4px; }
 .timer-mode button { flex: 1; justify-content: center; }
-.timer-row { display: grid; grid-template-columns: 1fr 22px 1fr 22px 1fr; align-items: center; justify-items: center; }
-.timer-row.lab { margin-top: 20px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
-.timer-row.digits { background: var(--surface-2); border-radius: var(--r-lg); padding: 10px 8px; justify-items: stretch; }
+.timer-row { display: grid; grid-template-columns: 1fr 16px 1fr 16px 1fr; align-items: center; justify-items: center; }
+.timer-row.lab { margin-top: 14px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.timer-row.digits { background: var(--surface-2); border-radius: var(--r-md); padding: 4px 6px; justify-items: stretch; }
 .timer-input {
   width: 100%; min-width: 0; padding: 0; text-align: center; border-radius: var(--r-md);
-  font-size: clamp(56px, 16vw, 92px); font-weight: 200; line-height: 1.15; font-variant-numeric: tabular-nums;
+  font-size: 48px; font-weight: 200; line-height: 1.3; font-variant-numeric: tabular-nums;
   caret-color: transparent; color: var(--ink);
 }
-.timer-input:focus { background: var(--ink); color: var(--on-ink); }
-.timer-colon { text-align: center; font-size: clamp(40px, 11vw, 64px); font-weight: 200; color: var(--ink-soft); }
+.timer-input:focus { background: var(--surface-3); }
+.timer-input::selection { background: transparent; color: inherit; }
+.timer-colon { font-size: 32px; font-weight: 200; color: var(--ink-soft); }
 .timer-step {
-  width: 64px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--r-md); color: var(--ink-soft); touch-action: manipulation; user-select: none; -webkit-user-select: none;
 }
+.timer-step .icon { width: 18px; height: 18px; }
 .timer-step:hover { background: var(--surface-2); color: var(--ink); }
-.timer-hint { min-height: 2.9em; margin: 12px 0 0; text-align: center; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
+.timer-hint { min-height: 2.8em; margin: 10px 0 0; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
 .timer-hint.warn { color: var(--ink); font-weight: 600; }
-.timer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-.timer-actions .btn { min-height: 52px; font-size: 17px; }
-.timer-actions .btn:disabled { opacity: .35; box-shadow: none; }
-.timer-live { margin: 16px 0 8px; text-align: center; font-size: clamp(64px, 18vw, 120px); font-weight: 200; font-variant-numeric: tabular-nums; }
+.timer-live { margin: 10px 0 14px; font-size: 56px; font-weight: 200; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .menu { max-height: calc(100% - var(--bt) - var(--bb) - 24px); overflow-y: auto; }
