@@ -1,4 +1,4 @@
-LECTERN v1.7.2 — offline viewer for the classroom
+LECTERN v1.8.0 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -47,7 +47,7 @@ SUPPORTED FILES
 IN THE VIEWER
   Bottom bar      First / Previous / Next / Last, progress bar (click or drag),
                   Draw, Overview (all pages as a grid), More (zoom, fit, rotate,
-                  black screen, keep screen on, theme)
+                  laser pointer, timer, black screen, keep screen on, theme)
   Fullscreen      Tap the left / right edge to turn pages, swipe, tap the middle
                   to show the buttons. The buttons hide themselves.
   Video / audio   Only three buttons: back 5 seconds, play / pause, forward 5
@@ -91,6 +91,9 @@ KEYBOARD
            D = draw (1 pen, 2 marker, 3 eraser; Ctrl+Z undo, Ctrl+Shift+Z redo)
            M = bookmark   , . = previous / next bookmark   N = notes
            B = black screen   W = white screen   R = rotate   + − 0 = zoom
+           L = laser pointer (a red dot follows the mouse or a finger)
+           T = timer (silent; turns red when the time is reached)
+           Zoomed in: drag the page with the mouse to move it
            [ ] = previous / next file of the queue          Esc = back
 
 BROWSERS

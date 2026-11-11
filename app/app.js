@@ -708,7 +708,7 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes'].forEach((id) => {
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes', 'timerDlg'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     let logical = native.get.call(el), timer = 0;
@@ -2146,6 +2146,8 @@ function closeDriver() {
 
 function closeViewer() {
   V.openToken++;
+  setLaser(false);
+  closeTimerDialog();
   if (window.Pen) Pen.reset();
   notesReset();
   V.armed = null;
@@ -2407,12 +2409,300 @@ $('mFwd').onclick = () => navigate('next');
 
 /* ----- Pen and marker (the code lives in app/modules/ink.js and loads on first use) ----- */
 async function toggleInk() {
+  if (Laser.on) setLaser(false);               // the pen and the laser pointer don't mix
   if (window.Pen) { Pen.toggle(); return; }
   if (!V.driver || !V.driver.canDraw) return;
   try { await lib('ink'); Pen.toggle(); }
   catch (err) { console.warn(err); showToast('Could not load the pen tools'); }
 }
 $('vInk').onclick = toggleInk;
+
+/* ----- Laser pointer: a red dot that follows the mouse (or a finger on a touch screen). Nothing is drawn ----- */
+const Laser = { on: false, dot: $('laserDot') };
+function setLaser(on) {
+  on = !!on;
+  if (on === Laser.on) return;
+  if (on && window.Pen && Pen.on) Pen.toggle();
+  Laser.on = on;
+  V.el.classList.toggle('laser-on', on);
+  $('mLaser').setAttribute('aria-pressed', String(on));
+  if (!on) Laser.dot.hidden = true;
+  showToast(on ? 'Laser pointer on' : 'Laser pointer off');
+}
+function laserAim(e) {
+  if (!Laser.on) return;
+  // the dot is only for the page: not over the bars, the menu, the notes, the overview or a dialog
+  if (e.target.closest && e.target.closest('.vbar, .menu, .notes, .overview, .modal, .timer-chip')) { Laser.dot.hidden = true; return; }
+  Laser.dot.hidden = false;
+  Laser.dot.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px)';
+}
+function laserLose(e) { if (Laser.on && (e.type === 'pointerleave' || e.pointerType !== 'mouse')) Laser.dot.hidden = true; }
+V.el.addEventListener('pointermove', laserAim);
+V.el.addEventListener('pointerdown', laserAim);
+['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => V.el.addEventListener(ev, laserLose));
+$('mLaser').onclick = () => { closeMenu(); setLaser(!Laser.on); };
+
+/* ----- Timer: no sounds. It only shows the time and turns red when the time is reached.
+   "down" counts from the set time to 00:00; "up" counts from 00:00 to the set time.
+   After that it keeps going (red), so the speaker sees how far over they are. ----- */
+const Timer = {
+  active: false, running: false,
+  mode: 'down',
+  total: 0,                     // the set time, ms
+  before: 0, since: 0,          // time counted before the last start, and when the last start was
+  set: [0, 7, 0],               // hours, minutes, seconds in the dialog (remembered)
+  tick: 0,
+};
+const TIMER_MAX = [23, 59, 59];
+const pad2 = (n) => String(n).padStart(2, '0');
+(function loadTimerPref() {
+  const p = loadPref('fv-timer', '').split(',');           // "down,0,7,0"
+  const n = p.slice(1).map(Number);
+  if (p.length === 4 && (p[0] === 'down' || p[0] === 'up') && n.every((x, i) => Number.isInteger(x) && x >= 0 && x <= TIMER_MAX[i])) {
+    Timer.mode = p[0]; Timer.set = n;
+  }
+})();
+
+const timerElapsed = () => Timer.before + (Timer.running ? performance.now() - Timer.since : 0);
+function timerReadout() {
+  const el = timerElapsed(), reached = el >= Timer.total;
+  const secs = Timer.mode === 'up' ? Math.floor(el / 1000)
+    : reached ? Math.floor((el - Timer.total) / 1000) : Math.ceil((Timer.total - el) / 1000);
+  const sign = Timer.mode === 'down' && reached && secs > 0 ? '−' : '';     // below zero: −00:12
+  const long = Timer.total >= 3600000 || secs >= 3600;
+  const text = sign + (long ? Math.floor(secs / 3600) + ':' : '') + pad2(Math.floor(secs / 60) % 60) + ':' + pad2(secs % 60);
+  return { text, reached };
+}
+function timerTick() {
+  const chip = $('timerChip');
+  chip.hidden = !Timer.active;
+  if (!Timer.active) return;
+  const r = timerReadout();
+  if (chip.textContent !== r.text) chip.textContent = r.text;
+  chip.classList.toggle('over', r.reached);
+  chip.classList.toggle('paused', !Timer.running);
+  const live = $('timerLive');
+  if (live) { live.textContent = r.text; live.classList.toggle('over', r.reached); }
+}
+function timerRun(on) {
+  clearInterval(Timer.tick);
+  if (on) Timer.tick = setInterval(timerTick, 200);
+}
+function timerStart(h, m, s) {
+  Timer.total = ((h * 60 + m) * 60 + s) * 1000;
+  Timer.before = 0; Timer.since = performance.now();
+  Timer.active = Timer.running = true;
+  timerRun(true); timerTick();
+}
+function timerTogglePause() {
+  if (Timer.running) { Timer.before = timerElapsed(); Timer.running = false; timerRun(false); }
+  else { Timer.since = performance.now(); Timer.running = true; timerRun(true); }
+  timerTick();
+}
+function timerStop() { Timer.active = Timer.running = false; timerRun(false); timerTick(); }
+
+/* The timer window (its own little dialog inside the viewer, so it also works in fullscreen) */
+const TD = { el: $('timerDlg'), body: $('timerBody'), onEnter: null };
+const timerDialogOpen = () => !TD.el.hidden;
+function closeTimerDialog() {
+  if (TD.el.hidden) return;
+  TD.el.hidden = true;
+  TD.onEnter = null;
+  setTimeout(() => { if (TD.el.hidden) TD.body.replaceChildren(); }, 260);
+  showUi();
+}
+function openTimerDialog() {
+  closeMenu();
+  closeOverview();
+  TD.body.replaceChildren(Timer.active ? timerRunningView() : timerSetupView());
+  TD.el.hidden = false;
+}
+TD.el.addEventListener('pointerdown', (e) => { if (e.target === TD.el) closeTimerDialog(); });
+TD.el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) b.blur(); });
+$('timerChip').onclick = openTimerDialog;
+$('mTimer').onclick = openTimerDialog;
+
+function timerSetupView() {
+  const box = h('div', 'timer-box');
+  box.appendChild(h('h2', 'modal-title', 'Timer'));
+  let mode = Timer.mode;
+  const vals = Timer.set.slice();
+  const inputs = [];
+  const nonZero = () => vals[0] > 0 || vals[1] > 0 || vals[2] > 0;
+
+  // The little message under the digits: what the mode does, or "digits only"
+  const HINTS = {
+    down: 'Counts down from the time you set. Turns red at 00:00.',
+    up: 'Counts up from 00:00. Turns red when it reaches the time you set.',
+  };
+  const hint = h('p', 'timer-hint');
+  hint.setAttribute('aria-live', 'polite');
+  let hintTimer = 0;
+  const say = (text, warn) => {
+    clearTimeout(hintTimer);
+    hint.textContent = text;
+    hint.classList.toggle('warn', !!warn);
+    if (warn) hintTimer = setTimeout(() => say(HINTS[mode]), 2200);
+  };
+
+  // Countdown / Count up to
+  const seg = h('div', 'seg timer-mode');
+  const modeButtons = {};
+  [['down', 'Countdown'], ['up', 'Count up to']].forEach(([m, label]) => {
+    const b = h('button', '', label);
+    b.type = 'button';
+    b.onclick = () => {
+      mode = m;
+      for (const k in modeButtons) modeButtons[k].setAttribute('aria-pressed', String(k === mode));
+      say(HINTS[mode]);
+    };
+    modeButtons[m] = b;
+    seg.appendChild(b);
+  });
+  for (const k in modeButtons) modeButtons[k].setAttribute('aria-pressed', String(k === mode));
+  box.appendChild(seg);
+
+  const start = h('button', 'btn btn-primary', 'Start');
+  start.type = 'button';
+  const refresh = () => { start.disabled = !nonZero(); };
+
+  const step = (i, d) => {
+    vals[i] = (vals[i] + d + TIMER_MAX[i] + 1) % (TIMER_MAX[i] + 1);
+    inputs[i].value = pad2(vals[i]);
+    refresh();
+  };
+
+  // ▲ / ▼ above and below a field. Held down, they repeat.
+  const stepButton = (i, d) => {
+    const b = h('button', 'timer-step');
+    b.type = 'button';
+    b.setAttribute('aria-label', (d > 0 ? 'More ' : 'Less ') + ['hours', 'minutes', 'seconds'][i]);
+    b.appendChild(icon(d > 0 ? 'i-chev-up' : 'i-chev'));
+    let wait = 0, rep = 0;
+    const stop = () => { clearTimeout(wait); clearInterval(rep); };
+    b.onpointerdown = () => {
+      stop(); step(i, d);
+      wait = setTimeout(() => { rep = setInterval(() => step(i, d), 80); }, 450);
+    };
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => b.addEventListener(ev, stop));
+    b.onclick = (e) => { if (e.detail === 0) step(i, d); };        // Enter / Space on the keyboard (the mouse and fingers act on pointerdown)
+    b.oncontextmenu = (e) => e.preventDefault();                    // a long press on a touch screen
+    return b;
+  };
+
+  // The digits: real text fields, so a phone or tablet shows its number pad
+  const field = (i) => {
+    const el = h('input', 'timer-input');
+    el.type = 'text'; el.inputMode = 'numeric'; el.pattern = '[0-9]*'; el.maxLength = 2;
+    el.autocomplete = 'off'; el.spellcheck = false; el.enterKeyHint = 'done';
+    el.value = pad2(vals[i]);
+    el.setAttribute('aria-label', ['Hours', 'Minutes', 'Seconds'][i]);
+    el.onfocus = () => setTimeout(() => { try { el.select(); } catch (e) { /* fine */ } }, 0);
+    el.onblur = () => { el.value = pad2(vals[i]); };
+    el.onkeydown = (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); step(i, 1); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); step(i, -1); }
+      else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !/[0-9]/.test(e.key)) {
+        e.preventDefault(); say('Digits only (0–9)', true);       // letters, spaces and symbols never get in
+      }
+    };
+    el.oninput = () => {                                           // paste, a phone keyboard…
+      const raw = el.value;
+      let v = raw.replace(/\D/g, '').slice(0, 2);
+      if (v !== raw) say('Digits only (0–9)', true);
+      let n = v === '' ? 0 : Number(v);
+      if (n > TIMER_MAX[i]) { n = TIMER_MAX[i]; v = String(n); say('The largest value here is ' + n, true); }
+      el.value = v;
+      vals[i] = n;
+      refresh();
+      // two digits typed, or a first digit that can't have a second one: move on to the next field
+      if (v !== '' && i < 2 && (v.length === 2 || n * 10 > TIMER_MAX[i])) inputs[i + 1].focus();
+    };
+    inputs.push(el);
+    return el;
+  };
+
+  // Four rows with the same three columns: labels, ▲, digits, ▼
+  const row = (cls) => h('div', 'timer-row ' + cls);
+  const labels = row('lab'), ups = row('up'), digits = row('digits'), downs = row('down');
+  for (let i = 0; i < 3; i++) {
+    if (i) {
+      labels.appendChild(h('span')); ups.appendChild(h('span')); downs.appendChild(h('span'));
+      digits.appendChild(h('span', 'timer-colon', ':'));
+    }
+    labels.appendChild(h('span', 'timer-lab', ['h', 'min', 's'][i]));
+    ups.appendChild(stepButton(i, 1));
+    digits.appendChild(field(i));
+    downs.appendChild(stepButton(i, -1));
+  }
+  box.append(labels, ups, digits, downs, hint);
+  say(HINTS[mode]);
+
+  const actions = h('div', 'modal-actions timer-actions');
+  const cancel = h('button', 'btn', 'Cancel');
+  cancel.type = 'button';
+  cancel.onclick = closeTimerDialog;
+  start.onclick = () => {
+    if (!nonZero()) return;
+    Timer.mode = mode; Timer.set = vals.slice();
+    savePref('fv-timer', [mode, ...vals].join(','));
+    timerStart(vals[0], vals[1], vals[2]);
+    closeTimerDialog();
+  };
+  actions.append(cancel, start);
+  box.appendChild(actions);
+  refresh();
+  TD.onEnter = () => start.onclick();
+  if (window.matchMedia && matchMedia('(hover: hover)').matches) setTimeout(() => inputs[1].focus(), 60);   // not on a touch screen: the keyboard would pop up
+  return box;
+}
+
+function timerRunningView() {
+  const box = h('div', 'timer-box');
+  box.appendChild(h('h2', 'modal-title', 'Timer'));
+  const secs = Timer.total / 1000, pad = (n) => pad2(n);
+  const target = pad(Math.floor(secs / 3600)) + ':' + pad(Math.floor(secs / 60) % 60) + ':' + pad(secs % 60);
+  box.appendChild(h('p', 'timer-hint', Timer.mode === 'down' ? 'Counting down from ' + target : 'Counting up to ' + target));
+  const live = h('div', 'timer-live');
+  live.id = 'timerLive';
+  const r = timerReadout();
+  live.textContent = r.text;
+  live.classList.toggle('over', r.reached);
+  box.appendChild(live);
+
+  const actions = h('div', 'modal-actions timer-actions');
+  const cancel = h('button', 'btn', 'Cancel');
+  cancel.type = 'button';
+  cancel.onclick = () => { timerStop(); closeTimerDialog(); };
+  const pause = h('button', 'btn btn-primary', Timer.running ? 'Pause' : 'Resume');
+  pause.type = 'button';
+  pause.onclick = () => { timerTogglePause(); pause.textContent = Timer.running ? 'Pause' : 'Resume'; };
+  actions.append(cancel, pause);
+  box.appendChild(actions);
+  TD.onEnter = () => pause.onclick();
+  return box;
+}
+
+/* ----- Drag to move a zoomed page (mouse; a finger already scrolls by itself) ----- */
+let pan = null;
+V.stage.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'mouse' || e.button !== 0 || Laser.on || V.view.zoom <= 1) return;
+  const s = V.stage, r = s.getBoundingClientRect();
+  if (e.clientX >= r.left + s.clientWidth || e.clientY >= r.top + s.clientHeight) return;        // that is the scroll bar
+  if (s.scrollWidth <= s.clientWidth && s.scrollHeight <= s.clientHeight) return;                // nothing to move
+  if (e.target.closest && e.target.closest('a, button, input, select, textarea, video, audio')) return;
+  pan = { x: e.clientX, y: e.clientY, left: s.scrollLeft, top: s.scrollTop };
+  s.setPointerCapture(e.pointerId);
+  s.classList.add('panning');
+  e.preventDefault();
+});
+V.stage.addEventListener('pointermove', (e) => {
+  if (!pan) return;
+  V.stage.scrollLeft = pan.left - (e.clientX - pan.x);
+  V.stage.scrollTop = pan.top - (e.clientY - pan.y);
+});
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) =>
+  V.stage.addEventListener(ev, () => { if (pan) { pan = null; V.stage.classList.remove('panning'); } }));
 
 $('mZoomIn').onclick = () => setZoom(V.view.zoom * 1.25);
 $('mZoomOut').onclick = () => setZoom(V.view.zoom / 1.25);
@@ -2450,7 +2740,14 @@ scrub.addEventListener('pointerup', endScrub);
 scrub.addEventListener('pointercancel', endScrub);
 
 /* ----- Mouse / touch ----- */
-V.el.addEventListener('pointermove', (e) => { if (V.immersive && e.pointerType === 'mouse') showUi(); });
+V.el.addEventListener('pointermove', (e) => {
+  if (!V.immersive || e.pointerType !== 'mouse') return;
+  if (Laser.on) {                    // with the laser on, the bars only come back when the mouse goes to the top or bottom edge
+    const r = V.el.getBoundingClientRect();
+    if (e.clientY - r.top > V.el.querySelector('.vbar-top').offsetHeight && r.bottom - e.clientY > V.el.querySelector('.vbar-bottom').offsetHeight) return;
+  }
+  showUi();
+});
 V.el.querySelectorAll('.vbar, .side').forEach((el) =>
   el.addEventListener('pointerdown', () => { if (V.immersive) showUi(); }));
 
@@ -2465,6 +2762,7 @@ V.stage.addEventListener('pointerup', (e) => {
   const quick = Date.now() - pointerStart.time < 600;
   pointerStart = null;
   const touch = e.pointerType !== 'mouse';
+  if (Laser.on && touch) return;           // a finger is the laser: no swipes or edge taps
   const pageBased = V.driver && !(V.driver instanceof ScrollViewer) && !V.driver.isMedia;
 
   if (touch && pageBased && V.view.zoom <= 1 && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
@@ -2531,11 +2829,18 @@ document.addEventListener('keydown', (e) => {
   if (!V.el.hidden) {
     const act = (fn) => { e.preventDefault(); fn(); };
 
+    if (timerDialogOpen()) {                                  // the timer window: Esc closes, Enter = its main button, the rest is typing
+      if (e.key === 'Escape') act(closeTimerDialog);
+      else if (e.key === 'Enter' && TD.onEnter && !(e.target.closest && e.target.closest('button'))) act(TD.onEnter);
+      return;
+    }
+
     if (V.cover) return act(hideCover);                       // any key brings the slide back
 
     if (e.key === 'Escape') {
       if (V.menuOpen) return act(closeMenu);
       if (V.overviewOpen) return act(closeOverview);
+      if (Laser.on) return act(() => setLaser(false));
       if (window.Pen && Pen.on) return act(() => Pen.toggle());
       if (Notes.open) return act(() => notesToggle(false));
       // In real fullscreen the browser handles Esc itself; the fake one we handle
@@ -2547,6 +2852,9 @@ document.addEventListener('keydown', (e) => {
     // Class queue: [ and ] (or Shift + arrows) move between the files of the queue
     if (e.code === 'BracketLeft' || (e.shiftKey && e.key === 'ArrowLeft'))  return act(() => queueStep(-1));
     if (e.code === 'BracketRight' || (e.shiftKey && e.key === 'ArrowRight')) return act(() => queueStep(1));
+
+    if (e.code === 'KeyL') return act(() => setLaser(!Laser.on));
+    if (e.code === 'KeyT') return act(openTimerDialog);
 
     // Video / audio: Space plays or pauses, the arrows jump 5 seconds, nothing else
     if (V.driver && V.driver.isMedia) {
