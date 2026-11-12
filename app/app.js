@@ -2202,7 +2202,7 @@ function updateBar() {
   $('vInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
   Marks.refresh();
   notesRefresh();
-  $('mPresenter').disabled = !(ready && presentable());
+  $('mPresenter').disabled = !(presenterOn() || (ready && presentable()));
   linkPush();
 
   // Video / audio: play button, big play button
@@ -3298,6 +3298,7 @@ const Link = {
 };
 try { if ('BroadcastChannel' in window) Link.ch = new BroadcastChannel('lectern-link'); } catch (e) { /* no link then */ }
 
+const presenterOn = () => Link.role === 'presenter' && Link.alive && Link.peerRole === 'companion';
 const presentable = () => !!V.entry && !!V.driver && (V.entry.viewer === 'pdf' || V.entry.viewer === 'pptx') && V.driver.count > 0;
 
 /* ----- Presenter window ----- */
@@ -3332,7 +3333,7 @@ function presenterStart() {
   if (Link.alive && Link.peerRole === 'companion') {
     try { if (Link.win && !Link.win.closed) Link.win.focus(); } catch (e) { /* fine */ }
     linkSendAll(); linkUi();
-    showToast('The companion window is already open');
+    showToast('The companion window is already open (More → Stop presenter view ends it)', 3500);
     return;
   }
   const w = window.open(location.href.split('#')[0] + '#companion', 'lectern-companion', 'popup,width=1180,height=780');
@@ -3342,7 +3343,27 @@ function presenterStart() {
   showToast('Drag the companion window to your own screen, then press F here', 5000);
 }
 
+// Turn presenter view off: the companion window closes and this window is an ordinary viewer again
+function presenterStop() {
+  Link.send({ t: 'stop' });
+  const w = Link.win;
+  Link.win = null; Link.role = 'none'; Link.alive = false; Link.peerRole = ''; Link.key = 0; Link.last = '';
+  if (w) setTimeout(() => { try { if (!w.closed) w.close(); } catch (e) { /* fine */ } }, 250);
+  linkUi();
+  showToast('Presenter view is off');
+}
+
 /* ----- Companion window ----- */
+const pageTitle = document.title;
+function companionLeave() {                       // the presenter window ended the link and this window could not close itself
+  Link.role = 'none'; Link.alive = false; Link.rem = null; Link.pos = null;
+  if (Link.peek) { Link.peek.destroy(); Link.peek = null; }
+  document.title = pageTitle;
+  V.el.classList.remove('pv-open'); $('pv').hidden = true;
+  for (const id of ['mPresenter', 'mLaser', 'mBlack', 'mNotes', 'vInk']) $(id).hidden = false;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* fine */ }
+  linkUi();
+}
 function linkCmd(c) {
   if (!Link.rem || !Link.rem.key) { showToast('No presentation to control yet'); return; }
   Link.send({ t: 'cmd', key: Link.rem.key, c });
@@ -3474,7 +3495,7 @@ function linkStatus() {
 function linkUi() {
   const st = linkStatus();
   document.querySelectorAll('.link-pill').forEach((p) => {
-    p.hidden = !st;
+    p.hidden = !st || (Link.role === 'presenter' && !st.here);       // a presenter without a companion window shows nothing
     if (!st) return;
     p.classList.toggle('off', !st.here);
     p.querySelector('.lp-text').textContent = st.text;
@@ -3483,7 +3504,8 @@ function linkUi() {
     $('pvState').classList.toggle('off', !st.here);
     $('pvStateText').textContent = st.here ? 'Connected' : 'Not connected';
   }
-  $('mPresenterNote').textContent = Link.role === 'presenter' && st && st.here ? 'On' : '';
+  $('mPresenterText').textContent = presenterOn() ? 'Stop presenter view' : 'Presenter view';
+  $('mPresenter').disabled = !(presenterOn() || (V.driver && presentable()));
   pvRender();
 }
 
@@ -3518,6 +3540,7 @@ function linkReceive(m) {
       if (Link.role === 'companion') { Link.pos = m; if (!m.key && Link.rem) { Link.rem = null; if (Link.peek) { Link.peek.destroy(); Link.peek = null; } } pvRender(); }
       break;
     case 'timer': timerApply(m.s); break;
+    case 'stop': if (Link.role === 'companion') { window.close(); setTimeout(companionLeave, 300); } break;
   }
 }
 if (Link.ch) Link.ch.onmessage = (e) => linkReceive(e.data);
@@ -3527,7 +3550,7 @@ setInterval(() => {
   if (Link.alive && Date.now() - Link.seen > 6000) { Link.alive = false; linkUi(); }
 }, 1500);
 window.addEventListener('pagehide', () => Link.send({ t: 'bye' }));
-$('mPresenter').onclick = presenterStart;
+$('mPresenter').onclick = () => { if (presenterOn()) { closeMenu(); presenterStop(); } else presenterStart(); };
 
 if (Link.role === 'companion') {
   document.title = 'Lectern · Companion';

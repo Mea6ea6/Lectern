@@ -1,4 +1,4 @@
-LECTERN v1.10.0 — offline viewer for the classroom
+LECTERN v1.10.1 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -52,6 +52,7 @@ PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
      clicker) turn the slides; Left / Right turn the speech file. You can also turn
      slides in the first window. The timer is shared.
   3. Pen, laser and black screen work in the slides window only.
+  To end it: More > Stop presenter view (the second window closes).
   If the browser blocks the new window, allow pop-ups for this page.
   Both windows must be in the same browser, as two separate windows (not tabs).
 
