@@ -2099,9 +2099,11 @@ async function openViewer(entry) {
   if (window.Pen) Pen.reset();                 // drawings belong to one opening of one file
   notesReset();
   V.armed = null;
+  Link.key = 0;                                 // nothing to present until the file is open
   V.el.classList.remove('is-media');
 
   V.entry = entry;
+  V.openedAt = Date.now();
   V.view = { zoom: 1, fit: 'page', rot: 0 };
   V.stage.classList.remove('zoomed');
   V.el.hidden = false;
@@ -2124,6 +2126,7 @@ async function openViewer(entry) {
     await driver.open(entry.file);
     if (token !== V.openToken) return;
     showMessage('');
+    linkFile();
     updateBar();
   } catch (err) {
     if (token !== V.openToken) return;
@@ -2154,10 +2157,11 @@ function closeViewer() {
   hideCover();
   closeMenu();
   closeOverview();
-  if (isFullscreen()) exitFullscreen();
+  if (isFullscreen() && !pageFull()) exitFullscreen();
   setImmersive(false);
   closeDriver();
   V.entry = null;
+  Link.key = 0; linkPush();
   V.el.classList.remove('is-media');
   V.el.hidden = true;
   document.body.classList.remove('viewing');
@@ -2198,6 +2202,8 @@ function updateBar() {
   $('vInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
   Marks.refresh();
   notesRefresh();
+  $('mPresenter').disabled = !(ready && presentable());
+  linkPush();
 
   // Video / audio: play button, big play button
   const media = ready && d.isMedia;
@@ -2219,7 +2225,7 @@ function updateBar() {
 
 function navigate(where) {
   const d = V.driver;
-  if (!d) return;
+  if (!d || !$('vMsg').hidden) return;                // still opening (or could not open): nothing to turn yet
   if (d.isMedia) {                                    // video / audio: Next / Previous = 5 seconds
     if (where === 'next') { d.skip(5); showToast('+5 s'); }
     else if (where === 'prev') { d.skip(-5); showToast('−5 s'); }
@@ -2242,13 +2248,13 @@ function setFit(fit) { V.view.fit = fit; V.view.zoom = 1; applyView(); }
 function rotate(dir) { V.view.rot = (V.view.rot + dir * 90 + 360) % 360; applyView(); }
 
 let toastTimer = null;
-function showToast(text) {
+function showToast(text, ms) {
   if (!text) return;
   const t = $('toast');
   t.textContent = text;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1200);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms || 1200);
 }
 
 /* ----- Fullscreen ----- */
@@ -2257,16 +2263,37 @@ function exitFullscreen() {
   const fn = document.exitFullscreen || document.webkitExitFullscreen;
   if (fn) { try { Promise.resolve(fn.call(document)).catch(() => {}); } catch (e) { /* ignore */ } }
 }
+// The whole page in fullscreen (Settings → "Fullscreen window"): no browser bars, on the file list and in the viewer
+const pageFull = () => (document.fullscreenElement || document.webkitFullscreenElement) === document.documentElement;
+async function togglePageFullscreen() {
+  if (pageFull()) { exitFullscreen(); return; }
+  const root = document.documentElement, request = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!request) return;
+  try { await request.call(root); } catch (e) { /* the browser said no */ }
+}
+function syncFullUI() {
+  const can = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  for (const id of ['sFull', 'mFull']) { $(id).hidden = !can; $(id).setAttribute('aria-pressed', String(pageFull())); }
+}
 async function toggleFullscreen() {
-  if (isFullscreen()) { exitFullscreen(); return; }
+  if (isFullscreen() && !pageFull()) { exitFullscreen(); return; }
   if (V.immersive) { setImmersive(false); return; }       // the "fake" fullscreen (browser refused the real one)
+  if (pageFull()) { setImmersive(true); return; }         // the window is already full: only hide the bars
   const request = V.el.requestFullscreen || V.el.webkitRequestFullscreen;
   if (!request) { setImmersive(true); return; }
   try { await request.call(V.el); }                        // then fullscreenchange fires
   catch (e) { setImmersive(true); }
 }
-document.addEventListener('fullscreenchange', () => setImmersive(isFullscreen()));
-document.addEventListener('webkitfullscreenchange', () => setImmersive(isFullscreen()));
+function onFullscreenChange() {
+  syncFullUI();
+  if (pageFull()) return;                                 // the whole page went full: the viewer's bars stay as they are
+  setImmersive(isFullscreen());
+}
+document.addEventListener('fullscreenchange', onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+$('sFull').onclick = togglePageFullscreen;
+$('mFull').onclick = () => { closeMenu(); togglePageFullscreen(); };
+syncFullUI();
 
 // "Immersive": the page fills the screen, the bars float on top and hide after a few seconds
 function setImmersive(on) {
@@ -2488,7 +2515,8 @@ const pad2 = (n) => String(n).padStart(2, '0');
   }
 })();
 
-const timerElapsed = () => Timer.before + (Timer.running ? performance.now() - Timer.since : 0);
+// Time is counted from the clock (Date.now), so the presenter window and the companion window show the same seconds
+const timerElapsed = () => Timer.before + (Timer.running ? Date.now() - Timer.since : 0);
 function timerReadout() {
   const el = timerElapsed(), reached = el >= Timer.total;
   const secs = Timer.mode === 'up' ? Math.floor(el / 1000)
@@ -2517,16 +2545,27 @@ function timerRun(on) {
 }
 function timerStart(h, m, s) {
   Timer.total = ((h * 60 + m) * 60 + s) * 1000;
-  Timer.before = 0; Timer.since = performance.now();
+  Timer.before = 0; Timer.since = Date.now();
   Timer.active = Timer.running = true;
-  timerRun(true); timerTick();
+  timerRun(true); timerTick(); timerShare();
 }
 function timerTogglePause() {
   if (Timer.running) { Timer.before = timerElapsed(); Timer.running = false; timerRun(false); }
-  else { Timer.since = performance.now(); Timer.running = true; timerRun(true); }
-  timerTick();
+  else { Timer.since = Date.now(); Timer.running = true; timerRun(true); }
+  timerTick(); timerShare();
 }
-function timerStop() { Timer.active = Timer.running = false; timerRun(false); timerTick(); }
+function timerStop() { Timer.active = Timer.running = false; timerRun(false); timerTick(); timerShare(); }
+
+// The two linked windows share one timer: whoever changes it tells the other (see "Presenter view" below)
+function timerState() { return { active: Timer.active, running: Timer.running, mode: Timer.mode, total: Timer.total, before: Timer.before, since: Timer.since }; }
+function timerShare() { Link.send({ t: 'timer', s: timerState() }); }
+function timerApply(s) {
+  if (!s) return;
+  const was = Timer.active;
+  Object.assign(Timer, { active: !!s.active, running: !!s.running, mode: s.mode === 'up' ? 'up' : 'down', total: +s.total || 0, before: +s.before || 0, since: +s.since || 0 });
+  timerRun(Timer.running); timerTick();
+  if (was !== Timer.active && timerDialogOpen()) TD.body.replaceChildren(Timer.active ? timerRunningView() : timerSetupView());
+}
 
 /* The timer window (its own little dialog inside the viewer, so it also works in fullscreen) */
 const TD = { el: $('timerDlg'), body: $('timerBody'), onEnter: null };
@@ -2782,6 +2821,80 @@ V.el.addEventListener('pointermove', (e) => {
 V.el.querySelectorAll('.vbar, .side').forEach((el) =>
   el.addEventListener('pointerdown', () => { if (V.immersive) showUi(); }));
 
+/* ----- Zoom with two fingers, Ctrl + wheel (also a pinch on a trackpad) and a double tap -----
+   While the fingers move, the page is only scaled with CSS (smooth). When they lift, the real zoom is set (sharp)
+   and the page is scrolled so that the spot under the fingers stays under them. */
+const Zoomer = { on: false, f: 1, lastEnd: 0, lastTap: null, token: 0, timer: 0, wheel: 1 };
+let pinch = null;
+// The page element (a PDF page is a new canvas after every redraw, so it is looked up each time)
+const zoomAnchor = () => (V.driver && V.driver.inkAnchor && V.driver.inkAnchor()) || V.content;
+function zoomBegin(cx, cy) {
+  const anchor = zoomAnchor();
+  const r = anchor.getBoundingClientRect(), c = V.content.getBoundingClientRect();
+  Object.assign(Zoomer, { on: true, f: 1, cx, cy, w0: Math.round(r.width), fx: (cx - r.left) / (r.width || 1), fy: (cy - r.top) / (r.height || 1), token: Zoomer.token + 1 });
+  V.content.style.transformOrigin = (cx - c.left) + 'px ' + (cy - c.top) + 'px';
+}
+function zoomMove(f) {
+  const z = clamp(V.view.zoom * f, 0.25, 4);
+  Zoomer.f = z / V.view.zoom;
+  V.content.style.transform = 'scale(' + Zoomer.f + ')';
+}
+function zoomEnd() {
+  if (!Zoomer.on) return;
+  Zoomer.on = false;
+  V.content.style.transform = ''; V.content.style.transformOrigin = '';
+  if (Math.abs(Zoomer.f - 1) < 0.01) return;
+  const { fx, fy, cx, cy, token, w0 } = Zoomer;
+  setZoom(V.view.zoom * Zoomer.f);
+  // The page may take a moment to redraw (PDF): keep the spot under the fingers until the new size has arrived and stopped changing
+  let last = -1, still = 0, n = 0;
+  const settle = () => {
+    if (token !== Zoomer.token) return;
+    const r = zoomAnchor().getBoundingClientRect(), w = Math.round(r.width);
+    if (w > 0) {
+      V.stage.scrollLeft += r.left + fx * r.width - cx;
+      V.stage.scrollTop += r.top + fy * r.height - cy;
+      still = w === last ? still + 1 : 0;
+      last = w;
+    }
+    if (++n < 75 && !(still >= 4 && w !== w0)) requestAnimationFrame(settle);
+  };
+  requestAnimationFrame(settle);
+}
+function doubleTapZoom(x, y) {
+  zoomBegin(x, y);
+  zoomMove((V.view.zoom > 1.05 ? 1 : 1.5) / V.view.zoom);
+  zoomEnd();
+}
+V.stage.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 2 || Laser.on || (window.Pen && Pen.on)) return;
+  const [a, b] = e.touches;
+  pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1 };
+  zoomBegin((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+}, { passive: true });
+V.stage.addEventListener('touchmove', (e) => {
+  if (!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  const [a, b] = e.touches;
+  zoomMove(Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / pinch.d);
+}, { passive: false });
+['touchend', 'touchcancel'].forEach((ev) => V.stage.addEventListener(ev, (e) => {
+  if (!pinch || e.touches.length >= 2) return;
+  pinch = null; Zoomer.lastEnd = Date.now(); zoomEnd();
+}));
+V.stage.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey || Laser.on) return;
+  e.preventDefault();                                     // no zoom of the whole browser page
+  if (!Zoomer.on) { Zoomer.wheel = 1; zoomBegin(e.clientX, e.clientY); }
+  const dy = clamp(e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, -30, 30);
+  Zoomer.wheel *= Math.exp(-dy * 0.01);
+  zoomMove(Zoomer.wheel);
+  clearTimeout(Zoomer.timer);
+  Zoomer.timer = setTimeout(zoomEnd, 180);
+}, { passive: false });
+// A double click that has just opened the file must not select the text of the slide under the mouse
+V.stage.addEventListener('mousedown', (e) => { if (Date.now() - (V.openedAt || 0) < 600) e.preventDefault(); });
+
 // Taps: edges turn pages, the middle shows/hides the bars; a swipe turns pages too
 let pointerStart = null;
 V.stage.addEventListener('pointerdown', (e) => { pointerStart = { x: e.clientX, y: e.clientY, time: Date.now() }; });
@@ -2794,6 +2907,7 @@ V.stage.addEventListener('pointerup', (e) => {
   pointerStart = null;
   const touch = e.pointerType !== 'mouse';
   if (Laser.on && touch) return;           // a finger is the laser: no swipes or edge taps
+  if (pinch || Date.now() - Zoomer.lastEnd < 400) return;     // the end of a pinch is not a tap
   const pageBased = V.driver && !(V.driver instanceof ScrollViewer) && !V.driver.isMedia;
 
   if (touch && pageBased && V.view.zoom <= 1 && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
@@ -2811,6 +2925,16 @@ V.stage.addEventListener('pointerup', (e) => {
   if (!V.immersive && !touch) return;      // with a mouse in a normal window it's just a click on the content
   const rect = V.stage.getBoundingClientRect();
   const x = (e.clientX - rect.left) / rect.width;
+  if (touch && x >= 0.22 && x <= 0.78) {                    // two quick taps in the middle: zoom in, or back to normal
+    const now = Date.now(), L = Zoomer.lastTap;
+    if (L && now - L.t < 320 && Math.hypot(e.clientX - L.x, e.clientY - L.y) < 40) {
+      Zoomer.lastTap = null;
+      if (V.immersive) toggleUi();                           // the first tap flipped the bars: put them back
+      doubleTapZoom(e.clientX, e.clientY);
+      return;
+    }
+    Zoomer.lastTap = { t: now, x: e.clientX, y: e.clientY };
+  }
   if (x < 0.22) navigate('prev');
   else if (x > 0.78) navigate('next');
   else if (V.immersive) toggleUi();
@@ -2881,6 +3005,13 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.code === 'KeyG') return act(() => (V.overviewOpen ? closeOverview() : openOverview()));
     if (V.overviewOpen) return;                               // overview: only click, Esc or G
+
+    if (Link.role === 'companion') {
+      // Companion window: up / down (and a clicker's Page keys) turn the slides of the presentation; left / right stay with this document
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') return act(() => linkCmd('next'));
+      if (e.key === 'ArrowUp' || e.key === 'PageUp') return act(() => linkCmd('prev'));
+      if (['KeyL', 'KeyD', 'KeyB', 'KeyW', 'KeyN', 'KeyP'].includes(e.code)) return;     // these belong to the presentation window
+    } else if (e.code === 'KeyP') return act(presenterStart);
 
     // Class queue: [ and ] (or Shift + arrows) move between the files of the queue
     if (e.code === 'BracketLeft' || (e.shiftKey && e.key === 'ArrowLeft'))  return act(() => queueStep(-1));
@@ -3138,6 +3269,274 @@ function notesReset() {
 $('notesClose').onclick = () => notesToggle(false);
 $('mNotes').onclick = () => { closeMenu(); notesToggle(); };
 
+
+/* =====================================================================
+   Presenter view: two windows of Lectern that talk to each other (BroadcastChannel: offline, no server).
+   - Presenter window ("P" in the More menu): shows the slides, e.g. on the projector. It OWNS the slide number.
+   - Companion window: opened by the presenter window. Shows any other file (the speech) and a panel with the current
+     and next slide, the notes and the buttons. It never changes the slide itself: it sends a command, the presenter
+     window turns the page and reports the new state. So the two windows can't disagree.
+   - The companion gets a copy of the file once (a Blob is passed by reference, so it is cheap) and draws its own small
+     slides; after that only numbers travel between the windows. The timer is shared both ways.
+   Pen, laser, black screen and notes stay in the presenter window only.
+   ===================================================================== */
+const Link = {
+  id: Math.random().toString(36).slice(2, 10),
+  role: location.hash === '#companion' ? 'companion' : 'none',     // 'none' | 'presenter' | 'companion'
+  ch: null,
+  alive: false, peerRole: '', seen: 0, win: null,
+  seq: 0, key: 0,           // presenter: the number of the file now shown (0 = nothing to present)
+  last: '', resent: 0,
+  rem: null,                // companion: the file of the presenter { key, name, viewer, ratio, notes, ready }
+  pos: null,                // companion: where the presenter is { key, index, count }
+  peek: null,               // companion: draws small slides
+  send(msg) {
+    if (!this.ch || this.role === 'none') return;
+    try { this.ch.postMessage(Object.assign({ from: this.id, role: this.role }, msg)); }
+    catch (err) { console.warn('Presenter link: message not sent', err); }
+  },
+};
+try { if ('BroadcastChannel' in window) Link.ch = new BroadcastChannel('lectern-link'); } catch (e) { /* no link then */ }
+
+const presentable = () => !!V.entry && !!V.driver && (V.entry.viewer === 'pdf' || V.entry.viewer === 'pptx') && V.driver.count > 0;
+
+/* ----- Presenter window ----- */
+function linkSendFile() {
+  const d = V.driver, e = V.entry;
+  if (Link.role !== 'presenter' || !Link.key || !d || !e) return;
+  Link.send({ t: 'file', key: Link.key, name: e.name, viewer: e.viewer, file: e.file, ratio: d.thumbRatio, notes: d.notes || [] });
+}
+// A file has finished opening
+function linkFile() {
+  if (Link.role !== 'presenter') return;
+  Link.key = presentable() ? ++Link.seq : 0;
+  if (Link.key && Link.alive) linkSendFile();
+}
+function linkPush(force) {
+  if (Link.role !== 'presenter') return;
+  const d = V.driver, ok = !!Link.key && !!d && $('vMsg').hidden;
+  const s = ok ? { t: 'state', key: Link.key, index: d.currentIndex(), count: d.count } : { t: 'state', key: 0 };
+  const sig = JSON.stringify(s);
+  if (!force && sig === Link.last) return;
+  Link.last = sig;
+  Link.send(s);
+}
+function linkSendAll() { linkSendFile(); linkPush(true); if (Timer.active) timerShare(); }
+function presenterStart() {
+  if (Link.role === 'companion') return;
+  if (!Link.ch) { showToast('Presenter view needs a newer browser'); return; }
+  if (!presentable()) { showToast('Presenter view works with PDF and PowerPoint files'); return; }
+  closeMenu();
+  Link.role = 'presenter';
+  if (!Link.key) linkFile();
+  if (Link.alive && Link.peerRole === 'companion') {
+    try { if (Link.win && !Link.win.closed) Link.win.focus(); } catch (e) { /* fine */ }
+    linkSendAll(); linkUi();
+    showToast('The companion window is already open');
+    return;
+  }
+  const w = window.open(location.href.split('#')[0] + '#companion', 'lectern-companion', 'popup,width=1180,height=780');
+  if (!w) { showToast('The browser blocked the new window — allow pop-ups for this page', 4000); return; }
+  Link.win = w;
+  linkUi();
+  showToast('Drag the companion window to your own screen, then press F here', 5000);
+}
+
+/* ----- Companion window ----- */
+function linkCmd(c) {
+  if (!Link.rem || !Link.rem.key) { showToast('No presentation to control yet'); return; }
+  Link.send({ t: 'cmd', key: Link.rem.key, c });
+}
+
+async function peekPdf(file) {
+  await lib('pdf');
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  let chain = Promise.resolve();
+  return {
+    count: doc.numPages,
+    draw(i, el, stale) {
+      chain = chain.then(async () => {
+        if (stale()) return;
+        const page = await doc.getPage(i + 1);
+        const base = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: (el.clientWidth || 340) * Math.min(window.devicePixelRatio || 1, 2) / base.width });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp, background: '#fff' }).promise;
+        if (!stale()) el.replaceChildren(canvas);
+      }).catch((err) => console.warn('Slide preview failed:', err));
+      return chain;
+    },
+    destroy() { try { doc.destroy(); } catch (e) { /* fine */ } },
+  };
+}
+async function peekPptx(file, ratio) {
+  await lib('pptx');
+  const buf = await file.arrayBuffer();
+  const W = 1280, H = Math.round(W * (ratio || 9 / 16));
+  const host = h('div');
+  Object.assign(host.style, { position: 'fixed', left: '-20000px', top: '0', width: W + 'px', height: H + 'px' });
+  document.body.appendChild(host);
+  const pv = pptxPreview.init(host, { width: W, height: H, mode: 'slide' });
+  await pv.load(buf);
+  let chain = Promise.resolve();
+  return {
+    count: pv.slideCount,
+    draw(i, el, stale) {
+      chain = chain.then(() => {
+        if (stale()) return;
+        pv.removeCurrentSlide();
+        pv.renderSingleSlide(i);
+        const src = host.querySelector('.pptx-preview-slide-wrapper');
+        if (!src) return;
+        const clone = src.cloneNode(true);
+        clone.style.cssText += ';position:absolute;left:0;top:0;margin:0';
+        const box = h('div', 'clone-host');
+        box.style.width = W + 'px'; box.style.height = H + 'px'; box.dataset.w = W;
+        box.style.transform = 'scale(' + ((el.clientWidth || 340) / W) + ')';
+        box.appendChild(clone);
+        el.replaceChildren(box);
+      }).catch((err) => console.warn('Slide preview failed:', err));
+      return chain;
+    },
+    destroy() { try { pv.destroy(); } catch (e) { /* fine */ } host.remove(); },
+  };
+}
+async function peekLoad(m) {
+  const old = Link.peek; Link.peek = null;
+  if (old) old.destroy();
+  Link.rem = { key: m.key, name: m.name, viewer: m.viewer, ratio: m.ratio || 0.5625, notes: m.notes || [], ready: false };
+  pvRender();
+  try {
+    const eng = m.viewer === 'pdf' ? await peekPdf(m.file) : await peekPptx(m.file, m.ratio);
+    if (!Link.rem || Link.rem.key !== m.key) { eng.destroy(); return; }
+    Link.peek = eng; Link.rem.ready = true;
+  } catch (err) { console.warn('Presenter view: could not read the file', err); }
+  pvRender();
+}
+
+// The panel
+let pvJob = 0;
+function pvRender() {
+  if (Link.role !== 'companion') return;
+  const rem = Link.rem, pos = Link.pos && rem && Link.pos.key === rem.key ? Link.pos : null;
+  const online = Link.alive && Link.peerRole === 'presenter';
+  const empty = $('pvEmpty');
+  let msg = '';
+  if (!online) msg = 'Waiting for the presentation window…';
+  else if (Link.pos && !Link.pos.key) msg = 'Open a PDF or PowerPoint file in the presentation window.';
+  else if (!pos) msg = 'Loading the presentation…';
+  empty.textContent = msg;
+  $('pv').classList.toggle('idle', !!msg);
+  $('pvTitle').textContent = online && rem && rem.name ? rem.name : 'Presentation';
+  if (msg) { pvJob++; return; }
+
+  const i = pos.index, last = pos.count - 1;
+  $('pvPos').textContent = (i + 1) + ' / ' + pos.count;
+  $('pvPrev').disabled = i <= 0;
+  $('pvNextBtn').disabled = i >= last;
+  for (const id of ['pvNow', 'pvNext']) $(id).style.setProperty('--r', rem.ratio);
+  const text = rem.notes[i] || '';
+  const noNotes = !rem.notes.some(Boolean);
+  const box = $('pvNotes');
+  box.textContent = text || (noNotes ? 'This file has no speaker notes.' : 'No notes for this slide.');
+  box.classList.toggle('none', !text);
+  box.scrollTop = 0;
+
+  // The small slides
+  const job = ++pvJob, eng = Link.peek, stale = () => job !== pvJob;
+  $('pvNext').classList.toggle('end', i >= last);
+  if (!eng) return;
+  eng.draw(i, $('pvNow'), stale);
+  if (i < last) eng.draw(i + 1, $('pvNext'), stale); else $('pvNext').replaceChildren();
+}
+// When the panel changes size, slides drawn as pages of HTML are scaled again
+const pvResize = new ResizeObserver((items) => {
+  for (const it of items) {
+    const box = it.target.querySelector('.clone-host');
+    if (box) box.style.transform = 'scale(' + (it.target.clientWidth / Number(box.dataset.w || 1280)) + ')';
+  }
+});
+pvResize.observe($('pvNow'));
+pvResize.observe($('pvNext'));
+$('pvPrev').onclick = () => linkCmd('prev');
+$('pvNextBtn').onclick = $('pvNext').onclick = () => linkCmd('next');
+
+/* ----- Both windows ----- */
+function linkStatus() {
+  if (Link.role === 'none') return null;
+  const here = Link.alive && Link.peerRole === (Link.role === 'companion' ? 'presenter' : 'companion');
+  const text = Link.role === 'companion'
+    ? (here ? 'Presentation connected' : 'Presentation not found')
+    : (here ? 'Companion connected' : 'No companion window');
+  return { here, text };
+}
+function linkUi() {
+  const st = linkStatus();
+  document.querySelectorAll('.link-pill').forEach((p) => {
+    p.hidden = !st;
+    if (!st) return;
+    p.classList.toggle('off', !st.here);
+    p.querySelector('.lp-text').textContent = st.text;
+  });
+  if (st) {
+    $('pvState').classList.toggle('off', !st.here);
+    $('pvStateText').textContent = st.here ? 'Connected' : 'Not connected';
+  }
+  $('mPresenterNote').textContent = Link.role === 'presenter' && st && st.here ? 'On' : '';
+  pvRender();
+}
+
+function linkReceive(m) {
+  if (!m || m.from === Link.id || !m.role) return;
+  if (Link.role !== 'none' && m.role === Link.role) return;              // two windows with the same job: ignore each other
+  Link.seen = Date.now();
+  Link.peerRole = m.role;
+  const joined = !Link.alive;
+  Link.alive = true;
+  if (m.t === 'bye') { Link.alive = false; Link.pos = null; linkUi(); return; }
+  if (joined) {
+    if (Link.role === 'presenter') linkSendAll();
+    else if (Link.role === 'companion') { if (m.t === 'ping') Link.send({ t: 'hello' }); if (Timer.active) timerShare(); }
+    linkUi();
+  }
+  if (Link.role === 'none') return;
+
+  switch (m.t) {
+    case 'hello': if (Link.role === 'presenter' && !joined) linkSendAll(); break;
+    case 'ping':
+      // The companion lacks the file we are showing (it was not ready when we sent it): send it again
+      if (Link.role === 'presenter' && Link.key && m.have !== Link.key && Date.now() - Link.resent > 4000) {
+        Link.resent = Date.now(); linkSendFile(); linkPush(true);
+      }
+      break;
+    case 'cmd':
+      if (Link.role === 'presenter' && m.key === Link.key && Link.key && V.driver && $('vMsg').hidden && ['next', 'prev', 'first', 'last'].includes(m.c)) V.driver.go(m.c);
+      break;
+    case 'file': if (Link.role === 'companion') peekLoad(m); break;
+    case 'state':
+      if (Link.role === 'companion') { Link.pos = m; if (!m.key && Link.rem) { Link.rem = null; if (Link.peek) { Link.peek.destroy(); Link.peek = null; } } pvRender(); }
+      break;
+    case 'timer': timerApply(m.s); break;
+  }
+}
+if (Link.ch) Link.ch.onmessage = (e) => linkReceive(e.data);
+
+setInterval(() => {
+  if (Link.role !== 'none') Link.send({ t: 'ping', have: Link.rem ? Link.rem.key : 0 });
+  if (Link.alive && Date.now() - Link.seen > 6000) { Link.alive = false; linkUi(); }
+}, 1500);
+window.addEventListener('pagehide', () => Link.send({ t: 'bye' }));
+$('mPresenter').onclick = presenterStart;
+
+if (Link.role === 'companion') {
+  document.title = 'Lectern · Companion';
+  V.el.classList.add('pv-open');
+  $('pv').hidden = false;
+  for (const id of ['mPresenter', 'mLaser', 'mBlack', 'mNotes', 'vInk']) $(id).hidden = true;     // these belong to the presentation window
+  Link.send({ t: 'hello' });
+  linkUi();
+}
 
 /* ----- Start ----- */
 // After a mouse click a button gives up the focus, so Space / Enter keep working on the selected file

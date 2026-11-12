@@ -1,4 +1,4 @@
-LECTERN v1.8.4 — offline viewer for the classroom
+LECTERN v1.10.0 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -43,6 +43,21 @@ SUPPORTED FILES
   Old .ppt / .doc are not supported — re-save them as .pptx / .docx.
   Video and sound play only if the browser knows the format (MP4 with H.264 and
   WebM are fine in Chrome, Edge, Safari; some .mov files are not).
+
+PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
+  1. Open a PDF or PowerPoint, press P (or More > Presenter view). A second
+     window opens. Drag it to your laptop screen, then press F in the slides window.
+  2. In the second window open the file with your speech. On the right it shows the
+     current and next slide and the notes. Up / Down (or Page Up / Page Down on a
+     clicker) turn the slides; Left / Right turn the speech file. You can also turn
+     slides in the first window. The timer is shared.
+  3. Pen, laser and black screen work in the slides window only.
+  If the browser blocks the new window, allow pop-ups for this page.
+  Both windows must be in the same browser, as two separate windows (not tabs).
+
+FULLSCREEN WINDOW
+  Settings (or More in the viewer) > Fullscreen window hides the browser's bars.
+  Esc leaves it. Installed as an app, Lectern has no browser bars anyway.
 
 IN THE VIEWER
   Bottom bar      First / Previous / Next / Last, progress bar (click or drag),
@@ -92,8 +107,11 @@ KEYBOARD
            M = bookmark   , . = previous / next bookmark   N = notes
            B = black screen   W = white screen   R = rotate   + − 0 = zoom
            L = laser pointer (a red dot follows the mouse or a finger)
+           P = presenter view (see below)
            T = timer (silent; shown in the top bar, turns red when the time is reached)
            Zoomed in: drag the page with the mouse to move it
+           Touch screen: pinch with two fingers to zoom; double-tap the middle of the page to zoom in / back
+           Trackpad: pinch (or Ctrl + scroll) zooms where the pointer is
            [ ] = previous / next file of the queue          Esc = back
 
 BROWSERS
