@@ -353,7 +353,6 @@
       <div class="pv-head-row"><b id="pvTitle">Presentation</b>
         <span class="pv-state off" id="pvState"><i class="dot"></i><span id="pvStateText">Not connected</span></span>
       </div>
-      <div class="pv-timer" id="pvTimer" hidden></div>
     </div>
     <div class="pv-body">
       <div class="pv-empty" id="pvEmpty"></div>
@@ -370,8 +369,10 @@
             <button class="vbtn vbtn-solid" id="pvNextBtn" type="button" title="Next slide (↓)"><span>Next</span><kbd>↓</kbd></button>
           </div>
         </div>
-        <span class="pv-cap">Notes</span>
-        <div class="pv-notes-wrap"><div class="pv-notes" id="pvNotes"></div></div>
+        <div class="pv-cap-row"><span class="pv-cap">Notes</span>
+          <button class="pv-fold" id="pvFold" type="button" title="Hide notes" aria-label="Hide notes" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
+        </div>
+        <div class="pv-notes-wrap" id="pvNotesWrap"><div class="pv-notes" id="pvNotes"></div></div>
       </div>
     </div>
   </aside>

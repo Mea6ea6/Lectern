@@ -299,7 +299,16 @@ button:disabled { cursor: default; }
   box-shadow: var(--sh-1);
   transition: transform .12s, box-shadow .12s;
 }
-.kbd-nav .card.selected { transform: translateY(-3px); box-shadow: var(--sh-select); }   /* keyboard selection = lift + deep shadow … */
+/* A card under the pointer and a card chosen with the arrow keys move the same way: they grow and lift … */
+.card:hover, .kbd-nav .card.selected { scale: 1.02; translate: 0 -2px; }
+/* … the keyboard selection adds the glow … */
+.kbd-nav .card.selected { box-shadow: var(--sh-select); }
+/* While one card is the active one (pointer or arrow keys) the others step back: a little smaller and darker */
+.grid:has(.card:hover) .card:not(:hover) { scale: .98; filter: brightness(.78); }
+.kbd-nav .grid:has(.card.selected) .card:not(.selected) { scale: .98; filter: brightness(.78); }
+/* … and opening a file gives the card a quick bounce */
+.card.pop { animation: card-pop .12s ease-out; }
+@keyframes card-pop { 50% { scale: .96; translate: 0 0; } }
 /* … and an inverted name bar: impossible to miss from the back of the room */
 .kbd-nav .card.selected .card-foot { background: var(--ink); color: var(--on-ink); }
 .kbd-nav .card.selected .card-info { background: rgb(128 128 128 / .35); color: var(--on-ink); }
@@ -732,6 +741,9 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
   transition: opacity .12s, background .12s, box-shadow .12s;
 }
 .card-queue .icon { width: 18px; height: 18px; }
+.card-queue .qx { display: none; }                         /* queued card: the number becomes a trash can under the pointer */
+.card.queued .card-queue:hover .qn { display: none; }
+.card.queued .card-queue:hover .qx { display: block; }
 .card:hover .card-queue, .kbd-nav .card.selected .card-queue, .card-queue:focus-visible { opacity: 1; }
 @media (hover: none) { .card-queue { opacity: .8; } }
 .card.queued .card-queue { background: var(--ink); color: var(--on-ink); opacity: 1; }
@@ -882,12 +894,12 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
    Press  = it shrinks a little.
    A pressed/selected toggle keeps its own inverted colours (that is state, not hover).
    New interactive elements: add them to the lists below instead of writing their own :hover rule. */
-.btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn, .menu-item,
-.dd-menu button, .timer-pill, .timer-step, .q-clear, .side, .card, .ov-thumb {
-  transition: scale .1s ease-out, box-shadow .09s, background .09s, color .09s, opacity .09s, transform .09s ease-out;
+.btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn,
+.timer-pill, .timer-step, .side, .card, .ov-thumb {
+  transition: scale .12s ease-out, translate .12s ease-out, filter .15s, box-shadow .09s, background .09s, color .09s, opacity .09s, transform .09s ease-out;
 }
-.btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover, .menu-item:hover:not(:disabled),
-.dd-menu button:hover, .q-clear:hover, .timer-pill:hover, .card:hover { scale: 1.02; }
+.btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover, .timer-pill:hover { scale: 1.02; }
+/* Rows of menus and dropdowns (.menu-item, .dd-menu button) are deliberately static: no growing, no bounce */
 .seg button:hover:not(:disabled), .stepper button:hover:not(:disabled) { scale: 1.04; }
 .btn-icon:hover:not(:disabled), .vbtn-icon:hover:not(:disabled), .card-info:hover, .card-queue:hover,
 .ink-swatch:hover, .q-btn:hover:not(:disabled), .timer-step:hover { scale: 1.07; }
@@ -895,11 +907,11 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .ov-cell:hover .ov-thumb { scale: 1.03; }
 .btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .card-info:active, .card-queue:active,
 .stepper button:active:not(:disabled), .ink-swatch:active, .timer-step:active, .q-btn:active:not(:disabled) { scale: .975; transition-duration: .04s; }
-.seg button:active:not(:disabled), .menu-item:active, .dd-menu button:active, .card:active { scale: .985; transition-duration: .04s; }
-.modal-card .menu-item:active { scale: 1; }          /* wide rows in a window (like "Don't show this again") do not jump at all */
+.seg button:active:not(:disabled) { scale: .985; transition-duration: .04s; }
+.side:active:not(:disabled) { scale: .9; transition-duration: .04s; }
 @media (hover: none) {
-  .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover, .menu-item:hover,
-  .dd-menu button:hover, .seg button:hover, .stepper button:hover, .card:hover, .side:hover, .timer-step:hover, .q-btn:hover { scale: 1; }
+  .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover,
+  .seg button:hover, .stepper button:hover, .card:hover, .side:hover, .timer-step:hover, .q-btn:hover { scale: 1; }
 }
 
 /* Filter chips: sentence case, lighter than the small caps labels elsewhere */
@@ -911,12 +923,12 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
   position: fixed; left: 0; top: 0; z-index: 400; max-width: 260px; padding: 6px 10px; border-radius: 8px;
   background: #1f1f1f; color: #f4f4f4; font-size: 12.5px; font-weight: 600; line-height: 1.35; letter-spacing: .005em;
   box-shadow: 0 6px 18px rgb(0 0 0 / .35), 0 1px 3px rgb(0 0 0 / .3), inset 0 1px 0 rgb(255 255 255 / .09);
-  pointer-events: none; opacity: 0; transform: translateY(var(--ty, 4px)); transition: opacity .14s, transform .16s var(--ease-out);
+  pointer-events: none; opacity: 0; transform: translateY(var(--ty, 4px)); transition: opacity .18s, transform .2s var(--ease-out);
   display: flex; align-items: center; gap: 8px;
 }
 [data-theme="dark"] .tip { background: #2c2c2c; }
 .tip.show { opacity: 1; transform: translateY(0); }
-.tip.instant { transition-duration: 0s; }
+.tip-ghost { transition: opacity .16s, transform .16s; }   /* the previous tooltip, fading out while the next one fades in */
 .tip kbd {
   min-width: 0; margin: 0; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;
   background: rgb(255 255 255 / .16); color: #fff; box-shadow: none;
@@ -964,7 +976,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 /* Queue dialog: "Remove all" is a quiet text link, not a third button */
 .q-clear-row { display: flex; justify-content: flex-end; margin-top: 8px; }
-.q-clear { padding: 6px 10px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-radius: var(--r-md); transition: background .15s, box-shadow .15s, color .15s; }
 .viewer.inking.notes-open .stagewrap { right: 0; }
 
 /* Thickness slider in the drawing bar */
@@ -1051,12 +1062,12 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .timer-row.digits { background: var(--surface-2); border-radius: var(--r-md); padding: 4px 6px; justify-items: stretch; }
 .timer-input {
   width: 100%; min-width: 0; padding: 0; text-align: center; border-radius: var(--r-md);
-  font-size: 48px; font-weight: 200; line-height: 1.3; font-variant-numeric: tabular-nums;
+  font-size: 48px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums;
   caret-color: transparent; color: var(--ink);
 }
 .timer-input:focus { background: var(--surface-3); }
 .timer-input::selection { background: transparent; color: inherit; }
-.timer-colon { font-size: 32px; font-weight: 200; color: var(--ink-soft); }
+.timer-colon { font-size: 32px; font-weight: 600; color: var(--ink-soft); }
 .timer-step {
   width: 48px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--r-md); color: var(--ink-soft); touch-action: manipulation; user-select: none; -webkit-user-select: none;
@@ -1064,7 +1075,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .timer-step .icon { width: 18px; height: 18px; }
 .timer-hint { min-height: 2.8em; margin: 10px 0 0; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
 .timer-hint.warn { color: var(--ink); font-weight: 600; }
-.timer-live { margin: 10px 0 14px; font-size: 56px; font-weight: 200; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.timer-live { margin: 10px 0 14px; font-size: 56px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .menu { max-height: calc(100% - var(--bt) - var(--bb) - 24px); overflow-y: auto; }
 
 /* ---------- Presenter view: two linked windows ---------- */
@@ -1088,9 +1099,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .pv-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 14px 14px; }
 .pv-live { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .pv.idle .pv-live { display: none; }
-.pv:not(.idle) .pv-timer { margin-top: 2px; font-size: 40px; font-weight: 200; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); }
-.pv-timer.over { color: #e5322d; }
-.pv-timer.paused { opacity: .6; }
 .pv-empty { display: none; }
 .pv-empty { margin: auto; padding: 0 14px; text-align: center; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
 
@@ -1110,6 +1118,12 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .pv-btns .vbtn { justify-content: space-between; padding: 0 12px 0 16px; }
 .pv-btns .vbtn kbd { margin: 0; }
 .vbtn-solid kbd { background: rgb(var(--surface-rgb) / .2); box-shadow: none; color: var(--on-ink); }
-.pv-notes-wrap { position: relative; flex: 1; min-height: 0; }
-.pv-notes { height: 100%; -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); overflow: auto; padding: 0 4px 24px; font-size: 18px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.pv-notes-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--surface-2); border-radius: var(--r-md); }   /* its own block, like a code block */
+.pv-notes { height: 100%; -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); overflow: auto; padding: 14px 16px 28px; font-size: 18px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pv-notes.none { color: var(--ink-soft); font-size: 15px; }
+.pv-fold { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-md); background: var(--surface-2); color: var(--ink-soft); transition: scale .1s ease-out; }
+.pv-fold .icon { width: 16px; height: 16px; transition: transform .2s; }
+.pv-fold:hover { scale: 1.1; }
+.pv-fold:active { scale: .92; transition-duration: .04s; }
+.pv.notes-off .pv-notes-wrap { display: none; }               /* the "hide notes" button */
+.pv.notes-off .pv-fold .icon { transform: rotate(180deg); }

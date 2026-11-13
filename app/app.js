@@ -581,7 +581,7 @@ function createCard(entry) {
   foot.append(info, h('span', 'card-name', entry.base));
   card.append(thumb, foot);
 
-  card.onclick = () => { select(entry.id, false); openViewer(entry); };
+  card.onclick = () => { select(entry.id, false); openCard(entry); };
   info.onclick = (e) => { e.stopPropagation(); select(entry.id, false); openInfo(entry); };
   // Hovering with a mouse selects the card, so Space / Enter act on it (like Quick Look on a Mac)
 
@@ -714,6 +714,15 @@ $('sortMenu').querySelectorAll('[data-sort]').forEach((b) =>
   b.setAttribute('aria-selected', String(b.dataset.sort === state.sort)));
 
 function select(id, scroll) { state.selectedId = id; markSelected(scroll); }
+// Opening a file from the list: the card gives a short bounce, then the viewer opens
+function openCard(entry) {
+  const card = entry.card;
+  if (!card || !card.isConnected) { openViewer(entry); return; }
+  card.classList.remove('pop'); void card.offsetWidth;          // restart the animation if it is already running
+  card.classList.add('pop');
+  setTimeout(() => { card.classList.remove('pop'); openViewer(entry); }, 120);
+}
+
 function markSelected(scroll) {
   for (const card of $('grid').children) {
     const on = Number(card.dataset.id) === state.selectedId;
@@ -1065,7 +1074,8 @@ function markQueue(entry, i = queueIndexOf(entry)) {
   entry.qMark = i;
   const btn = entry.card.querySelector('.card-queue');
   entry.card.classList.toggle('queued', i >= 0);
-  btn.replaceChildren(i >= 0 ? document.createTextNode(String(i + 1)) : icon('i-plus'));
+  if (i >= 0) { const num = h('span', 'qn', String(i + 1)), x = icon('i-trash'); x.classList.add('qx'); btn.replaceChildren(num, x); }
+  else btn.replaceChildren(icon('i-plus'));
   btn.title = i >= 0 ? 'In the class queue (place ' + (i + 1) + ') — click to remove (Q)' : 'Add to the class queue (Q)';
   btn.setAttribute('aria-label', btn.title);
 }
@@ -1147,7 +1157,7 @@ function renderQueueDialog(first) {
       list.appendChild(row);
     });
     box.appendChild(list);
-    const clear = h('button', 'q-clear', 'Remove all');
+    const clear = h('button', 'btn', 'Remove all');
     clear.title = 'Take every file out of the queue';
     clear.type = 'button';
     clear.onclick = () => { Q.items = []; queueChanged(); };
@@ -2597,11 +2607,6 @@ function timerTick() {
     p.classList.toggle('over', r.reached);
     p.classList.toggle('paused', !Timer.running);
   });
-  const big = $('pvTimer');                                       // the large readout in the companion's panel
-  if (big) {
-    big.hidden = !Timer.active;
-    if (r) { if (big.textContent !== r.text) big.textContent = r.text; big.classList.toggle('over', r.reached); big.classList.toggle('paused', !Timer.running); }
-  }
   const live = $('timerLive');
   if (live && r) { live.textContent = r.text; live.classList.toggle('over', r.reached); }
 }
@@ -3159,7 +3164,7 @@ document.addEventListener('keydown', (e) => {
     }
     case 'Enter': {                              // Enter = open the file
       const entry = selectedEntry();
-      if (entry) { e.preventDefault(); openViewer(entry); }
+      if (entry) { e.preventDefault(); openCard(entry); }
       return;
     }
     case '/': e.preventDefault(); $('search').focus(); return;
@@ -3179,9 +3184,9 @@ document.addEventListener('keydown', (e) => {
    ===================================================================== */
 const Tip = (function () {
   const el = $('tip');
-  const DELAY = 700, GRACE = 600;
+  const DELAY = 700;
   const canHover = window.matchMedia && matchMedia('(hover: hover)').matches;
-  let timer = 0, target = null, visible = false, lastHidden = 0;
+  let timer = 0, target = null, visible = false;
   const KEYS = /^(.*?)\s*\(([^()\s]{1,10}(?:\s+or\s+[^()\s]{1,10})*)\)\s*$/;
 
   function adopt(root) {
@@ -3210,17 +3215,31 @@ const Tip = (function () {
   function hide() {
     clearTimeout(timer);
     target = null;
-    if (visible) { visible = false; lastHidden = performance.now(); el.classList.remove('show'); el.setAttribute('aria-hidden', 'true'); }
+    if (visible) { visible = false; el.classList.remove('show'); el.setAttribute('aria-hidden', 'true'); }
   }
-  function show(node, instant) {
+  // A copy of the tooltip as it looks right now (even half faded) that fades out on its own and removes itself
+  function ghostOfCurrent() {
+    const cs = getComputedStyle(el), o = parseFloat(cs.opacity);
+    if (!(o > 0.05)) return false;
+    const g = el.cloneNode(true);
+    g.removeAttribute('id'); g.classList.remove('show'); g.classList.add('tip-ghost');
+    g.style.transition = 'none'; g.style.opacity = String(o); g.style.transform = cs.transform;
+    document.body.appendChild(g);
+    requestAnimationFrame(() => requestAnimationFrame(() => { g.style.transition = ''; g.style.opacity = '0'; }));
+    setTimeout(() => g.remove(), 260);
+    return true;
+  }
+  function show(node) {
     if (!node.isConnected || !node.matches(':hover')) return;
     const raw = node.dataset.tip || '';
     const m = raw.match(KEYS);
     const label = m ? m[1] : raw;
     const keys = m ? m[2].split(/\s+or\s+/) : [];
     if (!keys.length && label.trim().toLowerCase() === node.textContent.trim().toLowerCase()) return;   // the button already says it
+    const ghosted = ghostOfCurrent();                          // the old tooltip fades out while this one fades in
+    el.style.transitionDelay = ghosted ? '.07s' : '0s';
+    if (ghosted) { el.style.transition = 'none'; el.style.opacity = '0'; }   // start the new one from invisible, not from the half-faded old one
     el.replaceChildren(h('span', '', label), ...keys.map((k) => h('kbd', '', k)));
-    el.classList.toggle('instant', !!instant);
     const r = node.getBoundingClientRect();
     el.style.left = '0px'; el.style.top = '0px';
     const w = el.offsetWidth, hh = el.offsetHeight;
@@ -3231,19 +3250,18 @@ const Tip = (function () {
     el.style.top = y + 'px';
     visible = true;
     el.setAttribute('aria-hidden', 'false');
-    requestAnimationFrame(() => el.classList.add('show'));
+    requestAnimationFrame(() => { el.style.transition = ''; el.style.opacity = ''; el.classList.add('show'); });
   }
 
   if (canHover) {
     document.addEventListener('mouseover', (e) => {
       const t = e.target.closest ? e.target.closest('[data-tip]') : null;
       if (t === target) return;
-      const wasVisible = visible;
       hide();
       if (!t) return;
       target = t;
-      const quick = wasVisible || performance.now() - lastHidden < GRACE;     // moving along a row of buttons: no new wait
-      timer = setTimeout(() => show(t, quick), quick ? 90 : DELAY);
+      timer = setTimeout(() => show(t), DELAY);                              // every new button starts the wait again
+
     }, true);
     document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) hide(); }, true);
     ['pointerdown', 'keydown', 'wheel', 'scroll', 'blur'].forEach((ev) => window.addEventListener(ev, hide, true));
@@ -3612,6 +3630,14 @@ setInterval(() => {
   if (Link.alive && Date.now() - Link.seen > 6000) { Link.alive = false; linkUi(); }
 }, 1500);
 window.addEventListener('pagehide', () => Link.send({ t: 'bye' }));
+// "Hide notes" in the companion's panel (remembered)
+function pvNotesOff(off) {
+  $('pv').classList.toggle('notes-off', off);
+  $('pvFold').setAttribute('aria-expanded', String(!off));
+  $('pvFold').dataset.tip = off ? 'Show notes' : 'Hide notes';
+}
+pvNotesOff(loadPref('fv-pv-notes-off', '0') === '1');
+$('pvFold').onclick = () => { const off = !$('pv').classList.contains('notes-off'); savePref('fv-pv-notes-off', off ? '1' : '0'); pvNotesOff(off); };
 $('mPresenter').onclick = () => { if (presenterOn()) { closeMenu(); presenterStop(); } else presenterStart(); };
 
 if (Link.role === 'companion') {
