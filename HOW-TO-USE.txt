@@ -1,4 +1,4 @@
-LECTERN v1.11.0 — offline viewer for the classroom
+LECTERN v1.12.0 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -18,7 +18,7 @@ HOW TO START FROM A FLASH DRIVE
      single files, into the window).
        Chrome / Edge   A normal folder picker. The folder is remembered: next time
                        press "Reopen" (the browser asks once for permission).
-                       The round arrow rescans the folder after you add files.
+                       "Rescan folder" (in the More menu, top right) picks up files you added.
        Firefox         The browser asks "Upload files to this site?" — answer
                        yes. This is only its standard wording: nothing is
                        uploaded anywhere. Dragging the folder into the window
@@ -57,7 +57,7 @@ PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
   Both windows must be in the same browser, as two separate windows (not tabs).
 
 FULLSCREEN WINDOW
-  Settings (or More in the viewer) > Fullscreen window hides the browser's bars.
+  More (top right of the file list, or More in the viewer) > Fullscreen window hides the browser's bars.
   Esc leaves it. Installed as an app, Lectern has no browser bars anyway.
 
 IN THE VIEWER

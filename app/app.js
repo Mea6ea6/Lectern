@@ -291,6 +291,8 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
 
 // The little "Appearance" popover on the home screen
 $('btnSettings').onclick = (e) => { e.stopPropagation(); $('settings').hidden = !$('settings').hidden; };
+// Items marked data-close close the menu after they are pressed (choose folder, add files, ...)
+$('settings').addEventListener('click', (e) => { if (e.target.closest('[data-close]')) $('settings').hidden = true; });
 document.addEventListener('pointerdown', (e) => {
   if (!$('settings').hidden && !e.target.closest('#settings, #btnSettings')) $('settings').hidden = true;
 });
@@ -582,7 +584,6 @@ function createCard(entry) {
   card.onclick = () => { select(entry.id, false); openViewer(entry); };
   info.onclick = (e) => { e.stopPropagation(); select(entry.id, false); openInfo(entry); };
   // Hovering with a mouse selects the card, so Space / Enter act on it (like Quick Look on a Mac)
-  card.onpointerenter = (e) => { if (e.pointerType === 'mouse') select(entry.id, false); };
 
   entry.card = card;
   entry.qMark = undefined;          // a new card has to be marked even if the place did not change
@@ -644,13 +645,24 @@ function renderChips() {
   const chips = filters.map((f) => {
     const count = f.id === 'all' ? state.files.length : state.files.filter((e) => e.kind === f.id).length;
     const chip = h('button', 'chip k-' + f.id + (state.filter === f.id ? ' active' : ''), f.title);
+    chip.title = f.id === 'all' ? 'Show all files' : 'Show only: ' + f.title;
     chip.type = 'button';
     chip.appendChild(h('b', '', String(count)));
     chip.onclick = () => { state.filter = f.id; render(); };
     return chip;
   });
   $('chips').replaceChildren(...chips);
+  $('filterVal').textContent = filters.find((f) => f.id === state.filter).title;
 }
+
+// Filter button: the chip row slides open / closed (always closed when the app starts)
+function setFiltersOpen(open) {
+  $('chipsWrap').classList.toggle('open', open);
+  $('chipsWrap').setAttribute('aria-hidden', String(!open));
+  $('filterBtn').setAttribute('aria-expanded', String(open));
+  $('filterBtn').dataset.tip = open ? 'Hide file types' : 'Show file types';
+}
+$('filterBtn').onclick = () => setFiltersOpen($('filterBtn').getAttribute('aria-expanded') !== 'true');
 
 $('search').oninput = (e) => { state.query = e.target.value; render(); };
 /* ----- Sort: our own drop-down (the browser's native list can't be styled) ----- */
@@ -798,6 +810,7 @@ function askBeforeFolderPicker() {
   const skip = h('button', 'menu-item');
   skip.type = 'button';
   skip.setAttribute('aria-pressed', 'false');
+  skip.title = 'Go straight to the picker next time';
   skip.append(h('span', 'grow', 'Don’t show this again'), h('span', 'switch'));
   skip.onclick = () => skip.setAttribute('aria-pressed', String(skip.getAttribute('aria-pressed') !== 'true'));
 
@@ -807,9 +820,11 @@ function askBeforeFolderPicker() {
     openClassicFolderPicker();
   };
   const cancel = h('button', 'btn', 'Cancel');
+  cancel.title = 'Cancel';
   cancel.type = 'button';
   cancel.onclick = closeModal;
   const ok = h('button', 'btn btn-primary', 'Continue');
+  ok.title = 'Continue to the folder picker';
   ok.type = 'button';
   ok.onclick = go;
 
@@ -873,9 +888,11 @@ function openInfo(entry) {
   rows.append(pendingLabel, pendingValue);
 
   const close = h('button', 'btn', 'Close');
+  close.title = 'Close this window (Esc)';
   close.type = 'button';
   close.onclick = closeModal;
   const open = h('button', 'btn btn-primary', 'Open');
+  open.title = 'Open this file (Enter)';
   open.type = 'button';
   const openFile = () => { closeModal(); openViewer(entry); };
   open.onclick = openFile;
@@ -1131,6 +1148,7 @@ function renderQueueDialog(first) {
     });
     box.appendChild(list);
     const clear = h('button', 'q-clear', 'Remove all');
+    clear.title = 'Take every file out of the queue';
     clear.type = 'button';
     clear.onclick = () => { Q.items = []; queueChanged(); };
     box.appendChild(h('div', 'q-clear-row')).appendChild(clear);
@@ -1138,11 +1156,13 @@ function renderQueueDialog(first) {
 
   const actions = h('div', 'modal-actions');
   const close = h('button', 'btn', 'Close');
+  close.title = 'Close this window (Esc)';
   close.type = 'button';
   close.onclick = closeModal;
   actions.append(close);
   if (Q.items.length) {                       // nothing to start when the list is empty
     const start = h('button', 'btn btn-primary', 'Start');
+    start.title = 'Start the class queue';
     start.type = 'button';
     start.disabled = !loaded;
     start.onclick = queueStart;
@@ -2323,7 +2343,13 @@ function onFullscreenChange() {
 }
 document.addEventListener('fullscreenchange', onFullscreenChange);
 document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+// Moving the mouse hands control back to the pointer: the keyboard selection is hidden again
+document.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') document.body.classList.remove('kbd-nav'); });
 $('sFull').onclick = togglePageFullscreen;
+// "Show tips": the grey help lines at the bottom of the home screens (remembered between launches)
+function applyHints(on) { $('footer').hidden = !on; $('sHints').setAttribute('aria-pressed', String(on)); }
+applyHints(loadPref('fv-hints', '1') === '1');
+$('sHints').onclick = () => { const on = $('footer').hidden; savePref('fv-hints', on ? '1' : '0'); applyHints(on); };
 $('mFull').onclick = () => { closeMenu(); togglePageFullscreen(); };
 syncFullUI();
 
@@ -2336,6 +2362,9 @@ function setImmersive(on) {
   $('vFullText').textContent = on ? 'Exit fullscreen' : 'Fullscreen';
   $('vFull').title = on ? 'Exit fullscreen (F or Esc)' : 'Fullscreen (F)';
   if (on) showUi(); else { clearTimeout(V.idleTimer); V.el.classList.remove('ui-hidden'); }
+  // The page padding changes (bars float over the page), but when the whole window is already fullscreen the stage
+  // keeps its size, so the resize observer stays silent: fit the content again by hand.
+  requestAnimationFrame(() => { if (V.driver && !V.el.hidden) { V.driver.refit(); if (window.Pen) Pen.redraw(); } });
 }
 function showUi() {
   V.el.classList.remove('ui-hidden');
@@ -2655,6 +2684,7 @@ function timerSetupView() {
   [['down', 'Countdown'], ['up', 'Count up to']].forEach(([m, label]) => {
     const b = h('button', '', label);
     b.type = 'button';
+    b.title = m === 'down' ? 'Count down from the set time' : 'Count up to the set time';
     b.onclick = () => {
       mode = m;
       for (const k in modeButtons) modeButtons[k].setAttribute('aria-pressed', String(k === mode));
@@ -2667,6 +2697,7 @@ function timerSetupView() {
   box.appendChild(seg);
 
   const start = h('button', 'btn btn-primary', 'Start');
+  start.title = 'Start the timer';
   start.type = 'button';
   const refresh = () => { start.disabled = !nonZero(); };
 
@@ -2744,6 +2775,7 @@ function timerSetupView() {
 
   const actions = h('div', 'modal-actions');
   const cancel = h('button', 'btn', 'Close');
+  cancel.title = 'Close this window (Esc)';
   cancel.type = 'button';
   cancel.onclick = closeTimerDialog;
   start.onclick = () => {
@@ -2776,13 +2808,16 @@ function timerRunningView() {
 
   const actions = h('div', 'modal-actions');
   const close = h('button', 'btn', 'Close');                      // like every window: the left button only closes it
+  close.title = 'Close this window (Esc)';
   close.type = 'button';
   close.onclick = closeTimerDialog;
   const stop = h('button', 'btn', 'Stop');
+  stop.title = 'Stop and reset the timer';
   stop.type = 'button';
   stop.onclick = () => { timerStop(); closeTimerDialog(); };
   const pause = h('button', 'btn btn-primary', Timer.running ? 'Pause' : 'Resume');
   pause.type = 'button';
+  pause.title = 'Pause or resume the timer';
   pause.onclick = () => { timerTogglePause(); pause.textContent = Timer.running ? 'Pause' : 'Resume'; };
   actions.append(close, stop, pause);
   box.appendChild(actions);
@@ -3111,6 +3146,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;   // a focused button acts by itself
+  document.body.classList.add('kbd-nav');             // the selected card is only drawn while the keyboard is in use (see style.css)
   switch (e.key) {
     case 'ArrowRight': e.preventDefault(); return moveSelection(1, 0);
     case 'ArrowLeft':  e.preventDefault(); return moveSelection(-1, 0);
@@ -3530,6 +3566,7 @@ function linkUi() {
     $('pvStateText').textContent = st.here ? 'Connected' : 'Not connected';
   }
   $('mPresenterText').textContent = presenterOn() ? 'Stop presenter view' : 'Presenter view';
+  $('mPresenter').dataset.tip = presenterOn() ? 'Close the second window (P)' : 'Presenter view: a second window (P)';
   $('mPresenter').disabled = !(presenterOn() || (V.driver && presentable()));
   pvRender();
 }

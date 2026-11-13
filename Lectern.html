@@ -106,64 +106,75 @@
     <div class="actions">
       <span class="link-pill off" hidden><i class="dot"></i><span class="lp-text"></span></span>
       <button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button>
-     <div class="actions-files" id="headFiles" hidden>
-      <button class="btn reopen-btn" type="button" hidden>
-        <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
-      </button>
-      <button class="btn btn-icon" id="btnRefresh" type="button" title="Rescan folder" aria-label="Rescan folder" hidden>
-        <svg class="icon"><use href="#i-refresh"/></svg>
-      </button>
-      <button class="btn btn-primary" id="btnFolder" type="button">
-        <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
-      </button>
-      <button class="btn" id="btnFiles" type="button">
-        <svg class="icon"><use href="#i-addfile"/></svg><span>Add files</span>
-      </button>
-     </div>
-      <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
-        <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
-      </button>
-      <button class="btn" id="btnInstall" type="button" hidden title="Install Lectern as an app">
-        <svg class="icon"><use href="#i-install"/></svg><span>Install</span>
-      </button>
       <div class="anchor">
-        <button class="btn btn-icon" id="btnSettings" type="button" title="Appearance" aria-label="Appearance">
+        <button class="btn btn-icon" id="btnSettings" type="button" title="More" aria-label="More">
           <svg class="icon"><use href="#i-sliders"/></svg>
         </button>
+        <!-- The "More" menu of the home screen: file actions (shown once there are files), install, appearance -->
         <div class="popover" id="settings" hidden>
+          <div id="headFiles" hidden>
+            <button class="menu-item reopen-btn" type="button" data-close hidden title="Open the folder from last time">
+              <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
+            </button>
+            <button class="menu-item" id="btnFolder" type="button" data-close title="Choose another folder">
+              <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
+            </button>
+            <button class="menu-item" id="btnFiles" type="button" data-close title="Add single files to the list">
+              <svg class="icon"><use href="#i-addfile"/></svg><span>Add files</span>
+            </button>
+            <button class="menu-item" id="btnRefresh" type="button" data-close hidden title="Rescan the folder for new files">
+              <svg class="icon"><use href="#i-refresh"/></svg><span>Rescan folder</span>
+            </button>
+            <div class="menu-gap"></div>
+          </div>
+          <button class="menu-item" id="btnInstall" type="button" data-close hidden title="Install Lectern as an app">
+            <svg class="icon"><use href="#i-install"/></svg><span>Install as app</span>
+          </button>
           <div class="pop-row"><span class="pop-label">Theme</span>
             <div class="seg">
-              <button type="button" data-theme-set="light">Light</button>
-              <button type="button" data-theme-set="dark">Dark</button>
+              <button type="button" data-theme-set="light" title="Light theme">Light</button>
+              <button type="button" data-theme-set="dark" title="Dark theme">Dark</button>
             </div>
           </div>
           <button class="menu-item" id="sFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
             <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
+          </button>
+          <button class="menu-item" id="sHints" type="button" aria-pressed="true" title="Show or hide the tips at the bottom of the page">
+            <svg class="icon"><use href="#i-info"/></svg><span class="grow">Show tips</span><span class="switch"></span>
           </button>
         </div>
       </div>
     </div>
   </header>
 
+  <!-- One row: sort + filter on the left, search in the middle (takes the free width), queue on the right -->
   <div class="toolbar" id="toolbar" hidden>
-    <label class="search">
-      <svg class="icon"><use href="#i-search"/></svg>
-      <input id="search" type="search" placeholder="Search by name" autocomplete="off">
-    </label>
     <div class="dd" id="sortDD">
-      <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+      <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sort the files">
         <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
         <svg class="icon"><use href="#i-chev"/></svg>
       </button>
       <div class="dd-menu" id="sortMenu" role="listbox" hidden>
-        <button type="button" role="option" data-sort="name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
-        <button type="button" role="option" data-sort="date"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
-        <button type="button" role="option" data-sort="size"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
-        <button type="button" role="option" data-sort="type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
+        <button type="button" role="option" data-sort="name" title="Sort by name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
+        <button type="button" role="option" data-sort="date" title="Newest files first"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
+        <button type="button" role="option" data-sort="size" title="Largest files first"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
+        <button type="button" role="option" data-sort="type" title="Group by file type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
       </div>
     </div>
-    <div class="chips" id="chips"></div>
+    <button class="btn dd-btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="chipsWrap" title="Show file types">
+      <span class="dd-cap">Filter</span><span class="dd-val" id="filterVal">All</span>
+      <svg class="icon"><use href="#i-chev"/></svg>
+    </button>
+    <label class="search">
+      <svg class="icon"><use href="#i-search"/></svg>
+      <input id="search" type="search" placeholder="Search by name" autocomplete="off">
+    </label>
+    <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
+      <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
+    </button>
   </div>
+  <!-- The file-type chips slide open under the toolbar when the Filter button is pressed (closed by default) -->
+  <div class="chips-wrap" id="chipsWrap" aria-hidden="true"><div class="chips-in"><div class="chips" id="chips"></div></div></div>
 
   <main>
     <section id="empty" class="empty">
@@ -173,13 +184,13 @@
         <h2 class="t-idle">Choose a folder with your files</h2>
         <h2 class="t-drop">Drop to add files</h2>
         <div class="empty-actions">
-          <button class="btn btn-primary btn-big" id="btnFolder2" type="button">
+          <button class="btn btn-primary btn-big" id="btnFolder2" type="button" title="Choose a folder with your files">
             <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
           </button>
-          <button class="btn btn-big reopen-btn" type="button" hidden>
+          <button class="btn btn-big reopen-btn" type="button" hidden title="Open the folder from last time">
             <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
           </button>
-          <button class="btn btn-big" id="btnFiles2" type="button">
+          <button class="btn btn-big" id="btnFiles2" type="button" title="Choose single files">
             <svg class="icon"><use href="#i-addfile"/></svg><span>Choose files</span>
           </button>
         </div>
@@ -287,7 +298,7 @@
         <button class="vbtn" id="vOverview" type="button" title="Overview (G)">
           <svg class="icon"><use href="#i-grid"/></svg><span>Overview</span>
         </button>
-        <button class="vbtn" id="vMore" type="button" aria-haspopup="true">
+        <button class="vbtn" id="vMore" type="button" aria-haspopup="true" title="Zoom, fit, tools and settings">
           <svg class="icon"><use href="#i-more"/></svg><span>More</span>
         </button>
       </div>
@@ -378,45 +389,45 @@
     <div class="menu-row">
       <span class="menu-label">Fit</span>
       <div class="seg">
-        <button type="button" data-fit="page"><svg class="icon"><use href="#i-fitpage"/></svg>Page</button>
-        <button type="button" data-fit="width"><svg class="icon"><use href="#i-fitwidth"/></svg>Width</button>
+        <button type="button" data-fit="page" title="Fit the whole page"><svg class="icon"><use href="#i-fitpage"/></svg>Page</button>
+        <button type="button" data-fit="width" title="Fit the page width"><svg class="icon"><use href="#i-fitwidth"/></svg>Width</button>
       </div>
     </div>
     <div class="menu-row">
       <span class="menu-label">Rotate</span>
-      <div class="seg">
+      <div class="stepper">
         <button type="button" id="mRotL" title="Rotate left"><svg class="icon"><use href="#i-rotl"/></svg>Left</button>
         <button type="button" id="mRotR" title="Rotate right (R)"><svg class="icon"><use href="#i-rotr"/></svg>Right</button>
       </div>
     </div>
     <div class="menu-gap"></div>
-    <button class="menu-item" id="mLaser" type="button" aria-pressed="false">
+    <button class="menu-item" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
       <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
     </button>
-    <button class="menu-item" id="mTimer" type="button">
+    <button class="menu-item" id="mTimer" type="button" title="Lesson timer (T)">
       <svg class="icon"><use href="#i-timer"/></svg><span class="grow">Timer</span><kbd>T</kbd>
     </button>
-    <button class="menu-item" id="mBlack" type="button">
+    <button class="menu-item" id="mBlack" type="button" title="Black screen (B)">
       <svg class="icon"><use href="#i-black"/></svg><span class="grow">Black screen</span><kbd>B</kbd>
     </button>
-    <button class="menu-item" id="mNotes" type="button">
+    <button class="menu-item" id="mNotes" type="button" title="Speaker notes (N)">
       <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
     </button>
-    <button class="menu-item" id="mPresenter" type="button">
+    <button class="menu-item" id="mPresenter" type="button" title="Presenter view: a second window (P)">
       <svg class="icon"><use href="#i-presenter"/></svg><span class="grow" id="mPresenterText">Presenter view</span><kbd>P</kbd>
     </button>
     <div class="menu-gap"></div>
     <button class="menu-item" id="mFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
       <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
     </button>
-    <button class="menu-item" id="mAwake" type="button" aria-pressed="true">
+    <button class="menu-item" id="mAwake" type="button" aria-pressed="true" title="Stop the screen from going to sleep">
       <svg class="icon"><use href="#i-screen"/></svg><span class="grow" id="mAwakeText">Keep screen on</span><span class="switch"></span>
     </button>
     <div class="menu-row">
       <span class="menu-label">Theme</span>
       <div class="seg">
-        <button type="button" data-theme-set="light">Light</button>
-        <button type="button" data-theme-set="dark">Dark</button>
+        <button type="button" data-theme-set="light" title="Light theme">Light</button>
+        <button type="button" data-theme-set="dark" title="Dark theme">Dark</button>
       </div>
     </div>
   </div>
