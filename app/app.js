@@ -1,16 +1,36 @@
 'use strict';
 /* =====================================================================
-   File Viewer — works offline, opens by double-clicking Viewer.html.
+   Lectern — offline file viewer (PDF, PPTX, DOCX, XLSX, images, video...).
+   Vanilla JS, no build step. Runs from Lectern.html (USB stick) and as a PWA.
 
-   The file is split into parts:
-     1. Constants and state
-     2. Small helpers
-     3. Appearance (theme + style)
-     4. Getting files (folder picker, files, drag & drop, remembered folder)
-     5. The file list (cards, search, sort, selection)
-     6. Thumbnails
-     7. Viewers: PDF, PPTX, DOCX, XLSX, images, text
-     8. The viewer window (buttons, overview, menu, fullscreen, keys, touch)
+   MAP OF THIS FILE (search for the number/heading to jump):
+     1. Constants and state       EXT_TO_KIND, EXT_TO_VIEWER, `state` (file list state)
+     2. Small helpers             $, prefs (localStorage), kvGet/kvSet (IndexedDB)
+     3. Appearance                theme; PWA install button
+     4. Getting files             folder picker, drag & drop, remembered folder
+     5. The file list             cards, search, sort, selection, details, the class QUEUE
+     6. Thumbnails                first page/slide previews (PDF/PPTX/images)
+     7. Viewers                   BaseViewer -> PdfViewer, BoxViewer (PptxViewer, ImageViewer),
+                                  ScrollViewer (DocxViewer, TextViewer), XlsxViewer.
+                                  More formats (ODF, media, zip, epub) live in app/formats.js,
+                                  libraries are loaded lazily with lib(name).
+     8. The viewer window         `V` (the open viewer), toasts, buttons, overview, menu, fullscreen, black screen, laser,
+                                  TIMER, notes, pinch/double-tap zoom, keyboard, and at the end
+                                  PRESENTER VIEW (the `Link` object: two windows over a
+                                  BroadcastChannel; the companion is the window opened with
+                                  location.hash === '#companion').
+
+   PITFALLS (read before editing):
+     - Animated show/hide: `hidden` is overridden for the id list in the
+       'ANIMATED HIDE/SHOW' block (search "'timerDlg'"; it sits in
+       section 5). A new popup id must be added to that list.
+     - style.css already has a global `.empty` class — do not reuse that name for new elements.
+     - Letter shortcuts use e.code (layout independent). The keyboard handler is one big
+       function in section 8; the companion window has its own early branch.
+     - Presenter view: the presenter window owns the slide state; the companion only sends
+       commands ({t:'cmd'}) and draws previews itself. Only PDF and PPTX are presentable.
+     - Tests: Playwright + Chromium against `python3 -m http.server`; see make-sw.py /
+       make-flash.py for building the archives (service worker file list is generated).
    ===================================================================== */
 
 
@@ -188,14 +208,19 @@ function loadPref(key, fallback) {
 }
 function savePref(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* fine */ } }
 
-// A tiny key-value store in IndexedDB (used to remember the last folder)
+// A tiny key-value store in IndexedDB (used to remember the last folder).
+// The connection is opened once and reused; a failed open is retried next time.
+let dbPromise = null;
 function openDb() {
-  return new Promise((ok, fail) => {
-    const req = indexedDB.open('file-viewer', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('kv');
-    req.onsuccess = () => ok(req.result);
-    req.onerror = () => fail(req.error);
-  });
+  if (!dbPromise) {
+    dbPromise = new Promise((ok, fail) => {
+      const req = indexedDB.open('file-viewer', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => ok(req.result);
+      req.onerror = () => fail(req.error);
+    }).catch(e => { dbPromise = null; throw e; });
+  }
+  return dbPromise;
 }
 async function kvGet(key) {
   const db = await openDb();
@@ -1190,20 +1215,42 @@ function putThumb(entry) {
   fitPageThumbs(thumb);
 }
 
+// Shared by every PDF preview (list thumbnail, overview, presenter panel):
+// draw one pdf.js page into a new canvas that is `width` pixels wide.
+async function pdfCanvas(page, width) {
+  const base = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: width / base.width });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#fff' }).promise;
+  return canvas;
+}
+
+// Shared by every PPTX preview (overview, presenter panel): copy the slide that the hidden
+// previewer `host` has just drawn into a box of the full slide size W x H, scaled down to
+// `shownWidth` px. (A scaled copy is far cheaper than re-rendering the slide.)
+function slideCopy(host, W, H, shownWidth) {
+  const src = host.querySelector('.pptx-preview-slide-wrapper');
+  if (!src) return null;
+  const clone = src.cloneNode(true);
+  clone.style.cssText += ';position:absolute;left:0;top:0;margin:0';
+  const box = h('div', 'clone-host');
+  box.style.width = W + 'px';
+  box.style.height = H + 'px';
+  box.dataset.w = W;                       // the panel's resize observer rescales from this
+  box.style.transform = 'scale(' + (shownWidth / W) + ')';
+  box.appendChild(clone);
+  return box;
+}
+
 // PDF: draw page 1 into a small canvas
 async function thumbPdf(entry) {
   await lib('pdf');
   const data = new Uint8Array(await entry.file.arrayBuffer());
   const doc = await pdfjsLib.getDocument({ data }).promise;
   entry.pages = doc.numPages;
-  const page = await doc.getPage(1);
-  const base = page.getViewport({ scale: 1 });
-  const viewport = page.getViewport({ scale: 420 / base.width });
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#fff' }).promise;
-  entry.thumbNode = canvas;
+  entry.thumbNode = await pdfCanvas(await doc.getPage(1), 420);
   doc.destroy();
 }
 
@@ -1462,14 +1509,7 @@ class PdfViewer extends BaseViewer {
 
   async renderThumb(i, el) {
     const page = await this.doc.getPage(i + 1);
-    const base = page.getViewport({ scale: 1 });
-    const width = 260 * Math.min(window.devicePixelRatio || 1, 2);
-    const viewport = page.getViewport({ scale: width / base.width });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#fff' }).promise;
-    el.replaceChildren(canvas);
+    el.replaceChildren(await pdfCanvas(page, 260 * Math.min(window.devicePixelRatio || 1, 2)));
   }
 
   destroy() {
@@ -1622,16 +1662,8 @@ class PptxViewer extends BoxViewer {
       }
       this.thumbPv.removeCurrentSlide();
       this.thumbPv.renderSingleSlide(i);
-      const src = this.thumbHost.querySelector('.pptx-preview-slide-wrapper');
-      if (!src) return;
-      const clone = src.cloneNode(true);
-      clone.style.cssText += ';position:absolute;left:0;top:0;margin:0';
-      const host = h('div', 'clone-host');
-      host.style.width = this.W + 'px';
-      host.style.height = this.H + 'px';
-      host.style.transform = 'scale(' + ((el.clientWidth || 220) / this.W) + ')';
-      host.appendChild(clone);
-      el.replaceChildren(host);
+      const box = slideCopy(this.thumbHost, this.W, this.H, el.clientWidth || 220);
+      if (box) el.replaceChildren(box);
     }).catch((err) => console.warn('Thumbnail failed:', err));
     return this.thumbChain;
   }
@@ -2536,6 +2568,11 @@ function timerTick() {
     p.classList.toggle('over', r.reached);
     p.classList.toggle('paused', !Timer.running);
   });
+  const big = $('pvTimer');                                       // the large readout in the companion's panel
+  if (big) {
+    big.hidden = !Timer.active;
+    if (r) { if (big.textContent !== r.text) big.textContent = r.text; big.classList.toggle('over', r.reached); big.classList.toggle('paused', !Timer.running); }
+  }
   const live = $('timerLive');
   if (live && r) { live.textContent = r.text; live.classList.toggle('over', r.reached); }
 }
@@ -3378,12 +3415,7 @@ async function peekPdf(file) {
     draw(i, el, stale) {
       chain = chain.then(async () => {
         if (stale()) return;
-        const page = await doc.getPage(i + 1);
-        const base = page.getViewport({ scale: 1 });
-        const vp = page.getViewport({ scale: (el.clientWidth || 340) * Math.min(window.devicePixelRatio || 1, 2) / base.width });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp, background: '#fff' }).promise;
+        const canvas = await pdfCanvas(await doc.getPage(i + 1), (el.clientWidth || 340) * Math.min(window.devicePixelRatio || 1, 2));
         if (!stale()) el.replaceChildren(canvas);
       }).catch((err) => console.warn('Slide preview failed:', err));
       return chain;
@@ -3408,15 +3440,8 @@ async function peekPptx(file, ratio) {
         if (stale()) return;
         pv.removeCurrentSlide();
         pv.renderSingleSlide(i);
-        const src = host.querySelector('.pptx-preview-slide-wrapper');
-        if (!src) return;
-        const clone = src.cloneNode(true);
-        clone.style.cssText += ';position:absolute;left:0;top:0;margin:0';
-        const box = h('div', 'clone-host');
-        box.style.width = W + 'px'; box.style.height = H + 'px'; box.dataset.w = W;
-        box.style.transform = 'scale(' + ((el.clientWidth || 340) / W) + ')';
-        box.appendChild(clone);
-        el.replaceChildren(box);
+        const box = slideCopy(host, W, H, el.clientWidth || 340);
+        if (box) el.replaceChildren(box);
       }).catch((err) => console.warn('Slide preview failed:', err));
       return chain;
     },
@@ -3453,7 +3478,7 @@ function pvRender() {
   if (msg) { pvJob++; return; }
 
   const i = pos.index, last = pos.count - 1;
-  $('pvPos').textContent = (i + 1) + ' / ' + pos.count;
+  $('pvPos').textContent = (rem.viewer === 'pdf' ? 'Page ' : 'Slide ') + (i + 1) + ' of ' + pos.count;
   $('pvPrev').disabled = i <= 0;
   $('pvNextBtn').disabled = i >= last;
   for (const id of ['pvNow', 'pvNext']) $(id).style.setProperty('--r', rem.ratio);

@@ -338,27 +338,29 @@
 
   <!-- Companion window: the presentation's current and next slide, its notes and buttons -->
   <aside class="pv idle" id="pv" hidden>
-    <div class="pv-head"><b id="pvTitle">Presentation</b>
-      <span class="pv-state off" id="pvState"><i class="dot"></i><span id="pvStateText">Not connected</span></span>
+    <div class="pv-head">
+      <div class="pv-head-row"><b id="pvTitle">Presentation</b>
+        <span class="pv-state off" id="pvState"><i class="dot"></i><span id="pvStateText">Not connected</span></span>
+      </div>
+      <div class="pv-timer" id="pvTimer" hidden></div>
     </div>
     <div class="pv-body">
       <div class="pv-empty" id="pvEmpty"></div>
       <div class="pv-live">
-        <div class="pv-shot" id="pvNow" style="--r:.5625;--maxh:210px"></div>
+        <div class="pv-cap-row"><span class="pv-cap">Now</span><span class="pv-cap" id="pvPos"></span></div>
+        <div class="pv-shot" id="pvNow" style="--r:.5625;--maxh:180px"></div>
         <div class="pv-row">
           <div class="pv-next">
             <span class="pv-cap">Next</span>
-            <div class="pv-shot" id="pvNext" style="--r:.5625;--maxh:110px"></div>
+            <div class="pv-shot" id="pvNext" style="--r:.5625;--maxh:100px"></div>
           </div>
-          <div class="pv-ctl">
-            <div class="pv-pos" id="pvPos"></div>
-            <div class="pv-btns">
-              <button class="vbtn vbtn-icon" id="pvPrev" type="button" title="Previous slide (↑)" aria-label="Previous slide"><svg class="icon"><use href="#i-chev-up"/></svg></button>
-              <button class="vbtn vbtn-icon" id="pvNextBtn" type="button" title="Next slide (↓)" aria-label="Next slide"><svg class="icon"><use href="#i-chev"/></svg></button>
-            </div>
+          <div class="pv-btns">
+            <button class="vbtn" id="pvPrev" type="button" title="Previous slide (↑)"><span>Previous</span><kbd>↑</kbd></button>
+            <button class="vbtn vbtn-solid" id="pvNextBtn" type="button" title="Next slide (↓)"><span>Next</span><kbd>↓</kbd></button>
           </div>
         </div>
-        <div class="pv-notes" id="pvNotes"></div>
+        <span class="pv-cap">Notes</span>
+        <div class="pv-notes-wrap"><div class="pv-notes" id="pvNotes"></div></div>
       </div>
     </div>
   </aside>

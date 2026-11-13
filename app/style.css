@@ -1005,7 +1005,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .ink-ring.eraser { background: rgba(255,255,255,.12); }
 
 /* =====================================================================
-   v1.8.0 — drag a zoomed page, laser pointer, timer
+   Drag a zoomed page, laser pointer, timer
    ===================================================================== */
 .stage.zoomed { cursor: grab; }
 .stage.panning { cursor: grabbing; user-select: none; -webkit-user-select: none; }
@@ -1064,11 +1064,10 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .timer-live { margin: 10px 0 14px; font-size: 56px; font-weight: 200; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .menu { max-height: calc(100% - var(--bt) - var(--bb) - 24px); overflow-y: auto; }
 
-/* ---------- v1.10.0 — presenter view: two linked windows ---------- */
+/* ---------- Presenter view: two linked windows ---------- */
 .link-pill { display: inline-flex; align-items: center; gap: 7px; flex: none; height: 28px; padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
 .link-pill .dot, .pv-state .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); transition: opacity .2s; }
 .link-pill.off .dot, .pv-state.off .dot { opacity: .3; }
-.menu-note { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-right: 4px; }
 
 /* The companion window's panel: same place and look as the notes panel */
 .pv {
@@ -1079,13 +1078,17 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .viewer.pv-open .stagewrap { right: min(404px, 40vw); }
 .viewer.inking .pv { display: none; }
 .viewer.inking.pv-open .stagewrap { right: 0; }
-.pv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px 6px; color: var(--ink-soft); }
+.pv-head { padding: 14px 18px 4px; color: var(--ink-soft); }
+.pv-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pv-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--ink); }
 .pv-state { display: inline-flex; align-items: center; gap: 7px; flex: none; font-size: 12px; font-weight: 600; }
 .pv-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 14px 14px; }
 .pv-live { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .pv.idle .pv-live { display: none; }
-.pv:not(.idle) .pv-empty { display: none; }
+.pv:not(.idle) .pv-timer { margin-top: 2px; font-size: 40px; font-weight: 200; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); }
+.pv-timer.over { color: #e5322d; }
+.pv-timer.paused { opacity: .6; }
+.pv-empty { display: none; }
 .pv-empty { margin: auto; padding: 0 14px; text-align: center; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
 
 .pv-shot {
@@ -1095,13 +1098,15 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .pv-shot canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 .pv-shot .clone-host { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
 .pv-shot.end::after { content: "Last slide"; position: absolute; inset: 0; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-soft); font-size: 13px; font-weight: 600; }
-.pv-row { display: flex; gap: 14px; align-items: stretch; flex: none; min-height: 138px; }
+.pv-cap-row { display: flex; align-items: baseline; justify-content: space-between; flex: none; }
+.pv-cap { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.pv-row { display: flex; gap: 14px; align-items: stretch; flex: none; min-height: 118px; }
 .pv-next { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .pv-next .pv-shot { align-self: flex-start; cursor: pointer; }
-.pv-cap { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-.pv-ctl { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-width: 96px; }
-.pv-pos { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pv-btns { display: flex; gap: 6px; }
-.pv-btns .vbtn { min-height: 40px; min-width: 40px; }
-.pv-notes { flex: 1; min-height: 0; overflow: auto; font-size: 18px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; padding: 2px 4px 0; }
+.pv-btns { flex: none; width: 132px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.pv-btns .vbtn { justify-content: space-between; padding: 0 12px 0 16px; }
+.pv-btns .vbtn kbd { margin: 0; }
+.vbtn-solid kbd { background: rgb(var(--surface-rgb) / .2); box-shadow: none; color: var(--on-ink); }
+.pv-notes-wrap { position: relative; flex: 1; min-height: 0; }
+.pv-notes { height: 100%; -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); overflow: auto; padding: 0 4px 24px; font-size: 18px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pv-notes.none { color: var(--ink-soft); font-size: 15px; }
