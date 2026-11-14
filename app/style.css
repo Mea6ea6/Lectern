@@ -301,17 +301,9 @@ button:disabled { cursor: default; }
 }
 /* A card under the pointer and a card chosen with the arrow keys move the same way: they grow and lift … */
 .card:hover, .kbd-nav .card.selected { scale: 1.02; translate: 0 -2px; }
-/* … the keyboard selection adds the glow … */
-.kbd-nav .card.selected { box-shadow: var(--sh-select); }
-/* While one card is the active one (pointer or arrow keys) the others step back: a little smaller and darker */
-.grid:has(.card:hover) .card:not(:hover) { scale: .98; filter: brightness(.78); }
-.kbd-nav .grid:has(.card.selected) .card:not(.selected) { scale: .98; filter: brightness(.78); }
 /* … and opening a file gives the card a quick bounce */
 .card.pop { animation: card-pop .12s ease-out; }
 @keyframes card-pop { 50% { scale: .96; translate: 0 0; } }
-/* … and an inverted name bar: impossible to miss from the back of the room */
-.kbd-nav .card.selected .card-foot { background: var(--ink); color: var(--on-ink); }
-.kbd-nav .card.selected .card-info { background: rgb(128 128 128 / .35); color: var(--on-ink); }
 .card.selected .card-foot, .card .card-foot { transition: background .15s, color .15s; }
 
 .thumb {
@@ -371,11 +363,12 @@ button:disabled { cursor: default; }
 .card-info .icon { width: 20px; height: 20px; }
 .no-results { text-align: center; color: var(--ink-soft); padding: 40px; }
 
+.footer > * { grid-area: 1 / 1; }                          /* the two footers sit on top of each other so they can cross-fade */
 .foot-line { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
 .foot-start { display: flex; flex-direction: column; gap: 6px; }
 .foot-start .foot-line:last-child { opacity: .7; }
 .footer {
-  position: relative; z-index: 1;
+  position: relative; z-index: 1; display: grid;
   padding: 6px 20px 28px; color: var(--ink-soft); font-size: 13px;
   text-shadow: 0 0 10px rgb(var(--surface-rgb) / .9);     /* stays readable over the grey backdrop */
 }
@@ -453,6 +446,8 @@ button:disabled { cursor: default; }
   touch-action: pan-y;                  /* pinching is done by the app itself (see Zoomer in app.js) */
 }
 .stage.zoomed { touch-action: pan-x pan-y; }
+.page-ghosts { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }   /* the page that is sliding away */
+.page-ghosts > * { will-change: transform, opacity; }
 .content { margin: auto; padding: calc(12px + var(--bt)) 12px calc(12px + var(--bb)); }   /* the page sits between the bars, scrolls under them */
 
 .vmsg {
@@ -693,6 +688,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .modal.anim-out { opacity: 0; transition: opacity .18s var(--ease-in); }
 
 #viewer.anim-in  { animation: view-in .3s var(--ease-out) backwards; }
+#viewer.from-card.anim-in { animation: none; }          /* opened from a card: the clip-path growth in app.js replaces the fade */
 #viewer.anim-out { animation: view-out .2s var(--ease-in) forwards; }
 #overview.anim-in  { animation: rise-in .3s var(--ease-out) backwards; }
 #overview.anim-out { animation: rise-out .18s var(--ease-in) forwards; }
@@ -778,6 +774,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .qnav .vbtn { min-height: 42px; min-width: 42px; background: transparent; }
 .qpos { min-width: 52px; text-align: center; font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
 .vbtn[aria-pressed="true"], .vbtn[aria-pressed="true"]:hover:not(:disabled) { background: var(--ink); color: var(--on-ink); }
+#vInk[aria-pressed="true"], #vInk[aria-pressed="true"]:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }   /* Draw: no inversion */
 
 /* ---------- Video and audio ---------- */
 .mcontrols { display: none; align-items: center; justify-content: center; gap: 18px; padding: 4px 0 4px; }
@@ -890,29 +887,52 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 @media (max-width: 720px) { .epub-page, .rtf-page, .zip-page { padding: 24px 20px; } }
 
 /* ---------- ONE interaction style for every interactive element ----------
-   Hover  = the element grows a little (nothing changes colour, nothing gets a new shadow).
-   Press  = it shrinks a little.
-   A pressed/selected toggle keeps its own inverted colours (that is state, not hover).
-   New interactive elements: add them to the lists below instead of writing their own :hover rule. */
+   Buttons: hovering changes nothing. Pressing shrinks the button a little; letting go springs it back.
+   Cards (files) are the exception: they grow and lift on hover / arrow-key selection.
+   A pressed/selected toggle keeps its own inverted colours (that is state, not hover) - except Draw.
+   New interactive elements: add them to the lists below instead of writing their own :active rule. */
 .btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn,
-.timer-pill, .timer-step, .side, .card, .ov-thumb {
+.timer-pill, .timer-step, .side, .pv-fold {
+  transition: scale .38s cubic-bezier(.22, 1.25, .36, 1), filter .15s, box-shadow .2s, background-color .22s ease, color .22s ease, opacity .12s, transform .09s ease-out;   /* the overshoot is the spring back */
+}
+.card, .ov-thumb {
   transition: scale .12s ease-out, translate .12s ease-out, filter .15s, box-shadow .09s, background .09s, color .09s, opacity .09s, transform .09s ease-out;
 }
-.btn:hover:not(:disabled), .chip:hover, .vbtn:hover:not(:disabled), .dd-btn:hover, .timer-pill:hover { scale: 1.02; }
-/* Rows of menus and dropdowns (.menu-item, .dd-menu button) are deliberately static: no growing, no bounce */
-.seg button:hover:not(:disabled), .stepper button:hover:not(:disabled) { scale: 1.04; }
-.btn-icon:hover:not(:disabled), .vbtn-icon:hover:not(:disabled), .card-info:hover, .card-queue:hover,
-.ink-swatch:hover, .q-btn:hover:not(:disabled), .timer-step:hover { scale: 1.07; }
-.side:hover:not(:disabled) { scale: 1.12; }
+/* Rows of menus and dropdowns (.menu-item, .dd-menu button) are deliberately static: no shrinking, no bounce */
 .ov-cell:hover .ov-thumb { scale: 1.03; }
 .btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .card-info:active, .card-queue:active,
-.stepper button:active:not(:disabled), .ink-swatch:active, .timer-step:active, .q-btn:active:not(:disabled) { scale: .975; transition-duration: .04s; }
-.seg button:active:not(:disabled) { scale: .985; transition-duration: .04s; }
-.side:active:not(:disabled) { scale: .9; transition-duration: .04s; }
-@media (hover: none) {
-  .btn:hover, .chip:hover, .vbtn:hover, .dd-btn:hover, .card-info:hover, .card-queue:hover, .ink-swatch:hover,
-  .seg button:hover, .stepper button:hover, .card:hover, .side:hover, .timer-step:hover, .q-btn:hover { scale: 1; }
+.stepper button:active:not(:disabled), .ink-swatch:active, .timer-step:active, .q-btn:active:not(:disabled),
+.timer-pill:active, .pv-fold:active { scale: .95; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
+.seg button:active:not(:disabled) { scale: .96; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
+.side:active:not(:disabled) { scale: .9; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
+@media (hover: none) { .card:hover, .ov-cell:hover .ov-thumb { scale: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .btn, .chip, .vbtn, .dd-btn, .seg button, .stepper button, .side, .q-btn { transition-duration: .01ms; } }
+
+/* Hover on a button: the background gets a little lighter (smoothly). Toggled-on and solid buttons keep their own colours. */
+:root, [data-theme="light"] { --hov-c: #000; --hov-p: 5%; }   /* light theme: the controls are already white, so hover tints them a touch darker */
+[data-theme="dark"] { --hov-c: #fff; --hov-p: 8%; }
+.btn, .chip, .card-queue, .dd-btn { --hb: var(--surface); }
+.vbtn, .stepper button, .card-info, .pv-fold { --hb: var(--surface-2); }
+.q-btn { --hb: var(--surface-3); }
+.seg button, .timer-pill, .timer-step, .side { --hb: transparent; }
+@media (hover: hover) {
+  .btn:hover:not(:disabled):not(.btn-primary):not(.q-clear-btn), .chip:hover:not(.active), .dd-btn:hover, .vbtn:hover:not(:disabled):not(.vbtn-solid):not([aria-pressed="true"]),
+  .seg button:hover:not(:disabled):not([aria-pressed="true"]), .stepper button:hover:not(:disabled), .card-info:hover, .card-queue:hover,
+  .q-btn:hover:not(:disabled), .timer-pill:hover, .timer-step:hover, .pv-fold:hover {
+    background-color: color-mix(in srgb, var(--hb), var(--hov-c) var(--hov-p));
+  }
+  .side:hover:not(:disabled) { background-color: rgb(255 255 255 / .1); }
 }
+.side { border-radius: var(--r-md); }
+/* Rows in the More menu, the settings popover, dropdowns and dialogs: the background fades in under the pointer (they do not grow) */
+.menu-item, .dd-menu button { --hb: transparent; transition: background-color .2s ease, color .2s ease, opacity .12s; }
+.modal-card .menu-item { --hb: var(--surface-2); }
+@media (hover: hover) {
+  .menu-item:hover:not(:disabled), .dd-menu button:hover { background-color: color-mix(in srgb, var(--hb), var(--hov-c) 9%); }
+}
+/* "Remove all" in the queue: no background until the pointer is over it */
+.q-clear-btn { background: none; background-image: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--ink-soft); }
+@media (hover: hover) { .q-clear-btn:hover:not(:disabled) { background-color: var(--surface-2); color: var(--ink); } }
 
 /* Filter chips: sentence case, lighter than the small caps labels elsewhere */
 .chip { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 600; }
@@ -1121,9 +1141,24 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .pv-notes-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--surface-2); border-radius: var(--r-md); }   /* its own block, like a code block */
 .pv-notes { height: 100%; -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); overflow: auto; padding: 14px 16px 28px; font-size: 18px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pv-notes.none { color: var(--ink-soft); font-size: 15px; }
-.pv-fold { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-md); background: var(--surface-2); color: var(--ink-soft); transition: scale .1s ease-out; }
+.pv-fold { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-md); background: var(--surface-2); color: var(--ink-soft); }
 .pv-fold .icon { width: 16px; height: 16px; transition: transform .2s; }
-.pv-fold:hover { scale: 1.1; }
-.pv-fold:active { scale: .92; transition-duration: .04s; }
-.pv.notes-off .pv-notes-wrap { display: none; }               /* the "hide notes" button */
+.pv.notes-off .pv-notes-wrap { display: none; }
+.pv.notes-off { bottom: auto; }                                 /* the whole panel shrinks, not just the notes */
+.pv.notes-off .pv-live { flex: none; }               /* the "hide notes" button */
 .pv.notes-off .pv-fold .icon { transform: rotate(180deg); }
+
+/* ---------- Motion (v1.13) ---------- */
+/* Cards slide in one after another right after files were loaded (--i = place in the list, capped so a big folder is not slow) */
+.grid.enter .card { animation: tile-in .4s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 28ms); }
+@keyframes tile-in { from { opacity: 0; translate: 0 16px; scale: .97; } }
+/* Overview thumbnails fade in when they are drawn */
+.ov-thumb > canvas, .ov-thumb > .clone-host, .ov-thumb > img { animation: fade-in .25s ease-out; }
+/* The progress bar glides instead of jumping (not while dragging it) */
+.scrub-track i { transition: width .22s ease-out; }
+.scrub-knob { transition: transform .12s, left .22s ease-out; }
+.scrub.dragging .scrub-track i, .scrub.dragging .scrub-knob { transition: transform .12s; }
+@media (prefers-reduced-motion: reduce) {
+  .grid.enter .card, .ov-thumb > * { animation: none; }
+  .scrub-track i, .scrub-knob { transition: none; }
+}

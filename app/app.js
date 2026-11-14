@@ -362,6 +362,7 @@ function addFiles(list, replace) {
     for (const e of incoming) if (!have.has(e.key)) { state.files.push(e); have.add(e.key); }
     state.skipped += skipped;
   }
+  state.cardsEnter = true;          // the next render lets the cards slide in one after another
   render();
 }
 
@@ -583,7 +584,6 @@ function createCard(entry) {
 
   card.onclick = () => { select(entry.id, false); openCard(entry); };
   info.onclick = (e) => { e.stopPropagation(); select(entry.id, false); openInfo(entry); };
-  // Hovering with a mouse selects the card, so Space / Enter act on it (like Quick Look on a Mac)
 
   entry.card = card;
   entry.qMark = undefined;          // a new card has to be marked even if the place did not change
@@ -608,6 +608,13 @@ function render() {
   const list = visibleFiles();
   $('grid').classList.toggle('no-blur', list.length > 80);   // blur behind hundreds of cards would make scrolling heavy
   $('grid').replaceChildren(...list.map(createCard));
+  if (state.cardsEnter) {                                  // only right after files were loaded, not on every filter / search
+    state.cardsEnter = false;
+    list.forEach((e, i) => e.card.style.setProperty('--i', String(Math.min(i, 14))));
+    $('grid').classList.add('enter');
+    clearTimeout(render.enterTimer);
+    render.enterTimer = setTimeout(() => $('grid').classList.remove('enter'), 1000);
+  }
   $('noResults').hidden = !hasFiles || list.length > 0;
 
   if (!list.some((e) => e.id === state.selectedId)) state.selectedId = list.length ? list[0].id : null;
@@ -720,7 +727,11 @@ function openCard(entry) {
   if (!card || !card.isConnected) { openViewer(entry); return; }
   card.classList.remove('pop'); void card.offsetWidth;          // restart the animation if it is already running
   card.classList.add('pop');
-  setTimeout(() => { card.classList.remove('pop'); openViewer(entry); }, 120);
+  setTimeout(() => {
+    card.classList.remove('pop');
+    V.openFrom = card.isConnected ? card.getBoundingClientRect() : null;     // the viewer grows out of this card
+    openViewer(entry);
+  }, 120);
 }
 
 function markSelected(scroll) {
@@ -754,7 +765,7 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes', 'timerDlg'].forEach((id) => {
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes', 'timerDlg', 'footer', 'footKeys', 'footStart'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     let logical = native.get.call(el), timer = 0;
@@ -1059,11 +1070,16 @@ function queueToggle(entry) {
   else Q.items.push({ path: entry.path, name: entry.name, size: entry.size, modified: entry.modified, ext: entry.ext, entry });
   queueChanged();
 }
+const prefersReducedMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 function queueChanged() {
   const place = new Map(Q.items.map((it, i) => [it.entry, i]));
   for (const e of state.files) markQueue(e, place.has(e) ? place.get(e) : -1);   // only cards whose place changed are touched
   $('btnQueue').hidden = !state.files.length && !Q.items.length;
-  $('qCount').textContent = Q.items.length ? String(Q.items.length) : '';
+  const countText = Q.items.length ? String(Q.items.length) : '';
+  if ($('qCount').textContent !== countText && countText && !prefersReducedMotion()) {       // the number gives a little hop when it changes
+    $('qCount').animate([{ scale: 1.4 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+  }
+  $('qCount').textContent = countText;
   if (!M.el.hidden && M.body.classList.contains('queue-dialog')) renderQueueDialog();
   updateQueueNav();
 }
@@ -1157,7 +1173,7 @@ function renderQueueDialog(first) {
       list.appendChild(row);
     });
     box.appendChild(list);
-    const clear = h('button', 'btn', 'Remove all');
+    const clear = h('button', 'btn q-clear-btn', 'Remove all');
     clear.title = 'Take every file out of the queue';
     clear.type = 'button';
     clear.onclick = () => { Q.items = []; queueChanged(); };
@@ -2166,9 +2182,21 @@ async function openViewer(entry) {
 
   V.entry = entry;
   V.openedAt = Date.now();
+  V.lastIndex = -1;                             // the first page of a file is not animated
   V.view = { zoom: 1, fit: 'page', rot: 0 };
   V.stage.classList.remove('zoomed');
+  const from = V.openFrom; V.openFrom = null;
+  const grow = !!from && !prefersReducedMotion() && !!V.el.animate;       // opened from a card: the page grows out of it
+  if (grow) V.el.classList.add('from-card');                              // (instead of the plain fade, see style.css)
   V.el.hidden = false;
+  if (grow) {
+    const W = innerWidth, H = innerHeight;
+    V.el.animate([
+      { clipPath: 'inset(' + from.top + 'px ' + (W - from.right) + 'px ' + (H - from.bottom) + 'px ' + from.left + 'px round 18px)' },
+      { clipPath: 'inset(0px 0px 0px 0px round 0px)' },
+    ], { duration: 360, easing: 'cubic-bezier(.2,.8,.2,1)' }).finished
+      .catch(() => {}).then(() => V.el.classList.remove('from-card'));
+  }
   document.body.classList.add('viewing');
   $('vTitle').textContent = entry.name;
   showMessage('Opening…', '', true);
@@ -2183,6 +2211,8 @@ async function openViewer(entry) {
     driver.entry = entry;
     V.view.fit = driver.defaultFit;
     driver.onChange = updateBar;
+    installPageGhost(driver);
+    V.pending = null; clearGhosts();
     V.driver = driver;
     V.el.classList.toggle('is-media', driver.isMedia);
     await driver.open(entry.file);
@@ -2241,9 +2271,67 @@ function showMessage(title, details, loading) {
 }
 
 // Refreshes the label, progress bar and which buttons are enabled
+// Page animation (More → Page animation): the old page slowly slides away while the new one slides in from the side it comes from.
+// A copy of the old page (the "ghost") is taken the moment goTo() is called, and the move only starts when the new page is
+// really on the screen (a PDF page takes a moment to draw), so nothing jumps.
+V.pageAnim = loadPref('fv-anim', '1') === '1';
+V.lastIndex = -1;
+V.ghostLayer = null;
+const PAGE_MS = 460, PAGE_EASE = 'cubic-bezier(.45,.05,.25,1)';
+function pageGhost() {
+  const src = V.content.firstElementChild;
+  if (!src || !V.pageAnim || prefersReducedMotion()) return null;
+  const wrap = V.stage.parentElement.getBoundingClientRect(), r = src.getBoundingClientRect();
+  if (!r.width || !r.height || src.querySelectorAll('*').length > 3000) return null;
+  const copy = src.cloneNode(true);
+  const from = src.matches('canvas') ? [src] : [...src.querySelectorAll('canvas')];
+  const to = copy.matches('canvas') ? [copy] : [...copy.querySelectorAll('canvas')];
+  from.forEach((c, i) => { try { to[i].getContext('2d').drawImage(c, 0, 0); } catch (e) { /* a blank ghost is fine */ } });
+  Object.assign(copy.style, { position: 'absolute', left: (r.left - wrap.left) + 'px', top: (r.top - wrap.top) + 'px', width: r.width + 'px', height: r.height + 'px', margin: '0' });
+  return copy;
+}
+function clearGhosts() { if (V.ghostLayer) { V.ghostLayer.remove(); V.ghostLayer = null; } }
+function installPageGhost(driver) {
+  const go = driver.goTo.bind(driver);
+  driver.goTo = (i) => {
+    if (driver instanceof ScrollViewer || driver.isMedia) return go(i);
+    const before = driver.index;
+    if (!V.pending) V.pending = { ghost: pageGhost() };           // keep the first one while a slow page is still drawing
+    go(i);
+    if (driver.index === before) V.pending = null;               // nothing changed (clamped at the end)
+  };
+}
+function playPageMove(ghost, dir) {
+  clearGhosts();
+  const wrapEl = V.stage.parentElement, dist = Math.min(180, Math.max(60, wrapEl.clientWidth * .12));
+  const layer = h('div', 'page-ghosts');
+  layer.appendChild(ghost);
+  wrapEl.appendChild(layer);
+  V.ghostLayer = layer;
+  const opt = { duration: PAGE_MS, easing: PAGE_EASE, fill: 'both' };
+  const out = ghost.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: 'translateX(' + (-dir * dist) + 'px)' }], opt);
+  V.content.animate([{ opacity: 0, transform: 'translateX(' + (dir * dist) + 'px)' }, { opacity: 1, transform: 'none' }], { duration: PAGE_MS, easing: PAGE_EASE });
+  out.onfinish = () => { if (V.ghostLayer === layer) clearGhosts(); };
+}
+function animatePage(d) {
+  const idx = d.index;
+  const drawn = d.shown === undefined || d.shown === idx;         // a PDF page says when it is really on the screen
+  if (V.lastIndex >= 0 && idx !== V.lastIndex) {
+    const dir = idx > V.lastIndex ? 1 : -1;
+    const ghost = V.pending && V.pending.ghost;
+    if (drawn) {
+      if (ghost && V.pageAnim && !prefersReducedMotion()) requestAnimationFrame(() => playPageMove(ghost, dir));
+      V.pending = null;
+    }
+    // while the new page is still being drawn we only wait: V.lastIndex stays put so the move is played later
+    if (!drawn) return;
+  }
+  V.lastIndex = idx;
+}
 function updateBar() {
   const d = V.driver;
   const ready = !!d && $('vMsg').hidden;
+  if (ready && d.count > 1 && !(d instanceof ScrollViewer) && !d.isMedia) animatePage(d);
   $('vPos').textContent = ready ? d.label() : '';
 
   const p = ready ? d.progress() : 0;
@@ -2283,6 +2371,7 @@ function updateBar() {
   });
   $('mRotL').disabled = $('mRotR').disabled = !ready || !d.canRotate;
   $('mAwake').setAttribute('aria-pressed', String(V.awake));
+  $('mAnim').setAttribute('aria-pressed', String(V.pageAnim));
 }
 
 function navigate(where) {
@@ -2858,6 +2947,11 @@ document.querySelectorAll('[data-fit]').forEach((b) => { b.onclick = () => setFi
 $('mRotL').onclick = () => rotate(-1);
 $('mRotR').onclick = () => rotate(1);
 $('mBlack').onclick = () => showCover(false);
+$('mAnim').onclick = () => {
+  V.pageAnim = !V.pageAnim;
+  savePref('fv-anim', V.pageAnim ? '1' : '0');
+  updateBar();
+};
 $('mAwake').onclick = () => {
   V.awake = !V.awake;
   savePref('fv-awake', V.awake ? '1' : '0');
@@ -3547,6 +3641,10 @@ function pvRender() {
   const job = ++pvJob, eng = Link.peek, stale = () => job !== pvJob;
   $('pvNext').classList.toggle('end', i >= last);
   if (!eng) return;
+  if (pvRender.last !== i && pvRender.last !== undefined && !prefersReducedMotion()) {
+    for (const id of ['pvNow', 'pvNext']) $(id).animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+  }
+  pvRender.last = i;
   eng.draw(i, $('pvNow'), stale);
   if (i < last) eng.draw(i + 1, $('pvNext'), stale); else $('pvNext').replaceChildren();
 }
@@ -3637,7 +3735,14 @@ function pvNotesOff(off) {
   $('pvFold').dataset.tip = off ? 'Show notes' : 'Hide notes';
 }
 pvNotesOff(loadPref('fv-pv-notes-off', '0') === '1');
-$('pvFold').onclick = () => { const off = !$('pv').classList.contains('notes-off'); savePref('fv-pv-notes-off', off ? '1' : '0'); pvNotesOff(off); };
+$('pvFold').onclick = () => {
+  const off = !$('pv').classList.contains('notes-off'), pv = $('pv');
+  savePref('fv-pv-notes-off', off ? '1' : '0');
+  const from = pv.offsetHeight;
+  pvNotesOff(off);                                             // the whole panel shrinks to its content (or grows back)
+  const to = pv.offsetHeight;
+  if (!prefersReducedMotion() && from !== to && pv.animate) pv.animate([{ height: from + 'px' }, { height: to + 'px' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+};
 $('mPresenter').onclick = () => { if (presenterOn()) { closeMenu(); presenterStop(); } else presenterStart(); };
 
 if (Link.role === 'companion') {
