@@ -1,4 +1,4 @@
-LECTERN v1.15.0 — offline viewer for the classroom
+LECTERN v1.17.0 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -90,6 +90,24 @@ CLASS QUEUE (the files for one lesson, in order)
   to the next file, so a presentation clicker can run the whole lesson.
   The queue lives while the page is open: after a reload, or when you choose a
   different folder, it starts empty.
+
+CONTINUE WHERE YOU STOPPED
+  Lectern remembers the slide / page (or the scroll position) of every file. When you
+  open it again, a card at the bottom asks "Continue from slide 20 of 64?" - Enter
+  continues, Esc or "Start over" stays at the beginning. If you do nothing for 20
+  seconds the card goes away and the file stays at the beginning; the remembered
+  place is kept until you move. A file is recognised by its name and size.
+
+VIDEO AND AUDIO
+  Click = play / pause, double click = full screen. Up / Down = volume, M = sound off,
+  < and > = speed (0.25x - 2x), , and . = one frame back / forward, C = subtitles,
+  D = pen on the paused picture. More: speed, subtitles file, repeat.
+  Subtitles: put a .srt or .vtt with the same name next to the video - it is found
+  automatically. Recordings longer than 2 minutes offer "Continue from 42:10?".
+  Songs show their cover, title and artist (mp3, FLAC, M4A).
+  Queue: when a video or song ends, "Next: ..." counts down 8 seconds and plays the
+  next file of the queue. Enter = play now, Esc = stay here.
+  (In the video player M is sound; bookmarks are for documents.)
 
 BOOKMARKS
   Press M (or the bookmark button in the bottom bar) to mark the page you are on.

@@ -88,6 +88,10 @@
     <symbol id="i-up"       viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
     <symbol id="i-down"     viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
     <symbol id="i-x"        viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-volume"   viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+    <symbol id="i-mute"     viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
+    <symbol id="i-cc"       viewBox="0 0 24 24"><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17V7a1.5 1.5 0 0 1 1.5-1.5zM10.5 10.2A2.3 2.3 0 1 0 10.5 13.8M17.5 10.2A2.3 2.3 0 1 0 17.5 13.8"/></symbol>
+    <symbol id="i-repeat"   viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a4 4 0 0 0-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 0 0 4-4v-1"/></symbol>
     <symbol id="i-music"    viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></symbol>
   </defs>
 </svg>
@@ -276,6 +280,7 @@
 
   <div class="vbar vbar-bottom">
     <div class="scrub" id="vScrub" role="slider" aria-label="Position in file">
+      <span class="scrub-tip" id="scrubTip" hidden></span>
       <div class="scrub-track"><i id="vProgress"></i></div>
       <div class="scrub-marks" id="vMarks"></div>
       <b class="scrub-knob" id="vKnob"></b>
@@ -303,11 +308,24 @@
         </button>
       </div>
     </div>
-    <!-- Video / audio: just play / pause and 5 seconds back / forward -->
+    <!-- Video / audio: time, play / pause with 5 seconds back / forward, volume, speed, subtitles, pen -->
     <div class="mcontrols" id="mControls">
-      <button class="vbtn vbtn-icon vbtn-big" id="mBack" type="button" title="Back 5 seconds (←)" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
-      <button class="vbtn vbtn-icon vbtn-big vbtn-solid" id="mPlay" type="button" title="Play / pause (Space)" aria-label="Play"><svg class="icon"><use id="mPlayIcon" href="#i-play"/></svg></button>
-      <button class="vbtn vbtn-icon vbtn-big" id="mFwd" type="button" title="Forward 5 seconds (→)" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
+      <span class="mtime" id="mTime">0:00 / 0:00</span>
+      <div class="mcenter">
+        <button class="vbtn vbtn-icon vbtn-big" id="mBack" type="button" title="Back 5 seconds (←)" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
+        <button class="vbtn vbtn-icon vbtn-big vbtn-solid" id="mPlay" type="button" title="Play / pause (Space)" aria-label="Play"><svg class="icon"><use id="mPlayIcon" href="#i-play"/></svg></button>
+        <button class="vbtn vbtn-icon vbtn-big" id="mFwd" type="button" title="Forward 5 seconds (→)" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
+      </div>
+      <div class="mright">
+        <div class="vol">
+          <button class="vbtn vbtn-icon" id="mMute" type="button" title="Mute (M)" aria-label="Mute"><svg class="icon"><use id="mMuteIcon" href="#i-volume"/></svg></button>
+          <input type="range" id="mVolume" min="0" max="100" step="1" value="100" title="Volume (↑ ↓)" aria-label="Volume">
+        </div>
+        <button class="vbtn" id="mSpeed" type="button" hidden title="Playback speed (&lt; and &gt;). Click to go back to normal">1×</button>
+        <button class="vbtn vbtn-icon" id="mCC" type="button" hidden aria-pressed="false" title="Subtitles (C)" aria-label="Subtitles"><svg class="icon"><use href="#i-cc"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mInk" type="button" hidden aria-pressed="false" title="Pen and marker on the paused picture (D)" aria-label="Pen and marker"><svg class="icon"><use href="#i-draw"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mMore" type="button" aria-haspopup="true" title="Speed, subtitles, repeat, tools and settings" aria-label="More"><svg class="icon"><use href="#i-more"/></svg></button>
+      </div>
     </div>
   </div>
 
@@ -379,7 +397,25 @@
 
   <!-- “More” menu -->
   <div class="menu" id="vMenu" hidden>
-    <div class="menu-row">
+    <div class="menu-row media-only">
+      <span class="menu-label">Speed</span>
+      <div class="stepper">
+        <button type="button" id="mSpeedDn" title="Slower (&lt;)" aria-label="Slower"><svg class="icon"><use href="#i-minus"/></svg></button>
+        <button type="button" id="mSpeedVal" title="Normal speed">1×</button>
+        <button type="button" id="mSpeedUp" title="Faster (&gt;)" aria-label="Faster"><svg class="icon"><use href="#i-plus"/></svg></button>
+      </div>
+    </div>
+    <button class="menu-item media-only" id="mSubs" type="button" aria-pressed="false" title="Show the subtitles (C)">
+      <svg class="icon"><use href="#i-cc"/></svg><span class="grow">Subtitles</span><span class="switch"></span>
+    </button>
+    <button class="menu-item media-only" id="mSubsFile" type="button" title="Pick a .srt or .vtt file for this video">
+      <svg class="icon"><use href="#i-plus"/></svg><span class="grow">Choose a subtitles file…</span>
+    </button>
+    <button class="menu-item media-only" id="mLoop" type="button" aria-pressed="false" title="Play this file again and again">
+      <svg class="icon"><use href="#i-repeat"/></svg><span class="grow">Repeat</span><span class="switch"></span>
+    </button>
+    <div class="menu-gap media-only"></div>
+    <div class="menu-row doc-only">
       <span class="menu-label">Zoom</span>
       <div class="stepper">
         <button type="button" id="mZoomOut" title="Zoom out (−)" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button>
@@ -387,21 +423,21 @@
         <button type="button" id="mZoomIn" title="Zoom in (+)" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button>
       </div>
     </div>
-    <div class="menu-row">
+    <div class="menu-row doc-only">
       <span class="menu-label">Fit</span>
       <div class="seg">
         <button type="button" data-fit="page" title="Fit the whole page"><svg class="icon"><use href="#i-fitpage"/></svg>Page</button>
         <button type="button" data-fit="width" title="Fit the page width"><svg class="icon"><use href="#i-fitwidth"/></svg>Width</button>
       </div>
     </div>
-    <div class="menu-row">
+    <div class="menu-row doc-only">
       <span class="menu-label">Rotate</span>
       <div class="stepper">
         <button type="button" id="mRotL" title="Rotate left"><svg class="icon"><use href="#i-rotl"/></svg>Left</button>
         <button type="button" id="mRotR" title="Rotate right (R)"><svg class="icon"><use href="#i-rotr"/></svg>Right</button>
       </div>
     </div>
-    <div class="menu-gap"></div>
+    <div class="menu-gap doc-only"></div>
     <button class="menu-item" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
       <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
     </button>
@@ -441,13 +477,39 @@
     <div class="modal-card timer-dialog" role="dialog" aria-modal="true" aria-label="Timer" id="timerBody"></div>
   </div>
 
+  <!-- "Continue where you stopped?" -->
+  <div class="resume" id="resume" role="dialog" aria-label="Continue where you stopped" hidden>
+    <div class="resume-text" id="resumeText"></div>
+    <div class="resume-actions">
+      <button class="btn" id="resumeNo" type="button" title="Open from the beginning (Esc)">Start over</button>
+      <button class="btn btn-primary" id="resumeYes" type="button" title="Go to the place you stopped at (Enter)">Continue <kbd>Enter</kbd></button>
+    </div>
+    <span class="resume-bar" id="resumeBar"></span>
+  </div>
+
+  <!-- Video / audio finished: the next file of the queue starts by itself -->
+  <div class="resume upnext" id="upnext" role="dialog" aria-label="Next file" hidden>
+    <div class="resume-text" id="upnextText"></div>
+    <div class="resume-actions">
+      <button class="btn" id="upnextNo" type="button" title="Stay on this file (Esc)">Stay here</button>
+      <button class="btn btn-primary" id="upnextYes" type="button" title="Start the next file now (Enter)">Play now <kbd>Enter</kbd></button>
+    </div>
+    <span class="resume-bar" id="upnextBar"></span>
+  </div>
+  <input type="file" id="subPick" accept=".srt,.vtt" hidden>
+
   <div class="toast" id="toast"></div>
   <div class="cover" id="cover" hidden></div>
 </div>
 
-<!-- The libraries in app/lib are loaded on demand by app.js — no internet needed -->
+<!-- The libraries in app/lib are loaded on demand by core.js — no internet needed -->
 <div class="tip" id="tip" role="tooltip" aria-hidden="true"></div>
 
-<script src="app/app.js"></script>
+<script src="app/core.js"></script>
+<script src="app/list.js"></script>
+<script src="app/viewers.js"></script>
+<script src="app/viewer-ui.js"></script>
+<script src="app/extras.js"></script>
+<script src="app/presenter.js"></script>
 </body>
 </html>

@@ -355,6 +355,10 @@ const Pen = (function () {
       out.width = anchor.width; out.height = anchor.height;
       out.getContext('2d').drawImage(anchor, 0, 0);
       withPage = true;
+    } else if (anchor && anchor.tagName === 'VIDEO' && anchor.videoWidth) {     // a paused video: the frame on the screen
+      out.width = anchor.videoWidth; out.height = anchor.videoHeight;
+      out.getContext('2d').drawImage(anchor, 0, 0);
+      withPage = true;
     } else if (anchor && anchor.querySelector && anchor.querySelector('img') && V.entry && V.entry.kind === 'image') {   // a photo
       const img = anchor.querySelector('img');
       out.width = img.naturalWidth || 1000; out.height = img.naturalHeight || 700;
@@ -411,7 +415,7 @@ const Pen = (function () {
     refreshButtons();
   }
 
-  // Called by app.js whenever the page, zoom or label may have changed
+  // Called by viewer-ui.js whenever the page, zoom or label may have changed
   function sync() { if (self.on) { refreshButtons(); redraw(); } }
 
   // Remembered choices
