@@ -297,14 +297,13 @@ button:disabled { cursor: default; }
   position: relative; display: flex; flex-direction: column; cursor: pointer;
   background: var(--surface); border-radius: var(--r-lg); overflow: hidden;
   box-shadow: var(--sh-1);
-  transition: transform .12s, box-shadow .12s;
-}
-/* A card under the pointer and a card chosen with the arrow keys move the same way: they grow and lift … */
-.card:hover, .kbd-nav .card.selected { scale: 1.02; translate: 0 -2px; }
+  }
+/* A file card is a big button: under the pointer or chosen with the arrow keys its background gets lighter (see the hover block below); pressing it shrinks it and it springs back */
+.card { --hb: var(--surface); }
 /* … and opening a file gives the card a quick bounce */
 .card.pop { animation: card-pop .12s ease-out; }
 @keyframes card-pop { 50% { scale: .96; translate: 0 0; } }
-.card.selected .card-foot, .card .card-foot { transition: background .15s, color .15s; }
+.card .thumb { transition: background-color .22s ease; }
 
 .thumb {
   position: relative; aspect-ratio: 16 / 10; width: 100%;
@@ -447,7 +446,7 @@ button:disabled { cursor: default; }
 }
 .stage.zoomed { touch-action: pan-x pan-y; }
 .page-ghosts { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }   /* the page that is sliding away */
-.page-ghosts > * { will-change: transform, opacity; }
+.paging .stage { overflow-x: clip; }
 .content { margin: auto; padding: calc(12px + var(--bt)) 12px calc(12px + var(--bb)); }   /* the page sits between the bars, scrolls under them */
 
 .vmsg {
@@ -687,6 +686,10 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .modal.anim-out .modal-card { animation: card-out .18s var(--ease-in) forwards; }
 .modal.anim-out { opacity: 0; transition: opacity .18s var(--ease-in); }
 
+#footer.anim-in  { animation: foot-in .36s var(--ease-out) backwards; }      /* hints rise from the bottom … */
+#footer.anim-out { animation: foot-out .22s var(--ease-in) forwards; pointer-events: none; }   /* … and sink back */
+@keyframes foot-in  { from { opacity: 0; transform: translateY(16px); } }
+@keyframes foot-out { to   { opacity: 0; transform: translateY(16px); } }
 #viewer.anim-in  { animation: view-in .3s var(--ease-out) backwards; }
 #viewer.from-card.anim-in { animation: none; }          /* opened from a card: the clip-path growth in app.js replaces the fade */
 #viewer.anim-out { animation: view-out .2s var(--ease-in) forwards; }
@@ -891,21 +894,22 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
    Cards (files) are the exception: they grow and lift on hover / arrow-key selection.
    A pressed/selected toggle keeps its own inverted colours (that is state, not hover) - except Draw.
    New interactive elements: add them to the lists below instead of writing their own :active rule. */
-.btn, .chip, .vbtn, .dd-btn, .seg button, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn,
+.btn, .chip, .vbtn, .dd-btn, .seg button, .card, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn,
 .timer-pill, .timer-step, .side, .pv-fold {
   transition: scale .38s cubic-bezier(.22, 1.25, .36, 1), filter .15s, box-shadow .2s, background-color .22s ease, color .22s ease, opacity .12s, transform .09s ease-out;   /* the overshoot is the spring back */
 }
-.card, .ov-thumb {
+.ov-thumb {
   transition: scale .12s ease-out, translate .12s ease-out, filter .15s, box-shadow .09s, background .09s, color .09s, opacity .09s, transform .09s ease-out;
 }
 /* Rows of menus and dropdowns (.menu-item, .dd-menu button) are deliberately static: no shrinking, no bounce */
 .ov-cell:hover .ov-thumb { scale: 1.03; }
 .btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .card-info:active, .card-queue:active,
 .stepper button:active:not(:disabled), .ink-swatch:active, .timer-step:active, .q-btn:active:not(:disabled),
+.card:active:not(:has(button:active)) { scale: .97; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .timer-pill:active, .pv-fold:active { scale: .95; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .seg button:active:not(:disabled) { scale: .96; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .side:active:not(:disabled) { scale: .9; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
-@media (hover: none) { .card:hover, .ov-cell:hover .ov-thumb { scale: 1; translate: 0 0; } }
+@media (hover: none) { .ov-cell:hover .ov-thumb { scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .btn, .chip, .vbtn, .dd-btn, .seg button, .stepper button, .side, .q-btn { transition-duration: .01ms; } }
 
 /* Hover on a button: the background gets a little lighter (smoothly). Toggled-on and solid buttons keep their own colours. */
@@ -922,7 +926,15 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
     background-color: color-mix(in srgb, var(--hb), var(--hov-c) var(--hov-p));
   }
   .side:hover:not(:disabled) { background-color: rgb(255 255 255 / .1); }
+  /* solid (white-on-black) buttons: Start, Open, Continue, Fullscreen … get a little softer */
+  .btn-primary:hover:not(:disabled), .vbtn-solid:hover:not(:disabled) { background-color: color-mix(in srgb, var(--ink), var(--on-ink) 16%); }
+  .card:hover, .card:hover .thumb { background-color: color-mix(in srgb, var(--hb), var(--hov-c) var(--hov-p)); }
 }
+/* the same for a card chosen with the arrow keys */
+.kbd-nav .card.selected { background-color: color-mix(in srgb, var(--hb), var(--hov-c) var(--hov-p)); }
+.kbd-nav .card.selected .thumb { background-color: color-mix(in srgb, var(--surface-2), var(--hov-c) var(--hov-p)); }
+.card:hover .thumb { --hb: var(--surface-2); }
+.btn-primary:active:not(:disabled), .vbtn-solid:active:not(:disabled) { scale: .95; }
 .side { border-radius: var(--r-md); }
 /* Rows in the More menu, the settings popover, dropdowns and dialogs: the background fades in under the pointer (they do not grow) */
 .menu-item, .dd-menu button { --hb: transparent; transition: background-color .2s ease, color .2s ease, opacity .12s; }

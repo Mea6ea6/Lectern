@@ -725,8 +725,7 @@ function select(id, scroll) { state.selectedId = id; markSelected(scroll); }
 function openCard(entry) {
   const card = entry.card;
   if (!card || !card.isConnected) { openViewer(entry); return; }
-  card.classList.remove('pop'); void card.offsetWidth;          // restart the animation if it is already running
-  card.classList.add('pop');
+  if (!card.matches(':hover')) { card.classList.remove('pop'); void card.offsetWidth; card.classList.add('pop'); }   // opened with the keyboard: bounce by hand (a click already bounces through :active)
   setTimeout(() => {
     card.classList.remove('pop');
     V.openFrom = card.isConnected ? card.getBoundingClientRect() : null;     // the viewer grows out of this card
@@ -2277,41 +2276,53 @@ function showMessage(title, details, loading) {
 V.pageAnim = loadPref('fv-anim', '1') === '1';
 V.lastIndex = -1;
 V.ghostLayer = null;
-const PAGE_MS = 460, PAGE_EASE = 'cubic-bezier(.45,.05,.25,1)';
-function pageGhost() {
+const PAGE_MS = 520, PAGE_EASE = 'cubic-bezier(.65,0,.35,1)';
+// Old-projector style: the current page slides out to the left while the next one slides in from the right (and back when going back).
+// Only transforms are animated, so the browser does it on the graphics card. A PDF page is moved as it is (no copy at all);
+// other formats get a copy of the old slide.
+function pageGhost(driver) {
   const src = V.content.firstElementChild;
   if (!src || !V.pageAnim || prefersReducedMotion()) return null;
   const wrap = V.stage.parentElement.getBoundingClientRect(), r = src.getBoundingClientRect();
-  if (!r.width || !r.height || src.querySelectorAll('*').length > 3000) return null;
+  if (!r.width || !r.height) return null;
+  const place = { left: (r.left - wrap.left) + 'px', top: (r.top - wrap.top) + 'px', width: r.width + 'px', height: r.height + 'px' };
+  if (driver instanceof PdfViewer) return { el: src, place };       // it is taken off the page when the new one is drawn: we just keep it
+  if (src.querySelectorAll('*').length > 3000) return null;
   const copy = src.cloneNode(true);
   const from = src.matches('canvas') ? [src] : [...src.querySelectorAll('canvas')];
   const to = copy.matches('canvas') ? [copy] : [...copy.querySelectorAll('canvas')];
   from.forEach((c, i) => { try { to[i].getContext('2d').drawImage(c, 0, 0); } catch (e) { /* a blank ghost is fine */ } });
-  Object.assign(copy.style, { position: 'absolute', left: (r.left - wrap.left) + 'px', top: (r.top - wrap.top) + 'px', width: r.width + 'px', height: r.height + 'px', margin: '0' });
-  return copy;
+  return { el: copy, place };
 }
-function clearGhosts() { if (V.ghostLayer) { V.ghostLayer.remove(); V.ghostLayer = null; } }
+function clearGhosts() {
+  if (V.ghostLayer) { V.ghostLayer.remove(); V.ghostLayer = null; }
+  V.stage.parentElement.classList.remove('paging');
+}
 function installPageGhost(driver) {
   const go = driver.goTo.bind(driver);
   driver.goTo = (i) => {
     if (driver instanceof ScrollViewer || driver.isMedia) return go(i);
     const before = driver.index;
-    if (!V.pending) V.pending = { ghost: pageGhost() };           // keep the first one while a slow page is still drawing
+    if (!V.pending) V.pending = { ghost: pageGhost(driver) };     // keep the first one while a slow page is still drawing
     go(i);
     if (driver.index === before) V.pending = null;               // nothing changed (clamped at the end)
   };
 }
-function playPageMove(ghost, dir) {
+function playPageMove(g, dir) {
   clearGhosts();
-  const wrapEl = V.stage.parentElement, dist = Math.min(180, Math.max(60, wrapEl.clientWidth * .12));
+  let el = g.el;
+  if (el.isConnected) el = el.cloneNode(true);                    // the page was not replaced after all: move a copy
+  Object.assign(el.style, g.place, { position: 'absolute', margin: '0', willChange: 'transform' });
+  const wrapEl = V.stage.parentElement, dist = wrapEl.clientWidth;
   const layer = h('div', 'page-ghosts');
-  layer.appendChild(ghost);
+  layer.appendChild(el);
   wrapEl.appendChild(layer);
+  wrapEl.classList.add('paging');                                  // no sideways scrollbar while the new page comes from outside
   V.ghostLayer = layer;
   const opt = { duration: PAGE_MS, easing: PAGE_EASE, fill: 'both' };
-  const out = ghost.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: 'translateX(' + (-dir * dist) + 'px)' }], opt);
-  V.content.animate([{ opacity: 0, transform: 'translateX(' + (dir * dist) + 'px)' }, { opacity: 1, transform: 'none' }], { duration: PAGE_MS, easing: PAGE_EASE });
-  out.onfinish = () => { if (V.ghostLayer === layer) clearGhosts(); };
+  el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-dir * dist) + 'px)' }], opt);
+  const inc = V.content.animate([{ transform: 'translateX(' + (dir * dist) + 'px)' }, { transform: 'translateX(0)' }], { duration: PAGE_MS, easing: PAGE_EASE });
+  inc.onfinish = inc.oncancel = () => { if (V.ghostLayer === layer) clearGhosts(); };
 }
 function animatePage(d) {
   const idx = d.index;
@@ -2320,7 +2331,7 @@ function animatePage(d) {
     const dir = idx > V.lastIndex ? 1 : -1;
     const ghost = V.pending && V.pending.ghost;
     if (drawn) {
-      if (ghost && V.pageAnim && !prefersReducedMotion()) requestAnimationFrame(() => playPageMove(ghost, dir));
+      if (ghost && V.pageAnim && !prefersReducedMotion()) playPageMove(ghost, dir);
       V.pending = null;
     }
     // while the new page is still being drawn we only wait: V.lastIndex stays put so the move is played later
