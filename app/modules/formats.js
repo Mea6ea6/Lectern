@@ -301,7 +301,7 @@ class MediaViewer extends BaseViewer {
 
     if (this.hasPicture) {
       el.className = 'media-video';
-      this.content.replaceChildren(el);
+      this.put(el);
       this.refit();
       const subs = subsFor(this.entry);
       if (subs.length) this.setSubtitles(subs[0]).catch(() => { /* a broken subtitle file is ignored */ });
@@ -316,7 +316,7 @@ class MediaViewer extends BaseViewer {
       } else box.appendChild(icon('i-music'));
       const sub = tags ? [tags.artist, tags.album].filter(Boolean).join(' · ') : '';
       box.append(h('div', 'media-title', (tags && tags.title) || (this.entry ? this.entry.base : '')), h('div', 'media-sub', sub || (wantVideo ? 'Sound only' : 'Audio')));
-      this.content.replaceChildren(box);
+      this.put(box);
     }
   }
 
@@ -929,7 +929,7 @@ class OdtViewer extends ScrollViewer {
 
     this.host = h('div', 'odt-host');
     this.host.appendChild(page);
-    this.content.replaceChildren(this.host);
+    this.put(this.host);
     this.listenScroll();
     this.refit();
   }
@@ -1417,7 +1417,7 @@ class RtfViewer extends ScrollViewer {
     page.style.width = this.natural + 'px';
     this.host = h('div', 'odt-host');
     this.host.appendChild(page);
-    this.content.replaceChildren(this.host);
+    this.put(this.host);
     this.listenScroll();
     this.refit();
   }
@@ -1504,7 +1504,7 @@ class ZipViewer extends ScrollViewer {
 
     this.host = h('div', 'text-host');
     this.host.appendChild(page);
-    this.content.replaceChildren(this.host);
+    this.put(this.host);
     this.listenScroll();
     this.refit();
   }
@@ -1717,7 +1717,7 @@ class EpubViewer extends ScrollViewer {
     if (token !== this.showToken) return;
     this.host = h('div', 'text-host');
     this.host.appendChild(page);
-    this.content.replaceChildren(this.host);
+    this.put(this.host);
     this.host.style.zoom = this.view.zoom;
     this.stage.scrollTo(0, 0);
     this.onChange();

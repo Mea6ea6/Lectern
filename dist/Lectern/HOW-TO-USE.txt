@@ -1,0 +1,144 @@
+LECTERN v1.17.4 — offline viewer for the classroom
+================================================================================
+Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
+and archives straight from a flash drive. Nothing to install, no internet, no
+account. Files are only READ — they are never changed, copied or uploaded.
+
+THIS FOLDER
+  Lectern.html   the page you open (double-click it)
+  app/           the program and its libraries — do not delete or rename
+  Files/         put your files here (any other folder also works)
+Keep all three together.
+
+HOW TO START FROM A FLASH DRIVE
+  1. Copy the whole "Lectern" folder to the drive. Put your files into "Files".
+  2. On the classroom computer plug in the drive and double-click "Lectern.html".
+     It opens in the browser (Chrome, Edge, Firefox or Safari).
+  3. Press "Choose folder" and pick the "Files" folder (or drag the folder, or
+     single files, into the window).
+       Chrome / Edge   A normal folder picker. The folder is remembered: next time
+                       press "Reopen" (the browser asks once for permission).
+                       "Rescan folder" (in the More menu, top right) picks up files you added.
+       Firefox         The browser asks "Upload files to this site?" — answer
+                       yes. This is only its standard wording: nothing is
+                       uploaded anywhere. Dragging the folder into the window
+                       skips the question.
+       Safari          Not tested by the author. If the folder button does not
+                       work, use "Add files" or drag files into the window.
+  4. Click a file (or select it and press Enter) to open it. Space (or the "i"
+     button on the card) shows details. Esc goes back.
+
+SUPPORTED FILES
+  Presentations   PPTX, PPSX, PPTM, PPSM, POTX, ODP          (no animations or transitions)
+  PDF             PDF
+  Documents       DOCX, ODT, RTF
+  Spreadsheets    XLSX, XLS, CSV, TSV, ODS
+  Images          PNG, JPG, GIF, WEBP, BMP, SVG, AVIF, APNG, ICO, TIFF, HEIC (iPhone photos)
+  Video           MP4, M4V, WEBM, MOV, OGV, MKV (if the browser knows its codec)
+  Audio           MP3, WAV, OGG, M4A, AAC, FLAC, OPUS
+  Books           EPUB
+  Text            TXT, MD, LOG (UTF-8 and Windows-1251)
+  Code and data   JSON, HTML (shown as text — web pages are never run)
+  Archives        ZIP (shows what is inside; nothing is unpacked)
+  Old .ppt / .doc are not supported — re-save them as .pptx / .docx.
+  Video and sound play only if the browser knows the format (MP4 with H.264 and
+  WebM are fine in Chrome, Edge, Safari; some .mov files are not).
+
+PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
+  1. Open a PDF or PowerPoint, press P (or More > Presenter view). A second
+     window opens. Drag it to your laptop screen, then press F in the slides window.
+  2. In the second window open the file with your speech. On the right it shows the
+     current and next slide and the notes. Up / Down (or Page Up / Page Down on a
+     clicker) turn the slides; Left / Right turn the speech file. You can also turn
+     slides in the first window. The timer is shared.
+  3. Pen, laser and black screen work in the slides window only.
+  To end it: More > Stop presenter view (the second window closes).
+  If the browser blocks the new window, allow pop-ups for this page.
+  Both windows must be in the same browser, as two separate windows (not tabs).
+
+FULLSCREEN WINDOW
+  More (top right of the file list, or More in the viewer) > Fullscreen window hides the browser's bars.
+  Esc leaves it. Installed as an app, Lectern has no browser bars anyway.
+
+IN THE VIEWER
+  Bottom bar      First / Previous / Next / Last, progress bar (click or drag),
+                  Draw, Overview (all pages as a grid), More (zoom, fit, rotate,
+                  laser pointer, timer, black screen, keep screen on, theme)
+  Fullscreen      Tap the left / right edge to turn pages, swipe, tap the middle
+                  to show the buttons. The buttons hide themselves.
+  Video / audio   Only three buttons: back 5 seconds, play / pause, forward 5
+                  seconds. Keys: Space = play / pause, ← → = 5 seconds.
+
+PEN AND MARKER (any page or slide)
+  Press "Draw" (or D). The top and bottom bars step aside, so the page gets the
+  whole screen, and one compact bar appears. Choose Pen, Marker (see-through) or
+  Eraser, a colour and a thickness (drag the slider; the dot next to it shows the
+  size, and each tool remembers its own). A circle around the pointer shows how
+  thick the line will be. The eraser rubs out only the part of a line you touch. Undo, Redo, Clear and
+  "save as picture" are in the same bar. Drag the bar by its grip (the three
+  lines on the left) if it covers something. The file is not changed; the
+  drawing stays on the screen of that page until you go back to the list.
+  While drawing is on, a finger or the mouse draws instead of swiping - use the
+  arrows in the drawing bar (or the keys) to change page. Press Done (D / Esc)
+  to return to normal gestures.
+
+CLASS QUEUE (the files for one lesson, in order)
+  Press the "+" on a file card (or Q on the keyboard). The "Queue" button in the
+  top bar opens the list: move files up / down, remove, Start.
+  While a file of the queue is open, the arrows in the top bar (or [ and ]) jump
+  to the next / previous file. At the very end of a file a second "Next" moves on
+  to the next file, so a presentation clicker can run the whole lesson.
+  The queue lives while the page is open: after a reload, or when you choose a
+  different folder, it starts empty.
+
+CONTINUE WHERE YOU STOPPED
+  Lectern remembers the slide / page (or the scroll position) of every file. When you
+  open it again, a card at the bottom asks "Continue from slide 20 of 64?" - Enter
+  continues, Esc or "Start over" stays at the beginning. If you do nothing for 20
+  seconds the card goes away and the file stays at the beginning; the remembered
+  place is kept until you move. A file is recognised by its name and size.
+
+VIDEO AND AUDIO
+  Click = play / pause, double click = full screen. Up / Down = volume, M = sound off,
+  < and > = speed (0.25x - 2x), , and . = one frame back / forward, C = subtitles,
+  D = pen on the paused picture. More: speed, subtitles file, repeat.
+  Subtitles: put a .srt or .vtt with the same name next to the video - it is found
+  automatically. Recordings longer than 2 minutes offer "Continue from 42:10?".
+  Songs show their cover, title and artist (mp3, FLAC, M4A).
+  Queue: when a video or song ends, "Next: ..." counts down 8 seconds and plays the
+  next file of the queue. Enter = play now, Esc = stay here.
+  (In the video player M is sound; bookmarks are for documents.)
+
+BOOKMARKS
+  Press M (or the bookmark button in the bottom bar) to mark the page you are on.
+  Marks show on the progress bar and in the Overview, and are remembered for that
+  file. "," and "." jump to the previous / next mark.
+
+SPEAKER NOTES (PPTX and ODP)
+  Press N (or More - Speaker notes) to open the notes of the slide on screen in a
+  side panel. They change with the slide.
+
+KEYBOARD
+  List     Arrows select    Enter open    Space details    / search    Q queue
+  Viewer   → ↓ Space Enter = next        ← ↑ Backspace = previous
+           Home / End = first / last     G = overview     F = fullscreen
+           D = draw (1 pen, 2 marker, 3 eraser; Ctrl+Z undo, Ctrl+Shift+Z redo)
+           M = bookmark   , . = previous / next bookmark   N = notes
+           B = black screen   W = white screen   R = rotate   + − 0 = zoom
+           L = laser pointer (a red dot follows the mouse or a finger)
+           P = presenter view (see below)
+           T = timer (silent; shown in the top bar, turns red when the time is reached)
+           Zoomed in: drag the page with the mouse to move it
+           Touch screen: pinch with two fingers to zoom; double-tap the middle of the page to zoom in / back
+           Trackpad: pinch (or Ctrl + scroll) zooms where the pointer is
+           [ ] = previous / next file of the queue          Esc = back
+
+BROWSERS
+  Chrome and Edge (recommended): remember the folder, can install Lectern as an
+  app from the web address. Firefox works too, without remembering the folder.
+  Use a recent version of the browser. Safari has not been tested.
+
+LICENSES OF THE PARTS INSIDE
+  PDF.js (Apache-2.0), docx-preview (Apache-2.0), pptx-preview (ISC), SheetJS
+  (Apache-2.0), JSZip (MIT), UTIF and pako (MIT), heic2any (MIT; contains libheif, LGPL-3.0),
+  Inter font (SIL OFL 1.1). Details: README on GitHub.

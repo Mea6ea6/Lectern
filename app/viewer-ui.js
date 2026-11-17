@@ -317,6 +317,7 @@ function updateMediaBar(d) {
   const muted = d.muted;
   $('mMuteIcon').setAttribute('href', muted ? '#i-mute' : '#i-volume');
   $('mMute').setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  $('mMute').dataset.tip = muted ? 'Unmute (M)' : 'Mute (M)';
   $('mVolume').value = muted ? 0 : Math.round(d.volume * 100);
   const rate = d.rate, normal = Math.abs(rate - 1) < 0.001;
   $('mSpeed').hidden = normal;                                   // the speed shows only when it is not normal
@@ -544,6 +545,7 @@ function openOverview() {
   for (let i = 0; i < d.count; i++) {
     const cell = h('button', 'ov-cell' + (i === current ? ' current' : ''));
     cell.type = 'button';
+    cell.dataset.tip = 'Go to ' + (d instanceof PptxViewer ? 'slide ' : d instanceof XlsxViewer ? 'sheet ' : 'page ') + (i + 1);
     const thumb = h('span', 'ov-thumb');
     thumb.dataset.i = i;
     thumb.style.aspectRatio = '1 / ' + d.thumbRatio;

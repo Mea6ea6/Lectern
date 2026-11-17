@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lectern</title>
+  <meta name="theme-color" content="#0b0b0b">
+  <meta name="application-name" content="Lectern">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" type="image/svg+xml" href="app/icons/icon.svg">
+  <link rel="apple-touch-icon" href="app/icons/apple-touch-icon.png">
+  <script>
+    /* Applied before the first paint, so there is no flash of the wrong theme or the wrong glass */
+    window.GLASS_DEFAULT = 80;     // fixed look: 0 = full frosted glass … 100 = solid panels
+    window.applyGlass = function (value) {
+      var solid = Math.max(0, Math.min(100, value)) / 100, g = 1 - solid, r = document.documentElement.style;
+      r.setProperty('--g', g.toFixed(3));                              // how much glass (0 … 1)
+      r.setProperty('--a1', (1 - 0.66 * g).toFixed(3));               // panels: opacity
+      r.setProperty('--a2', (1 - 0.56 * g).toFixed(3));               // controls on panels: opacity
+      r.setProperty('--wall-o', g.toFixed(3));                        // the grey "wallpaper" behind the glass
+      r.setProperty('--bd', g < 0.03 ? 'none' : 'blur(' + Math.round(g * 44) + 'px) saturate(' + (1 + 0.7 * g).toFixed(2) + ')');
+    };
+    try {
+      var d = document.documentElement;
+      var t = localStorage.getItem('fv-theme');
+      if (t) d.dataset.theme = t;
+    } catch (e) { /* storage blocked: keep defaults */ }
+    window.applyGlass(window.GLASS_DEFAULT);
+    /* The manifest only makes sense on a web address (it can't be fetched from a flash drive) */
+    if (/^https?:$/.test(location.protocol)) {
+      var m = document.createElement('link');
+      m.rel = 'manifest'; m.href = 'manifest.webmanifest';
+      document.head.appendChild(m);
+    }
+  </script>
+  <link rel="stylesheet" href="app/fonts.css">
+  <link rel="stylesheet" href="app/style.css">
+</head>
+<body>
+
+<!-- Icon set. Used like: <svg class="icon"><use href="#i-next"/></svg> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-first"    viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6"/></symbol>
+    <symbol id="i-prev"     viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-next"     viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-last"     viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6"/></symbol>
+    <symbol id="i-full"     viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-exitfull" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+    <symbol id="i-plus"     viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus"    viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-search"   viewBox="0 0 24 24"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4"/></symbol>
+    <symbol id="i-folder"   viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-addfile"  viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M12 12v6M9 15h6"/></symbol>
+    <symbol id="i-grid"     viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+    <symbol id="i-more"     viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/></symbol>
+    <symbol id="i-rotl"     viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></symbol>
+    <symbol id="i-rotr"     viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></symbol>
+    <symbol id="i-fitpage"  viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/></symbol>
+    <symbol id="i-fitwidth" viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></symbol>
+    <symbol id="i-sliders"  viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM9 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></symbol>
+    <symbol id="i-refresh"  viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+    <symbol id="i-screen"   viewBox="0 0 24 24"><path d="M3 5h18v11H3zM8 20h8M12 16v4"/></symbol>
+    <symbol id="i-info"     viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-check"    viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-chev"     viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-install"  viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-black"    viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4M12 7.6v3.2M9.6 8.8a3.6 3.6 0 1 0 4.8 0"/></symbol>
+    <symbol id="i-laser"    viewBox="0 0 24 24"><path d="M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
+    <symbol id="i-timer"    viewBox="0 0 24 24"><path d="M12 6a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM12 13.5V10M9.5 2.5h5M12 2.5V6M18.5 6.5l1.2-1.2"/></symbol>
+    <symbol id="i-chev-up"  viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6.5 3.5h11v17L12 16.6l-5.5 3.9z"/></symbol>
+    <symbol id="i-presenter" viewBox="0 0 24 24"><path d="M3 4.5h14v9.5H3zM8 18.5h4M10 14v4.5M17 9.5h4v9h-6.5"/></symbol>
+    <symbol id="i-notes"    viewBox="0 0 24 24"><path d="M4.5 4.5h15v11h-9l-4 4v-4h-2zM8 9h8M8 12.5h5"/></symbol>
+    <symbol id="i-pen"      viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM14.5 6.5l3 3"/></symbol>
+    <symbol id="i-marker"   viewBox="0 0 24 24"><path d="M9 20H4l2-4M7 16l8.5-8.5 3 3L10 19zM15.5 7.5l2-2 3 3-2 2M13 20h8"/></symbol>
+    <symbol id="i-eraser"   viewBox="0 0 24 24"><path d="M8 20h12M5.5 16.5l9-9a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L12 20H8.5l-3-3a1.4 1.4 0 0 1 0-.5zM9 12l5 5"/></symbol>
+    <symbol id="i-undo"     viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+    <symbol id="i-trash"    viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-save"     viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-draw"     viewBox="0 0 24 24"><path d="M3 21c3-1 5-1 6-3 1-2 0-4 2-6l8-8a2.1 2.1 0 0 1 3 3l-8 8c-2 2-4 1-6 2-2 1-2 3-5 4z"/></symbol>
+    <symbol id="i-play"     viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></symbol>
+    <symbol id="i-pause"    viewBox="0 0 24 24"><path d="M7 5v14M17 5v14" stroke-width="3.6"/></symbol>
+    <symbol id="i-back5"    viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/><text x="12" y="15.6" text-anchor="middle" font-size="8.5" font-weight="800" stroke="none" fill="currentColor" style="font-family:Inter,sans-serif">5</text></symbol>
+    <symbol id="i-fwd5"     viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/><text x="12" y="15.6" text-anchor="middle" font-size="8.5" font-weight="800" stroke="none" fill="currentColor" style="font-family:Inter,sans-serif">5</text></symbol>
+    <symbol id="i-queue"    viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h7M18 14v6M15 17h6"/></symbol>
+    <symbol id="i-up"       viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="i-down"     viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-x"        viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-volume"   viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+    <symbol id="i-mute"     viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
+    <symbol id="i-cc"       viewBox="0 0 24 24"><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17V7a1.5 1.5 0 0 1 1.5-1.5zM10.5 10.2A2.3 2.3 0 1 0 10.5 13.8M17.5 10.2A2.3 2.3 0 1 0 17.5 13.8"/></symbol>
+    <symbol id="i-repeat"   viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a4 4 0 0 0-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 0 0 4-4v-1"/></symbol>
+    <symbol id="i-music"    viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></symbol>
+  </defs>
+</svg>
+
+<!-- Hidden file pickers (used when the browser has no folder-picker API, e.g. Firefox) -->
+<input type="file" id="pickFolder" webkitdirectory hidden>
+<input type="file" id="pickFiles" multiple hidden>
+
+<!-- ============ HOME: file list ============ -->
+<div id="home">
+  <header class="topbar">
+    <div class="brand">
+      <h1>Lectern</h1>
+      <p id="status">No files selected</p>
+    </div>
+    <div class="actions">
+      <span class="link-pill off" hidden><i class="dot"></i><span class="lp-text"></span></span>
+      <button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button>
+      <div class="anchor">
+        <button class="btn btn-icon" id="btnSettings" type="button" title="More" aria-label="More">
+          <svg class="icon"><use href="#i-sliders"/></svg>
+        </button>
+        <!-- The "More" menu of the home screen: file actions (shown once there are files), install, appearance -->
+        <div class="popover" id="settings" hidden>
+          <div id="headFiles" hidden>
+            <button class="menu-item reopen-btn" type="button" data-close hidden title="Open the folder from last time">
+              <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
+            </button>
+            <button class="menu-item" id="btnFolder" type="button" data-close title="Choose another folder">
+              <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
+            </button>
+            <button class="menu-item" id="btnFiles" type="button" data-close title="Add single files to the list">
+              <svg class="icon"><use href="#i-addfile"/></svg><span>Add files</span>
+            </button>
+            <button class="menu-item" id="btnRefresh" type="button" data-close hidden title="Rescan the folder for new files">
+              <svg class="icon"><use href="#i-refresh"/></svg><span>Rescan folder</span>
+            </button>
+            <div class="menu-gap"></div>
+          </div>
+          <button class="menu-item" id="btnInstall" type="button" data-close hidden title="Install Lectern as an app">
+            <svg class="icon"><use href="#i-install"/></svg><span>Install as app</span>
+          </button>
+          <div class="pop-row"><span class="pop-label">Theme</span>
+            <div class="seg">
+              <button type="button" data-theme-set="light" title="Light theme">Light</button>
+              <button type="button" data-theme-set="dark" title="Dark theme">Dark</button>
+            </div>
+          </div>
+          <button class="menu-item" id="sFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
+            <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
+          </button>
+          <button class="menu-item" id="sHints" type="button" aria-pressed="true" title="Show or hide the tips at the bottom of the page">
+            <svg class="icon"><use href="#i-info"/></svg><span class="grow">Show tips</span><span class="switch"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- One row: sort + filter on the left, search in the middle (takes the free width), queue on the right -->
+  <div class="toolbar" id="toolbar" hidden>
+    <div class="dd" id="sortDD">
+      <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sort the files">
+        <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
+        <svg class="icon"><use href="#i-chev"/></svg>
+      </button>
+      <div class="dd-menu" id="sortMenu" role="listbox" hidden>
+        <button type="button" role="option" data-sort="name" title="Sort by name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
+        <button type="button" role="option" data-sort="date" title="Newest files first"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
+        <button type="button" role="option" data-sort="size" title="Largest files first"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
+        <button type="button" role="option" data-sort="type" title="Group by file type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
+      </div>
+    </div>
+    <button class="btn dd-btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="chipsWrap" title="Show file types">
+      <span class="dd-cap">Filter</span><span class="dd-val" id="filterVal">All</span>
+      <svg class="icon"><use href="#i-chev"/></svg>
+    </button>
+    <label class="search" title="Search by name">
+      <svg class="icon"><use href="#i-search"/></svg>
+      <input id="search" type="search" placeholder="Search by name" autocomplete="off">
+    </label>
+    <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
+      <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
+    </button>
+  </div>
+  <!-- The file-type chips slide open under the toolbar when the Filter button is pressed (closed by default) -->
+  <div class="chips-wrap" id="chipsWrap" aria-hidden="true"><div class="chips-in"><div class="chips" id="chips"></div></div></div>
+
+  <main>
+    <section id="empty" class="empty">
+      <div class="empty-card">
+        <svg class="icon empty-icon icon-idle"><use href="#i-folder"/></svg>
+        <svg class="icon empty-icon icon-drop"><use href="#i-addfile"/></svg>
+        <h2 class="t-idle">Choose a folder with your files</h2>
+        <h2 class="t-drop">Drop to add files</h2>
+        <div class="empty-actions">
+          <button class="btn btn-primary btn-big" id="btnFolder2" type="button" title="Choose a folder with your files">
+            <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
+          </button>
+          <button class="btn btn-big reopen-btn" type="button" hidden title="Open the folder from last time">
+            <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
+          </button>
+          <button class="btn btn-big" id="btnFiles2" type="button" title="Choose single files">
+            <svg class="icon"><use href="#i-addfile"/></svg><span>Choose files</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="grid" class="grid" hidden></section>
+    <p id="noResults" class="no-results" hidden>Nothing found</p>
+  </main>
+
+  <footer class="footer" id="footer">
+    <div class="foot-line" id="footKeys" hidden>
+      <span><kbd>Space</kbd> details</span>
+      <span><kbd>Enter</kbd> open</span>
+      <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> select</span>
+      <span><kbd>Q</kbd> add to queue</span>
+      <span><kbd>/</kbd> search</span>
+    </div>
+    <div class="foot-start" id="footStart">
+      <div class="foot-line">
+        <span>Drag files or folders into this window</span>
+        <span>Everything stays on this computer and works offline</span>
+      </div>
+      <div class="foot-line"><span>Presentations · PDF · documents · spreadsheets · images · video · audio · books · archives · text</span></div>
+    </div>
+  </footer>
+</div>
+
+<!-- Dialog (file details, folder hint) -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" id="modalBody"></div>
+</div>
+
+<div id="dropHint" class="drop-hint" hidden><div class="drop-frame">Drop to add files</div></div>
+
+<!-- ============ VIEWER: opens over the list ============ -->
+<div id="viewer" class="viewer" hidden>
+
+  <div class="vbar vbar-top">
+    <div class="vleft">
+      <button class="vbtn" id="vClose" type="button" title="Back to files (Esc)">
+        <svg class="icon"><use href="#i-prev"/></svg><span>Back</span>
+      </button>
+      <!-- Only when the open file is part of the class queue -->
+      <div class="qnav" id="qNav" hidden>
+        <button class="vbtn vbtn-icon" id="qPrev" type="button" title="Previous file in the queue ([ or Shift+←)" aria-label="Previous file"><svg class="icon"><use href="#i-prev"/></svg></button>
+        <span class="qpos" id="qPos"></span>
+        <button class="vbtn vbtn-icon" id="qNext" type="button" title="Next file in the queue (] or Shift+→)" aria-label="Next file"><svg class="icon"><use href="#i-next"/></svg></button>
+      </div>
+    </div>
+    <div class="vtitle-wrap"><div class="vtitle" id="vTitle"></div><span class="link-pill off" hidden><i class="dot"></i><span class="lp-text"></span></span><button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button></div>
+    <div class="vright">
+    <button class="vbtn vbtn-solid" id="vFull" type="button" title="Fullscreen (F)">
+      <svg class="icon"><use id="vFullIcon" href="#i-full"/></svg><span id="vFullText">Fullscreen</span>
+    </button>
+    </div>
+  </div>
+
+  <div class="stagewrap">
+    <div class="stage" id="stage" tabindex="-1">
+      <div class="content" id="content"></div>
+    </div>
+    <div class="vmsg" id="vMsg" hidden></div>
+
+    <div class="overview" id="overview" hidden>
+      <div class="ov-grid" id="ovGrid"></div>
+    </div>
+
+    <!-- Pen / marker layer: lives only on the screen, the file is never changed -->
+    <canvas class="ink-canvas" id="inkCanvas" hidden></canvas>
+
+    <!-- The laser dot and its short trail -->
+    <canvas class="laser-trail" id="laserTrail" hidden></canvas>
+    <div class="laser-dot" id="laserDot" hidden></div>
+
+    <!-- Video / audio: one big button in the middle while paused -->
+    <button class="media-big" id="mediaBig" type="button" aria-label="Play" hidden><svg class="icon"><use href="#i-play"/></svg></button>
+
+    <!-- Big side buttons: easy to hit on a touch board -->
+    <button class="side side-prev" id="vSidePrev" type="button" aria-label="Previous"><svg class="icon"><use href="#i-prev"/></svg></button>
+    <button class="side side-next" id="vSideNext" type="button" aria-label="Next"><svg class="icon"><use href="#i-next"/></svg></button>
+  </div>
+
+  <div class="vbar vbar-bottom">
+    <div class="scrub" id="vScrub" role="slider" aria-label="Position in file">
+      <span class="scrub-tip" id="scrubTip" hidden></span>
+      <div class="scrub-track"><i id="vProgress"></i></div>
+      <div class="scrub-marks" id="vMarks"></div>
+      <b class="scrub-knob" id="vKnob"></b>
+    </div>
+    <div class="vcontrols">
+      <div class="group">
+        <button class="vbtn vbtn-icon" id="vFirst" type="button" title="First (Home)" aria-label="First"><svg class="icon"><use href="#i-first"/></svg></button>
+        <button class="vbtn vbtn-icon" id="vPrev"  type="button" title="Previous (←)" aria-label="Previous"><svg class="icon"><use href="#i-prev"/></svg></button>
+        <span class="pos" id="vPos"></span>
+        <button class="vbtn vbtn-icon" id="vNext"  type="button" title="Next (→ or Space)" aria-label="Next"><svg class="icon"><use href="#i-next"/></svg></button>
+        <button class="vbtn vbtn-icon" id="vLast"  type="button" title="Last (End)" aria-label="Last"><svg class="icon"><use href="#i-last"/></svg></button>
+      </div>
+      <div class="group">
+        <button class="vbtn vbtn-icon" id="vMark" type="button" title="Bookmark this page (M)" aria-label="Bookmark this page" aria-pressed="false">
+          <svg class="icon"><use href="#i-bookmark"/></svg>
+        </button>
+        <button class="vbtn" id="vInk" type="button" title="Pen and marker (D)" aria-pressed="false">
+          <svg class="icon"><use href="#i-draw"/></svg><span>Draw</span>
+        </button>
+        <button class="vbtn" id="vOverview" type="button" title="Overview (G)">
+          <svg class="icon"><use href="#i-grid"/></svg><span>Overview</span>
+        </button>
+        <button class="vbtn" id="vMore" type="button" aria-haspopup="true" title="Zoom, fit, tools and settings">
+          <svg class="icon"><use href="#i-more"/></svg><span>More</span>
+        </button>
+      </div>
+    </div>
+    <!-- Video / audio: time, play / pause with 5 seconds back / forward, volume, speed, subtitles, pen -->
+    <div class="mcontrols" id="mControls">
+      <span class="mtime" id="mTime">0:00 / 0:00</span>
+      <div class="mcenter">
+        <button class="vbtn vbtn-icon vbtn-big" id="mBack" type="button" title="Back 5 seconds (←)" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
+        <button class="vbtn vbtn-icon vbtn-big vbtn-solid" id="mPlay" type="button" title="Play / pause (Space)" aria-label="Play"><svg class="icon"><use id="mPlayIcon" href="#i-play"/></svg></button>
+        <button class="vbtn vbtn-icon vbtn-big" id="mFwd" type="button" title="Forward 5 seconds (→)" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
+      </div>
+      <div class="mright">
+        <div class="vol">
+          <button class="vbtn vbtn-icon" id="mMute" type="button" title="Mute (M)" aria-label="Mute"><svg class="icon"><use id="mMuteIcon" href="#i-volume"/></svg></button>
+          <input type="range" id="mVolume" min="0" max="100" step="1" value="100" title="Volume (↑ ↓)" aria-label="Volume">
+        </div>
+        <button class="vbtn" id="mSpeed" type="button" hidden title="Playback speed (&lt; and &gt;). Click to go back to normal">1×</button>
+        <button class="vbtn vbtn-icon" id="mCC" type="button" hidden aria-pressed="false" title="Subtitles (C)" aria-label="Subtitles"><svg class="icon"><use href="#i-cc"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mInk" type="button" hidden aria-pressed="false" title="Pen and marker on the paused picture (D)" aria-label="Pen and marker"><svg class="icon"><use href="#i-draw"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mMore" type="button" aria-haspopup="true" title="Speed, subtitles, repeat, tools and settings" aria-label="More"><svg class="icon"><use href="#i-more"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drawing tools: appear when Draw is on -->
+  <div class="ink-bar" id="inkBar" hidden>
+    <div class="ink-grip" id="inkGrip" title="Drag to move this bar" aria-label="Move the drawing bar"></div>
+    <button class="vbtn vbtn-icon" id="inkPrev" type="button" title="Previous page" aria-label="Previous page"><svg class="icon"><use href="#i-prev"/></svg></button>
+    <span class="ink-pos" id="inkPos"></span>
+    <button class="vbtn vbtn-icon" id="inkNext" type="button" title="Next page" aria-label="Next page"><svg class="icon"><use href="#i-next"/></svg></button>
+    <i class="ink-sep"></i>
+    <div class="seg" id="inkTools">
+      <button type="button" data-ink-tool="pen" title="Pen (1)" aria-label="Pen"><svg class="icon"><use href="#i-pen"/></svg></button>
+      <button type="button" data-ink-tool="marker" title="Marker (2)" aria-label="Marker"><svg class="icon"><use href="#i-marker"/></svg></button>
+      <button type="button" data-ink-tool="eraser" title="Eraser (3)" aria-label="Eraser"><svg class="icon"><use href="#i-eraser"/></svg></button>
+    </div>
+    <div class="ink-size" id="inkSizeBox">
+      <input type="range" id="inkSize" min="0" max="100" step="1" value="20" title="Thickness" aria-label="Thickness">
+      <span class="ink-dot-box"><i id="inkDot"></i></span>
+    </div>
+    <div class="ink-colors" id="inkColors"></div>
+    <i class="ink-sep"></i>
+    <div class="ink-actions">
+      <button class="vbtn vbtn-icon" id="inkUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="icon"><use href="#i-undo"/></svg></button>
+      <button class="vbtn vbtn-icon" id="inkRedo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg class="icon flip"><use href="#i-undo"/></svg></button>
+      <button class="vbtn vbtn-icon" id="inkClear" type="button" title="Clear this page" aria-label="Clear this page"><svg class="icon"><use href="#i-trash"/></svg></button>
+      <button class="vbtn vbtn-icon" id="inkSave" type="button" title="Save the drawing as a picture" aria-label="Save as picture"><svg class="icon"><use href="#i-save"/></svg></button>
+      <button class="vbtn vbtn-solid" id="inkDone" type="button" title="Finish drawing (D or Esc)"><svg class="icon"><use href="#i-check"/></svg><span>Done</span></button>
+    </div>
+  </div>
+
+  <!-- Speaker notes (PPTX / ODP) -->
+  <aside class="notes" id="notes" hidden>
+    <div class="notes-head"><b id="notesTitle">Notes</b>
+      <button class="vbtn vbtn-icon" id="notesClose" type="button" title="Close notes (N)" aria-label="Close notes"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="notes-body" id="notesBody"></div>
+  </aside>
+
+
+  <!-- Companion window: the presentation's current and next slide, its notes and buttons -->
+  <aside class="pv idle" id="pv" hidden>
+    <div class="pv-head">
+      <div class="pv-head-row"><b id="pvTitle">Presentation</b>
+        <span class="pv-state off" id="pvState"><i class="dot"></i><span id="pvStateText">Not connected</span></span>
+      </div>
+    </div>
+    <div class="pv-body">
+      <div class="pv-empty" id="pvEmpty"></div>
+      <div class="pv-live">
+        <div class="pv-cap-row"><span class="pv-cap">Now</span><span class="pv-cap" id="pvPos"></span></div>
+        <div class="pv-shot" id="pvNow" style="--r:.5625;--maxh:180px"></div>
+        <div class="pv-row">
+          <div class="pv-next">
+            <span class="pv-cap">Next</span>
+            <div class="pv-shot" id="pvNext" style="--r:.5625;--maxh:100px"></div>
+          </div>
+          <div class="pv-btns">
+            <button class="vbtn" id="pvPrev" type="button" title="Previous slide (↑)"><span>Previous</span><kbd>↑</kbd></button>
+            <button class="vbtn vbtn-solid" id="pvNextBtn" type="button" title="Next slide (↓)"><span>Next</span><kbd>↓</kbd></button>
+          </div>
+        </div>
+        <div class="pv-cap-row"><span class="pv-cap">Notes</span>
+          <button class="pv-fold" id="pvFold" type="button" title="Hide notes" aria-label="Hide notes" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
+        </div>
+        <div class="pv-notes-wrap" id="pvNotesWrap"><div class="pv-notes" id="pvNotes"></div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- “More” menu -->
+  <div class="menu" id="vMenu" hidden>
+    <div class="menu-row media-only">
+      <span class="menu-label">Speed</span>
+      <div class="stepper">
+        <button type="button" id="mSpeedDn" title="Slower (&lt;)" aria-label="Slower"><svg class="icon"><use href="#i-minus"/></svg></button>
+        <button type="button" id="mSpeedVal" title="Normal speed">1×</button>
+        <button type="button" id="mSpeedUp" title="Faster (&gt;)" aria-label="Faster"><svg class="icon"><use href="#i-plus"/></svg></button>
+      </div>
+    </div>
+    <button class="menu-item media-only" id="mSubs" type="button" aria-pressed="false" title="Show the subtitles (C)">
+      <svg class="icon"><use href="#i-cc"/></svg><span class="grow">Subtitles</span><span class="switch"></span>
+    </button>
+    <button class="menu-item media-only" id="mSubsFile" type="button" title="Pick a .srt or .vtt file for this video">
+      <svg class="icon"><use href="#i-plus"/></svg><span class="grow">Choose a subtitles file…</span>
+    </button>
+    <button class="menu-item media-only" id="mLoop" type="button" aria-pressed="false" title="Play this file again and again">
+      <svg class="icon"><use href="#i-repeat"/></svg><span class="grow">Repeat</span><span class="switch"></span>
+    </button>
+    <div class="menu-gap media-only"></div>
+    <div class="menu-row doc-only">
+      <span class="menu-label">Zoom</span>
+      <div class="stepper">
+        <button type="button" id="mZoomOut" title="Zoom out (−)" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button>
+        <button type="button" id="mZoomVal" title="Reset zoom (0)">100%</button>
+        <button type="button" id="mZoomIn" title="Zoom in (+)" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button>
+      </div>
+    </div>
+    <div class="menu-row doc-only">
+      <span class="menu-label">Fit</span>
+      <div class="seg">
+        <button type="button" data-fit="page" title="Fit the whole page"><svg class="icon"><use href="#i-fitpage"/></svg>Page</button>
+        <button type="button" data-fit="width" title="Fit the page width"><svg class="icon"><use href="#i-fitwidth"/></svg>Width</button>
+      </div>
+    </div>
+    <div class="menu-row doc-only">
+      <span class="menu-label">Rotate</span>
+      <div class="stepper">
+        <button type="button" id="mRotL" title="Rotate left"><svg class="icon"><use href="#i-rotl"/></svg>Left</button>
+        <button type="button" id="mRotR" title="Rotate right (R)"><svg class="icon"><use href="#i-rotr"/></svg>Right</button>
+      </div>
+    </div>
+    <div class="menu-gap doc-only"></div>
+    <button class="menu-item" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
+      <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
+    </button>
+    <button class="menu-item" id="mTimer" type="button" title="Lesson timer (T)">
+      <svg class="icon"><use href="#i-timer"/></svg><span class="grow">Timer</span><kbd>T</kbd>
+    </button>
+    <button class="menu-item" id="mBlack" type="button" title="Black screen (B)">
+      <svg class="icon"><use href="#i-black"/></svg><span class="grow">Black screen</span><kbd>B</kbd>
+    </button>
+    <button class="menu-item" id="mNotes" type="button" title="Speaker notes (N)">
+      <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
+    </button>
+    <button class="menu-item" id="mPresenter" type="button" title="Presenter view: a second window (P)">
+      <svg class="icon"><use href="#i-presenter"/></svg><span class="grow" id="mPresenterText">Presenter view</span><kbd>P</kbd>
+    </button>
+    <div class="menu-gap"></div>
+    <button class="menu-item" id="mFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
+      <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
+    </button>
+    <button class="menu-item" id="mAnim" type="button" aria-pressed="true" title="Pages slide in when you turn them">
+      <svg class="icon"><use href="#i-next"/></svg><span class="grow">Page animation</span><span class="switch"></span>
+    </button>
+    <button class="menu-item" id="mAwake" type="button" aria-pressed="true" title="Stop the screen from going to sleep">
+      <svg class="icon"><use href="#i-screen"/></svg><span class="grow" id="mAwakeText">Keep screen on</span><span class="switch"></span>
+    </button>
+    <div class="menu-row">
+      <span class="menu-label">Theme</span>
+      <div class="seg">
+        <button type="button" data-theme-set="light" title="Light theme">Light</button>
+        <button type="button" data-theme-set="dark" title="Dark theme">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timer dialog: lives inside the viewer so it also shows in real fullscreen -->
+  <div class="modal" id="timerDlg" hidden>
+    <div class="modal-card timer-dialog" role="dialog" aria-modal="true" aria-label="Timer" id="timerBody"></div>
+  </div>
+
+  <!-- "Continue where you stopped?" -->
+  <div class="resume" id="resume" role="dialog" aria-label="Continue where you stopped" hidden>
+    <div class="resume-text" id="resumeText"></div>
+    <div class="resume-actions">
+      <button class="btn" id="resumeNo" type="button" title="Open from the beginning (Esc)">Start over</button>
+      <button class="btn btn-primary" id="resumeYes" type="button" title="Go to the place you stopped at (Enter)">Continue <kbd>Enter</kbd></button>
+    </div>
+    <span class="resume-bar" id="resumeBar"></span>
+  </div>
+
+  <!-- Video / audio finished: the next file of the queue starts by itself -->
+  <div class="resume upnext" id="upnext" role="dialog" aria-label="Next file" hidden>
+    <div class="resume-text" id="upnextText"></div>
+    <div class="resume-actions">
+      <button class="btn" id="upnextNo" type="button" title="Stay on this file (Esc)">Stay here</button>
+      <button class="btn btn-primary" id="upnextYes" type="button" title="Start the next file now (Enter)">Play now <kbd>Enter</kbd></button>
+    </div>
+    <span class="resume-bar" id="upnextBar"></span>
+  </div>
+  <input type="file" id="subPick" accept=".srt,.vtt" hidden>
+
+  <div class="toast" id="toast"></div>
+  <div class="cover" id="cover" hidden></div>
+</div>
+
+<!-- The libraries in app/lib are loaded on demand by core.js — no internet needed -->
+<div class="tip" id="tip" role="tooltip" aria-hidden="true"></div>
+
+<script src="app/core.js"></script>
+<script src="app/list.js"></script>
+<script src="app/viewers.js"></script>
+<script src="app/viewer-ui.js"></script>
+<script src="app/extras.js"></script>
+<script src="app/presenter.js"></script>
+</body>
+</html>

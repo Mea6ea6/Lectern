@@ -22,7 +22,10 @@
 
 class BaseViewer {
   constructor(content, stage, view) {
-    this.content = content;     // where we draw
+    // Where we draw. A viewer that was closed while its file was still loading (double click, quick Esc, next file)
+    // must not draw afterwards into the screen that now belongs to another file, so writes stop once it is destroyed.
+    this.dead = false;
+    this.content = content;
     this.stage = stage;         // the scrollable area around it
     this.view = view;           // { zoom, fit: 'page' | 'width', rot: 0 | 90 | 180 | 270 }
     this.onChange = () => {};   // tells the window to refresh label and buttons
@@ -68,7 +71,8 @@ class BaseViewer {
   refit() {}
   get thumbRatio() { return 0.75; }          // height / width of an overview thumbnail
   async renderThumb() {}
-  destroy() { this.content.replaceChildren(); }
+  put(...nodes) { if (!this.dead) this.content.replaceChildren(...nodes); }          // every draw goes through here
+  destroy() { this.content.replaceChildren(); this.dead = true; }
 }
 
 /* ----- PDF: one page at a time ----- */
@@ -137,7 +141,7 @@ class PdfViewer extends BaseViewer {
     catch (err) { if (err && err.name === 'RenderingCancelledException') return; throw err; }
     if (myId !== this.drawId) return;
 
-    this.content.replaceChildren(canvas);          // swap the whole picture at once — no flicker
+    this.put(canvas);          // swap the whole picture at once — no flicker
     this.shown = this.page - 1;
     if (!keepScroll) this.stage.scrollTo(0, 0);
     this.onChange();
@@ -172,7 +176,7 @@ class BoxViewer extends BaseViewer {
     this.box.style.width = W + 'px';
     this.box.style.height = H + 'px';
     this.holder.appendChild(this.box);
-    this.content.replaceChildren(this.holder);
+    this.put(this.holder);
   }
 
   inkAnchor() { return this.holder; }
@@ -201,6 +205,76 @@ class BoxViewer extends BaseViewer {
 }
 
 /* ----- PPTX speaker notes: read straight from the file (ppt/notesSlides), one text per slide ----- */
+// Some presentations (Keynote / Canva / many templates) do not paint the background themselves but point at the theme's
+// "background style" (<p:bgRef idx="1003">). The slide renderer reads that as a plain colour (black here) and loses the
+// picture. So before loading, such a reference is rewritten into an ordinary picture background (<p:bgPr><a:blipFill>).
+// Returns true when something was changed.
+async function pptxThemeBackgrounds(zip) {
+  const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const dirOf = (path) => path.slice(0, path.lastIndexOf('/') + 1);
+  const resolve = (from, target) => {                       // 'ppt/slides/' + '../media/a.png' -> 'ppt/media/a.png'
+    const parts = (target.startsWith('/') ? target.slice(1) : dirOf(from) + target).split('/'), out = [];
+    for (const p of parts) { if (p === '..') out.pop(); else if (p && p !== '.') out.push(p); }
+    return out.join('/');
+  };
+  const relsPath = (part) => dirOf(part) + '_rels/' + part.slice(part.lastIndexOf('/') + 1) + '.rels';
+  const readRels = async (part) => {
+    const f = zip.file(relsPath(part)); if (!f) return [];
+    const xml = await f.async('string'), list = [];
+    for (const m of xml.matchAll(/<Relationship\b[^>]*>/g)) {
+      const id = (m[0].match(/\bId="([^"]*)"/) || [])[1], type = (m[0].match(/\bType="([^"]*)"/) || [])[1], target = (m[0].match(/\bTarget="([^"]*)"/) || [])[1];
+      if (id && target) list.push({ id, type: type || '', target: resolve(part, target) });
+    }
+    return list;
+  };
+  const kind = (rels, word) => rels.find((r) => r.type.endsWith('/' + word));
+  const bgImage = {};                                         // theme part -> [image path or null, ...] for styles 1001, 1002, 1003
+  const themeImages = async (theme) => {
+    if (bgImage[theme]) return bgImage[theme];
+    const xml = await zip.file(theme).async('string'), rels = await readRels(theme);
+    const list = (xml.match(/<a:bgFillStyleLst>([\s\S]*?)<\/a:bgFillStyleLst>/) || [, ''])[1];
+    const items = list.match(/<a:(solidFill|gradFill|blipFill|noFill|pattFill)\b[\s\S]*?<\/a:\1>/g) || [];
+    return (bgImage[theme] = items.map((it) => {
+      if (!it.startsWith('<a:blipFill')) return null;
+      const id = (it.match(/r:embed="([^"]*)"/) || [])[1], r = rels.find((x) => x.id === id);
+      return r ? r.target : null;
+    }));
+  };
+  const themeOf = async (part) => {                           // slide -> layout -> master -> theme
+    let cur = part;
+    for (let i = 0; i < 3; i++) {
+      const rels = await readRels(cur), th = kind(rels, 'theme');
+      if (th) return th.target;
+      const up = kind(rels, 'slideLayout') || kind(rels, 'slideMaster');
+      if (!up) return null;
+      cur = up.target;
+    }
+    return null;
+  };
+  let changed = false;
+  const parts = Object.keys(zip.files).filter((n) => /^ppt\/(slides|slideLayouts|slideMasters)\/[^/]+\.xml$/.test(n));
+  for (const part of parts) {
+    let xml = await zip.file(part).async('string');
+    const m = xml.match(/<p:bg>\s*<p:bgRef\b[^>]*\bidx="(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/p:bgRef>)\s*<\/p:bg>/);
+    if (!m || +m[1] < 1001) continue;
+    const theme = await themeOf(part); if (!theme) continue;
+    const img = (await themeImages(theme))[+m[1] - 1001];
+    if (!img) continue;                                       // a plain colour or gradient: the renderer copes with those
+    const rels = await readRels(part), id = 'rIdLecternBg';
+    const relPath = relsPath(part);
+    const from = dirOf(part).split('/').filter(Boolean), to = img.split('/');
+    let k = 0; while (k < from.length && k < to.length - 1 && from[k] === to[k]) k++;
+    const rel = from.slice(k).map(() => '..').concat(to.slice(k)).join('/');         // path of the image as seen from the part
+    const entry = '<Relationship Id="' + id + '" Type="' + R_NS + '/image" Target="' + rel + '"/>';
+    const old = zip.file(relPath) ? await zip.file(relPath).async('string') : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+    zip.file(relPath, old.replace('</Relationships>', entry + '</Relationships>'));
+    xml = xml.replace(m[0], '<p:bg><p:bgPr><a:blipFill rotWithShape="1"><a:blip xmlns:r="' + R_NS + '" r:embed="' + id + '"/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>');
+    zip.file(part, xml);
+    changed = true;
+  }
+  return changed;
+}
+
 async function pptxNotes(zip) {
   const text = async (n) => { const f = zip.file(n); return f ? f.async('string') : ''; };
   const dom = (x) => new DOMParser().parseFromString(x, 'application/xml');
@@ -257,7 +331,8 @@ class PptxViewer extends BoxViewer {
       const cx = xml.match(/<p:sldSz[^>]*\scx="(\d+)"/);
       const cy = xml.match(/<p:sldSz[^>]*\scy="(\d+)"/);
       if (cx && cy) ratio = Number(cy[1]) / Number(cx[1]);
-    } catch (e) { /* assume 16:9 */ }
+      if (await pptxThemeBackgrounds(zip)) this.buf = await zip.generateAsync({ type: 'arraybuffer', compression: 'STORE' });
+    } catch (e) { /* assume 16:9, original file */ }
 
     this.setupBox(1280, Math.round(1280 * ratio));
     this.previewer = pptxPreview.init(this.box, { width: this.W, height: this.H, mode: 'slide' });
@@ -518,7 +593,7 @@ class DocxViewer extends ScrollViewer {
     await lib('docx');
     const buf = await file.arrayBuffer();
     this.host = h('div', 'docx-host');
-    this.content.replaceChildren(this.host);
+    this.put(this.host);
     await docx.renderAsync(buf, this.host, null, {
       className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false,
     });
@@ -619,7 +694,7 @@ class TextViewer extends ScrollViewer {
     this.host.appendChild(page);
     if (shown.note) this.host.appendChild(h('div', 'text-note', shown.note));
     else if (file.size > LIMIT) this.host.appendChild(h('div', 'text-note', 'Only the first 2 MB are shown.'));
-    this.content.replaceChildren(this.host);
+    this.put(this.host);
     this.listenScroll();
     this.refit();
   }
@@ -667,7 +742,7 @@ class XlsxViewer extends BaseViewer {
     } else {
       host.appendChild(this.buildTable(ws));
     }
-    this.content.replaceChildren(host);
+    this.put(host);
     this.stage.scrollTo(0, 0);
     this.refit();
     this.onChange();
