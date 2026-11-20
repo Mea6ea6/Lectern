@@ -124,7 +124,7 @@ body { background-color: var(--bg); }          /* one flat colour, no gradient *
 .btn, .chip, .search, .dd-btn {       /* light glass sheen on every control */
   background-image: linear-gradient(180deg, rgb(255 255 255 / calc(var(--g) * .16)), rgb(255 255 255 / 0) 65%);
 }
-.popover, .menu, .dd-menu, .modal-card, .vbar {
+.popover, .menu, .dd-menu, .modal-card, .vbar, .toast, .resume {
   background-image: linear-gradient(180deg, rgb(255 255 255 / calc(var(--g) * .12)), rgb(255 255 255 / 0) 45%);
 }
 .grid.no-blur .card { -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -449,16 +449,8 @@ button:disabled { cursor: default; }
 .paging .stage { overflow-x: clip; }
 .content { margin: auto; padding: calc(12px + var(--bt)) 12px calc(12px + var(--bb)); }   /* the page sits between the bars, scrolls under them */
 
-.vmsg {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 30px; text-align: center; font-size: 20px; font-weight: 600; pointer-events: none;
-}
-.vmsg small { font-size: 14px; font-weight: 400; color: var(--ink-soft); max-width: 520px; line-height: 1.5; }
-.vmsg.loading::before {
-  content: ""; width: 36px; height: 36px; border-radius: 50%;
-  border: 4px solid var(--surface-3); border-top-color: var(--ink);
-  animation: spin .8s linear infinite;
-}
+.vmsg { position: absolute; inset: 0; pointer-events: none; }
+.vmsg .btn-link { pointer-events: auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .side {
@@ -475,10 +467,12 @@ button:disabled { cursor: default; }
 .side-prev { left: 6px; }
 .side-next { right: 6px; }
 
-.toast {
+.toast {                       /* a small glass popup, like the menus: quiet, not a button */
   position: absolute; left: 50%; bottom: calc(var(--bb) + 16px); z-index: 4; transform: translateX(-50%);
-  padding: 10px 20px; border-radius: var(--r-pill); background: var(--ink); color: var(--on-ink);
-  font-size: 17px; font-weight: 600; box-shadow: var(--sh-2);
+  max-width: min(520px, calc(100vw - 32px)); padding: 10px 18px; border-radius: var(--r-lg);
+  background: var(--surface); color: var(--ink); text-align: center;
+  -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd);
+  font-size: 14px; font-weight: 500; line-height: 1.4; box-shadow: var(--sh-3);
   opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 .toast.show { opacity: 1; }
@@ -490,7 +484,7 @@ button:disabled { cursor: default; }
 .viewer.immersive.ui-hidden .vbar,
 .viewer.immersive.ui-hidden .side { opacity: 0; pointer-events: none; }
 .viewer.immersive .content { padding: 0; }
-.viewer.immersive.ui-hidden .stagewrap { cursor: none; }   /* hide the pointer over the page only, bars keep theirs */
+.viewer.immersive.ui-hidden.cursor-idle .stagewrap { cursor: none; }   /* the pointer hides after a moment without moving (over the page only) */
 .viewer.immersive .vbar-top { padding-top: 22px; }          /* keep the buttons away from the screen's top edge (browsers reveal their own bar there) */
 .vbtn { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 
@@ -596,6 +590,9 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .sheet .rn { background: #f3f3f3; color: #777; font-weight: 600; text-align: center; position: sticky; left: 0; z-index: 1; }
 .sheet th.rn { z-index: 3; }
 .sheet-note { padding: 12px 16px; color: #888; font-size: 13px; background: #fff; }
+.sheet-note .btn-link { margin-left: 4px; padding: 2px 4px; border: 0; background: none; font: inherit; color: #111; text-decoration: underline; cursor: pointer; border-radius: 4px; }
+.odf-chart { background: #fff; margin: 8px 0; }
+.odp-shape svg { width: 100%; height: 100%; }
 
 @media (max-width: 720px) {
   :root { --pad: 16px; }
@@ -867,7 +864,8 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .rtf-empty { color: #888; }
 
 .odp-slide { position: relative; overflow: hidden; background: #fff; color: #000; font-size: 24px; line-height: 1.2; }
-.odp-shape { position: absolute; box-sizing: border-box; overflow: hidden; word-wrap: break-word; }
+.odp-shape { position: absolute; box-sizing: border-box; overflow: visible; word-wrap: break-word; }
+.odp-shape:has(> .odp-img) { overflow: hidden; }
 .odp-shape p { margin: 0; }
 .odp-shape ul, .odp-shape ol { margin: 0; padding-left: 1.2em; }
 .odp-img { width: 100%; height: 100%; object-fit: fill; display: block; }
@@ -1191,14 +1189,14 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 /* ---------- Continue where you stopped ---------- */
 .resume {
   position: absolute; left: 50%; bottom: calc(var(--bb) + 16px); z-index: 5; translate: -50% 0;
-  display: flex; align-items: center; gap: 18px; padding: 12px 12px 14px 22px; overflow: hidden;
+  display: flex; align-items: center; gap: 16px; padding: 10px 10px 12px 18px; overflow: hidden;
   background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
   -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd);
   max-width: calc(100vw - 32px);
 }
-.resume-text { font-size: 17px; font-weight: 600; white-space: nowrap; }
+.resume-text { font-size: 14px; font-weight: 500; white-space: nowrap; }
 .resume-actions { display: flex; gap: 8px; }
-.resume-actions .btn { min-height: 40px; }
+.resume-actions .btn { min-height: 34px; padding: 0 14px; font-size: 14px; }
 .resume-actions kbd { margin-left: 6px; }
 .resume-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--ink); opacity: .5; transform-origin: left center; }   /* the 20-second countdown */
 #resume.anim-in  { animation: foot-in .34s var(--ease-out) backwards; }
@@ -1213,3 +1211,44 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .upnext .resume-text { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
 #upnext.anim-in  { animation: foot-in .34s var(--ease-out) backwards; }
 #upnext.anim-out { animation: foot-out .2s var(--ease-in) forwards; pointer-events: none; }
+
+/* Old .ppt files: text only, drawn as plain white slides */
+.ppt-slide { position: absolute; inset: 0; background: #fff; color: #111; padding: 72px 96px; overflow: hidden; font-family: Inter, system-ui, sans-serif; }
+.ppt-title { font-size: 60px; font-weight: 700; line-height: 1.12; letter-spacing: -.02em; margin-bottom: 36px; }
+.ppt-body p { font-size: 36px; line-height: 1.35; margin: 0 0 14px; }
+.ppt-s .ppt-body p { font-size: 28px; margin-bottom: 10px; }
+.ppt-xs .ppt-body p { font-size: 21px; margin-bottom: 6px; }
+
+.cf-icon { margin-right: 6px; font-size: .95em; letter-spacing: -.05em; }
+.btn-link { background: none; border: 0; padding: 4px 6px; font: inherit; color: var(--ink); text-decoration: underline; cursor: pointer; border-radius: 6px; }
+
+/* Self-check page (Lectern.html#selftest) */
+.selftest { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); overflow: auto; }
+.st-card { width: min(640px, 100%); max-height: 100%; display: flex; flex-direction: column; background: var(--surface); border-radius: 18px; box-shadow: 0 10px 40px rgba(0,0,0,.18); overflow: hidden; }
+.st-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 18px 22px 10px; font-size: 20px; }
+.st-sum { font-size: 14px; color: var(--ink-soft); }
+.failed .st-sum { color: var(--ink); font-weight: 700; }
+.st-list { flex: 1; overflow: auto; padding: 0 12px 8px; }
+.st-group { padding: 12px 10px 4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.st-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 8px; font-size: 14px; }
+.st-row.bad { background: var(--surface-3); font-weight: 600; }
+.st-row.info { color: var(--ink-soft); }
+.st-note { font-size: 12px; color: var(--ink-soft); text-align: right; }
+.st-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 14px 14px; }
+
+/* Large interface (More → Large interface): the chrome is drawn 25% bigger, the open document is not */
+:root { --ui: 1; }
+body.large-ui { --ui: 1.25; }
+body.large-ui .topbar, body.large-ui .toolbar, body.large-ui main, body.large-ui .footer, body.large-ui .vbar,
+body.large-ui .modal-card, body.large-ui .toast { zoom: var(--ui); }
+body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / var(--ui)); }
+
+/* One look for empty, loading and error states (stateNode() in core.js) */
+.state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 30px; text-align: center; }
+.state-title { font-size: 20px; font-weight: 600; }
+.state-text { max-width: 520px; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+.state > .icon { width: 40px; height: 40px; stroke-width: 1.5; color: var(--ink-soft); }
+.state .btn-link { margin-top: 4px; font-size: 14px; font-weight: 600; }
+.state-loading::before { content: ""; width: 36px; height: 36px; border-radius: 50%; border: 4px solid var(--surface-3); border-top-color: var(--ink); animation: spin .8s linear infinite; }
+.no-results { padding: 60px 40px; }
+.rtf-page .state { color: #888; }

@@ -122,6 +122,7 @@ const LIB_FILES = {
   // Lectern's own code that is only needed sometimes (a name with a "/" is looked up inside app/, not app/lib/)
   formats: ['jszip.min.js', 'modules/formats.js'],
   ink:     ['modules/ink.js'],
+  office:  ['jszip.min.js', 'modules/office.js'],
 };
 const scriptLoads = {};
 const libLoads = {};

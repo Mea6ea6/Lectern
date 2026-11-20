@@ -1,6 +1,6 @@
 'use strict';
 /* Lectern — Viewer drivers: PDF, PPTX, images, DOCX, text, XLSX.  One of the app/*.js files that Lectern.html loads in this order:
-   core.js, list.js, viewers.js, viewer-ui.js, extras.js, presenter.js. They are plain scripts that share one global scope
+   core.js, errors.js, list.js, viewers.js, viewer-ui.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js. They are plain scripts that share one global scope
    (no modules, so it also works from a file:// address on a flash drive). The map of everything is at the top of core.js. */
 
 /* ---------------------------------------------------------------------
@@ -260,7 +260,7 @@ async function pptxThemeBackgrounds(zip) {
     const theme = await themeOf(part); if (!theme) continue;
     const img = (await themeImages(theme))[+m[1] - 1001];
     if (!img) continue;                                       // a plain colour or gradient: the renderer copes with those
-    const rels = await readRels(part), id = 'rIdLecternBg';
+    const id = 'rIdLecternBg';
     const relPath = relsPath(part);
     const from = dirOf(part).split('/').filter(Boolean), to = img.split('/');
     let k = 0; while (k < from.length && k < to.length - 1 && from[k] === to[k]) k++;
@@ -331,7 +331,9 @@ class PptxViewer extends BoxViewer {
       const cx = xml.match(/<p:sldSz[^>]*\scx="(\d+)"/);
       const cy = xml.match(/<p:sldSz[^>]*\scy="(\d+)"/);
       if (cx && cy) ratio = Number(cy[1]) / Number(cx[1]);
-      if (await pptxThemeBackgrounds(zip)) this.buf = await zip.generateAsync({ type: 'arraybuffer', compression: 'STORE' });
+      let edited = await pptxThemeBackgrounds(zip);
+      try { await lib('office'); if (await OFC.pptxDiagrams(zip)) edited = true; if (await OFC.pptxCharts(zip)) edited = true; } catch (err) { console.warn('SmartArt skipped', err); }
+      if (edited) this.buf = await zip.generateAsync({ type: 'arraybuffer', compression: 'STORE' });
     } catch (e) { /* assume 16:9, original file */ }
 
     this.setupBox(1280, Math.round(1280 * ratio));
@@ -591,7 +593,9 @@ class DocxViewer extends ScrollViewer {
 
   async open(file) {
     await lib('docx');
-    const buf = await file.arrayBuffer();
+    let buf = await file.arrayBuffer();
+    // charts, shapes, SmartArt and Symbol bullets are turned into pictures / plain characters first (never fatal)
+    try { await lib('office'); buf = await OFC.docxPrepare(buf); } catch (err) { console.warn('Word extras skipped', err); }
     this.host = h('div', 'docx-host');
     this.put(this.host);
     await docx.renderAsync(buf, this.host, null, {
@@ -709,105 +713,5 @@ class TextViewer extends ScrollViewer {
   label() { return 'Read ' + Math.round(this.scrollRatio() * 100) + '%'; }
 }
 
-/* ----- XLSX / CSV: one sheet at a time as a table ----- */
-class XlsxViewer extends BaseViewer {
-  constructor(...args) { super(...args); this.hasOverview = true; }
-
-  async open(file) {
-    await lib('xlsx');
-    this.wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-    this.names = this.wb.SheetNames;
-    this.cur = 0;
-    this.show();
-  }
-
-  get count() { return this.names.length; }
-  get index() { return this.cur; }
-  inkAnchor() { return this.host; }
-  caption(i) { return this.names[i]; }
-  label() { return 'Sheet ' + (this.cur + 1) + ' of ' + this.names.length + ' · ' + this.names[this.cur]; }
-  goTo(i) {
-    i = clamp(i, 0, this.names.length - 1);
-    if (i === this.cur) return;
-    this.cur = i;
-    this.show();
-  }
-
-  show() {
-    const ws = this.wb.Sheets[this.names[this.cur]];
-    const host = h('div', 'sheet-host');
-    this.host = host;
-    if (!ws || !ws['!ref']) {
-      host.appendChild(h('div', 'sheet-note', 'This sheet is empty.'));
-    } else {
-      host.appendChild(this.buildTable(ws));
-    }
-    this.put(host);
-    this.stage.scrollTo(0, 0);
-    this.refit();
-    this.onChange();
-  }
-
-  buildTable(ws) {
-    const MAX_ROWS = 2000, MAX_COLS = 80;
-    const all = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '', blankrows: true });
-    const rows = all.slice(0, MAX_ROWS);
-    let cols = 0;
-    for (const r of rows) cols = Math.max(cols, r.length);
-    cols = Math.min(cols, MAX_COLS);
-
-    // Merged cells: the top-left cell spans, the others are skipped
-    const span = new Map(), covered = new Set();
-    for (const m of ws['!merges'] || []) {
-      span.set(m.s.r + ':' + m.s.c, { rows: m.e.r - m.s.r + 1, cols: m.e.c - m.s.c + 1 });
-      for (let r = m.s.r; r <= m.e.r; r++)
-        for (let c = m.s.c; c <= m.e.c; c++) if (r !== m.s.r || c !== m.s.c) covered.add(r + ':' + c);
-    }
-    // sheet_to_json starts at the first used cell; shift merges accordingly
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    const dr = range.s.r, dc = range.s.c;
-
-    const letters = (n) => { let s = ''; for (n++; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s; };
-
-    const table = h('table', 'sheet');
-    const head = h('tr');
-    head.appendChild(h('th', 'rn', ''));
-    for (let c = 0; c < cols; c++) head.appendChild(h('th', '', letters(c + dc)));
-    table.appendChild(head);
-
-    rows.forEach((row, r) => {
-      const tr = h('tr');
-      tr.appendChild(h('td', 'rn', String(r + 1 + dr)));
-      for (let c = 0; c < cols; c++) {
-        const key = (r + dr) + ':' + (c + dc);
-        if (covered.has(key)) continue;
-        const td = h('td', '', row[c] === undefined ? '' : String(row[c]));
-        const sp = span.get(key);
-        if (sp) { td.rowSpan = sp.rows; td.colSpan = sp.cols; }
-        tr.appendChild(td);
-      }
-      table.appendChild(tr);
-    });
-
-    const frag = document.createDocumentFragment();
-    frag.appendChild(table);
-    if (all.length > MAX_ROWS || cols >= MAX_COLS) {
-      frag.appendChild(h('div', 'sheet-note', 'Showing the first ' + Math.min(all.length, MAX_ROWS) + ' rows and ' + cols + ' columns.'));
-    }
-    return frag;
-  }
-
-  refit() { if (this.host) this.host.style.zoom = this.view.zoom; }
-
-  async renderThumb(i, el) {
-    const ws = this.wb.Sheets[this.names[i]];
-    const box = h('div', 'snippet');
-    box.appendChild(h('b', '', this.names[i]));
-    const ref = ws && ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
-    box.appendChild(document.createTextNode(ref ? (ref.e.r - ref.s.r + 1) + ' rows × ' + (ref.e.c - ref.s.c + 1) + ' columns' : 'Empty'));
-    el.replaceChildren(box);
-  }
-}
-
-// The newer formats (odp, odt, rtf, heic, media, zip, json, epub) add themselves from app/modules/formats.js
-const VIEWER_CLASSES = { pdf: PdfViewer, pptx: PptxViewer, docx: DocxViewer, xlsx: XlsxViewer, image: ImageViewer, text: TextViewer };
+// The spreadsheet viewer and the newer formats (xlsx, odp, odt, rtf, doc, ppt, heic, media, zip, json, epub) add themselves from app/modules/fmt-*.js and legacy.js
+const VIEWER_CLASSES = { pdf: PdfViewer, pptx: PptxViewer, docx: DocxViewer, image: ImageViewer, text: TextViewer };

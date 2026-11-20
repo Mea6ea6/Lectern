@@ -1,6 +1,6 @@
 'use strict';
 /* Lectern — The file list, details, the class queue, thumbnails.  One of the app/*.js files that Lectern.html loads in this order:
-   core.js, list.js, viewers.js, viewer-ui.js, extras.js, presenter.js. They are plain scripts that share one global scope
+   core.js, errors.js, list.js, viewers.js, viewer-ui.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js. They are plain scripts that share one global scope
    (no modules, so it also works from a file:// address on a flash drive). The map of everything is at the top of core.js. */
 
 /* ---------------------------------------------------------------------
@@ -105,7 +105,6 @@ function renderStatus() {
   if (!state.files.length) { $('status').textContent = 'Nothing open yet'; return; }
   const n = state.files.length;
   let text = (state.folderName ? state.folderName + ' · ' : '') + n + ' ' + plural(n, ['file', 'files']);
-  if (state.skipped) text += ' · ' + state.skipped + ' skipped (.ppt / .doc) — re-save as .pptx / .docx';
   $('status').textContent = text;
 }
 
@@ -416,8 +415,8 @@ async function loadDetails(entry) {
   const dateText = (v) => { const d = new Date(v); return isNaN(d) ? '' : fullDate(d.getTime()); };
 
   try {
-    if (FORMAT_VIEWERS.has(entry.viewer)) {
-      await lib('formats');
+    if (VIEWER_LIB[entry.viewer]) {
+      await lib(VIEWER_LIB[entry.viewer]);
       await VIEWER_CLASSES[entry.viewer].details(entry, add, dateText);
 
     } else if (entry.kind === 'pdf') {
@@ -609,7 +608,7 @@ function renderQueueDialog(first) {
   const loaded = Q.items.filter((it) => it.entry).length;
 
   if (!Q.items.length) {
-    box.appendChild(h('p', 'modal-text', 'Nothing here yet. Press + on a file card (or Q) to add the files for this lesson.'));
+    box.appendChild(stateNode('The queue is empty', 'Press + on a file card (or Q) to add the files for this lesson.', { icon: 'i-queue' }));
   } else {
     box.appendChild(h('p', 'modal-text', 'Put the files in order, then press Start. Inside a file, [ and ] jump to the next and previous one.'));
     const list = h('div', 'q-list');
@@ -698,8 +697,8 @@ async function runThumbQueue() {
   while (thumbQueue.length && V.el.hidden) {
     const entry = thumbQueue.shift();
     try {
-      if (FORMAT_VIEWERS.has(entry.viewer)) {          // the newer formats make their own thumbnails
-        await lib('formats');
+      if (VIEWER_LIB[entry.viewer]) {          // the newer formats make their own thumbnails
+        await lib(VIEWER_LIB[entry.viewer]);
         await VIEWER_CLASSES[entry.viewer].thumb(entry);
       } else switch (entry.kind) {
         case 'pdf':   await thumbPdf(entry); break;

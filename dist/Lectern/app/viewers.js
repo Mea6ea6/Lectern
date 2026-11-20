@@ -331,7 +331,9 @@ class PptxViewer extends BoxViewer {
       const cx = xml.match(/<p:sldSz[^>]*\scx="(\d+)"/);
       const cy = xml.match(/<p:sldSz[^>]*\scy="(\d+)"/);
       if (cx && cy) ratio = Number(cy[1]) / Number(cx[1]);
-      if (await pptxThemeBackgrounds(zip)) this.buf = await zip.generateAsync({ type: 'arraybuffer', compression: 'STORE' });
+      let edited = await pptxThemeBackgrounds(zip);
+      try { await lib('office'); if (await OFC.pptxDiagrams(zip)) edited = true; } catch (err) { console.warn('SmartArt skipped', err); }
+      if (edited) this.buf = await zip.generateAsync({ type: 'arraybuffer', compression: 'STORE' });
     } catch (e) { /* assume 16:9, original file */ }
 
     this.setupBox(1280, Math.round(1280 * ratio));
@@ -591,7 +593,9 @@ class DocxViewer extends ScrollViewer {
 
   async open(file) {
     await lib('docx');
-    const buf = await file.arrayBuffer();
+    let buf = await file.arrayBuffer();
+    // charts, shapes, SmartArt and Symbol bullets are turned into pictures / plain characters first (never fatal)
+    try { await lib('office'); buf = await OFC.docxPrepare(buf); } catch (err) { console.warn('Word extras skipped', err); }
     this.host = h('div', 'docx-host');
     this.put(this.host);
     await docx.renderAsync(buf, this.host, null, {
@@ -715,8 +719,13 @@ class XlsxViewer extends BaseViewer {
 
   async open(file) {
     await lib('xlsx');
-    this.wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const buf = await file.arrayBuffer();
+    this.wb = XLSX.read(buf, { type: 'array' });
     this.names = this.wb.SheetNames;
+    this.decor = null;                       // cell colours, column widths, pictures and charts (only for real .xlsx files)
+    try {
+      if (new Uint8Array(buf, 0, 2).join() === '80,75' && /\.xls[xm]$/i.test(file.name || '')) { await lib('office'); this.decor = await OFC.xlsxDecor(buf); }
+    } catch (err) { console.warn('Excel extras skipped', err); }
     this.cur = 0;
     this.show();
   }
@@ -743,9 +752,48 @@ class XlsxViewer extends BaseViewer {
       host.appendChild(this.buildTable(ws));
     }
     this.put(host);
+    try { this.placeObjects(host, this.names[this.cur]); } catch (err) { console.warn('Sheet pictures skipped', err); }
     this.stage.scrollTo(0, 0);
     this.refit();
     this.onChange();
+  }
+
+  // Charts and pictures of the sheet, laid over the cells they were anchored to
+  placeObjects(host, name) {
+    const info = this.decor && this.decor[name], table = host.querySelector('table');
+    if (!info || !info.drawings.length || !table) return;
+    const range = this.wb.Sheets[name]['!ref'] ? XLSX.utils.decode_range(this.wb.Sheets[name]['!ref']) : { s: { r: 0, c: 0 } };
+    const ths = Array.from(table.rows[0].cells), tops = Array.from(table.rows).map((r) => r.cells[0]);
+    host.style.position = 'relative';
+    const at = (c, r, co, ro) => {
+      const cc = clamp(c - range.s.c + 1, 1, ths.length - 1), rr = clamp(r - range.s.r + 1, 1, tops.length - 1);
+      return { x: table.offsetLeft + ths[cc].offsetLeft + co, y: table.offsetTop + tops[rr].offsetTop + ro };
+    };
+    const resolve = (f) => {                 // values of a range such as 'Sheet 1'!$B$2:$B$7 (charts saved without a cache)
+      const m = /^'?(.*?)'?!(.+)$/.exec(f.replace(/^\(|\)$/g, ''));
+      const ws = m && this.wb.Sheets[m[1]];
+      if (!ws) return [];
+      const rg = XLSX.utils.decode_range(m[2].replace(/\$/g, '')), out = [];
+      for (let r = rg.s.r; r <= rg.e.r; r++) for (let c = rg.s.c; c <= rg.e.c; c++) { const cell = ws[XLSX.utils.encode_cell({ r, c })]; out.push(cell ? String(cell.v) : null); }
+      return out;
+    };
+    for (const d of info.drawings) {
+      const a = at(d.from.c, d.from.r, d.from.co, d.from.ro);
+      let w = d.w, hh = d.h;
+      if (d.to) { const b = at(d.to.c, d.to.r, d.to.co, d.to.ro); w = b.x - a.x; hh = b.y - a.y; }
+      if (w < 20 || hh < 20) continue;
+      const box = h('div', 'sheet-obj');
+      box.style.cssText = 'position:absolute;left:' + a.x + 'px;top:' + a.y + 'px;width:' + w + 'px;height:' + hh + 'px';
+      if (d.kind === 'chart') {
+        const svg = OFC.chartSvg(d.xml, this.decor.__theme, Math.round(w), Math.round(hh), resolve);
+        if (!svg) continue;
+        box.innerHTML = svg;
+      } else {
+        const im = h('img'); im.src = URL.createObjectURL(d.blob); im.style.cssText = 'width:100%;height:100%;object-fit:fill;display:block';
+        box.appendChild(im);
+      }
+      host.appendChild(box);
+    }
   }
 
   buildTable(ws) {
@@ -755,6 +803,15 @@ class XlsxViewer extends BaseViewer {
     let cols = 0;
     for (const r of rows) cols = Math.max(cols, r.length);
     cols = Math.min(cols, MAX_COLS);
+    const info = this.decor && this.decor[this.names[this.cur]];
+    const range0 = XLSX.utils.decode_range(ws['!ref']);
+    if (info) {                                // the table must reach the cells under pictures and charts
+      for (const d of info.drawings) {
+        const endR = d.to ? d.to.r + 1 : d.from.r + Math.ceil(d.h / 24) + 1, endC = d.to ? d.to.c + 1 : d.from.c + Math.ceil(d.w / 36) + 1;
+        while (rows.length < Math.min(endR - range0.s.r, 400)) rows.push([]);
+        cols = Math.max(cols, Math.min(endC - range0.s.c, MAX_COLS));
+      }
+    }
 
     // Merged cells: the top-left cell spans, the others are skipped
     const span = new Map(), covered = new Set();
@@ -772,7 +829,11 @@ class XlsxViewer extends BaseViewer {
     const table = h('table', 'sheet');
     const head = h('tr');
     head.appendChild(h('th', 'rn', ''));
-    for (let c = 0; c < cols; c++) head.appendChild(h('th', '', letters(c + dc)));
+    for (let c = 0; c < cols; c++) {
+      const th = h('th', '', letters(c + dc));
+      if (info && info.colW[c + dc]) th.style.minWidth = info.colW[c + dc] + 'px';
+      head.appendChild(th);
+    }
     table.appendChild(head);
 
     rows.forEach((row, r) => {
@@ -784,6 +845,16 @@ class XlsxViewer extends BaseViewer {
         const td = h('td', '', row[c] === undefined ? '' : String(row[c]));
         const sp = span.get(key);
         if (sp) { td.rowSpan = sp.rows; td.colSpan = sp.cols; }
+        const st = info && info.cells.get(key);
+        if (st) {
+          if (st.bg) td.style.background = st.bg;
+          if (st.bold) td.style.fontWeight = '700';
+          if (st.italic) td.style.fontStyle = 'italic';
+          if (st.color) td.style.color = st.color;
+          if (st.h && st.h !== 'general') td.style.textAlign = st.h === 'centerContinuous' ? 'center' : st.h;
+          if (st.v) td.style.verticalAlign = st.v === 'center' ? 'middle' : st.v;
+          if (st.wrap) td.style.whiteSpace = 'normal';
+        }
         tr.appendChild(td);
       }
       table.appendChild(tr);

@@ -1,4 +1,4 @@
-LECTERN v1.17.4 — offline viewer for the classroom
+LECTERN v1.20.1 — offline viewer for the classroom
 ================================================================================
 Opens presentations, PDFs, documents, spreadsheets, photos, video, audio, books
 and archives straight from a flash drive. Nothing to install, no internet, no
@@ -40,7 +40,7 @@ SUPPORTED FILES
   Text            TXT, MD, LOG (UTF-8 and Windows-1251)
   Code and data   JSON, HTML (shown as text — web pages are never run)
   Archives        ZIP (shows what is inside; nothing is unpacked)
-  Old .ppt / .doc are not supported — re-save them as .pptx / .docx.
+  Old .doc / .ppt open as text only (no pictures) — re-save as .docx / .pptx for the full look.
   Video and sound play only if the browser knows the format (MP4 with H.264 and
   WebM are fine in Chrome, Edge, Safari; some .mov files are not).
 
@@ -142,3 +142,7 @@ LICENSES OF THE PARTS INSIDE
   PDF.js (Apache-2.0), docx-preview (Apache-2.0), pptx-preview (ISC), SheetJS
   (Apache-2.0), JSZip (MIT), UTIF and pako (MIT), heic2any (MIT; contains libheif, LGPL-3.0),
   Inter font (SIL OFL 1.1). Details: README on GitHub.
+
+Something does not open on this computer? Add  #selftest  to the address (Lectern.html#selftest) to check every format.
+For the back rows of a big room: More → Large interface.
+Fullscreen: with a mouse move to the bottom edge to show the controls; with a finger tap the middle of the page.

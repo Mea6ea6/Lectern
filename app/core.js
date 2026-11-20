@@ -3,8 +3,8 @@
    Lectern — offline file viewer (PDF, PPTX, DOCX, XLSX, images, video...).
    Vanilla JS, no build step. Runs from Lectern.html (USB stick) and as a PWA.
 
-   THE CODE IS SPLIT INTO SIX PLAIN SCRIPTS (Lectern.html loads them in this order, they share one global scope):
-     core.js (1-4)  ·  list.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js (8)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
+   THE CODE IS SPLIT INTO PLAIN SCRIPTS (Lectern.html loads them in this order, they share one global scope):
+     core.js (1-4)  ·  list.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
    They are not ES modules on purpose: modules do not load from a file:// address, and Lectern runs from a flash drive.
    A function declared in a later file is not yet known while an earlier file runs its top-level code.
 
@@ -16,8 +16,8 @@
      5. The file list             cards, search, sort, selection, details, the class QUEUE
      6. Thumbnails                first page/slide previews (PDF/PPTX/images)
      7. Viewers                   BaseViewer -> PdfViewer, BoxViewer (PptxViewer, ImageViewer),
-                                  ScrollViewer (DocxViewer, TextViewer), XlsxViewer.
-                                  More formats (ODF, media, zip, epub) live in app/formats.js,
+                                  ScrollViewer (DocxViewer, TextViewer).
+                                  Spreadsheets, ODF, media, zip, epub, old doc/ppt live in app/modules/fmt-*.js and legacy.js,
                                   libraries are loaded lazily with lib(name).
      8. The viewer window         `V` (the open viewer), toasts, buttons, overview, menu, fullscreen, black screen, laser,
                                   TIMER, notes, pinch/double-tap zoom, keyboard, and at the end
@@ -45,9 +45,9 @@
 
 // File extension -> the kind of file (decides the badge colour, the filter and the thumbnail)
 const EXT_TO_KIND = {
-  pptx: 'pptx', ppsx: 'pptx', pptm: 'pptx', ppsm: 'pptx', potx: 'pptx', odp: 'pptx',
+  pptx: 'pptx', ppsx: 'pptx', pptm: 'pptx', ppsm: 'pptx', potx: 'pptx', odp: 'pptx', ppt: 'pptx', pps: 'pptx',
   pdf: 'pdf',
-  docx: 'docx', odt: 'docx', rtf: 'docx',
+  docx: 'docx', odt: 'docx', rtf: 'docx', doc: 'docx',
   xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xlsx', ods: 'xlsx', csv: 'xlsx', tsv: 'xlsx',
   png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image', avif: 'image', apng: 'image', ico: 'image', jfif: 'image', jpe: 'image',
   tif: 'image', tiff: 'image',
@@ -62,18 +62,19 @@ const EXT_TO_KIND = {
 
 // Extension -> which viewer opens it (when it is not simply the same as the kind)
 const EXT_TO_VIEWER = {
-  odp: 'odp', odt: 'odt', rtf: 'rtf', ods: 'xlsx',
+  odp: 'odp', odt: 'odt', rtf: 'rtf', ods: 'xlsx', doc: 'doc', ppt: 'ppt', pps: 'ppt',
   heic: 'heic', heif: 'heic', tif: 'tiff', tiff: 'tiff',
   mp4: 'media', m4v: 'media', webm: 'media', mov: 'media', ogv: 'media', mkv: 'media',
   mp3: 'media', wav: 'media', ogg: 'media', oga: 'media', m4a: 'media', aac: 'media', flac: 'media', opus: 'media',
   zip: 'zip', json: 'json', html: 'text', htm: 'text', epub: 'epub',
 };
 
-// These viewers live in app/modules/formats.js, which is loaded the first time one of them is needed
-const FORMAT_VIEWERS = new Set(['odp', 'odt', 'rtf', 'heic', 'tiff', 'media', 'zip', 'json', 'epub']);
-
-// Old Office formats can't be opened — we only count them to tell the user
-const LEGACY_EXT = ['ppt', 'pps', 'doc'];
+// These viewers live in app/modules/ and load the first time one of them is needed: viewer name -> lib() name
+const VIEWER_LIB = {
+  xlsx: 'sheets',
+  odp: 'odf', odt: 'odf', rtf: 'rtf', heic: 'images', tiff: 'images', media: 'media',
+  zip: 'archive', json: 'archive', epub: 'epub', doc: 'legacy', ppt: 'legacy',
+};
 const SUB_EXT = ['srt', 'vtt'];          // subtitles are not shown in the list: a video picks up the ones with its name
 
 const KINDS = {
@@ -98,7 +99,6 @@ const state = {
   sort: 'name',       // sort mode
   query: '',          // search text
   selectedId: null,   // highlighted card
-  skipped: 0,         // how many old-format files were skipped
   folderName: '',     // name of the chosen folder
   handle: null,       // directory handle (Chrome/Edge only) — lets us rescan without asking again
   stored: null,       // directory handle remembered from the last visit
@@ -120,8 +120,17 @@ const LIB_FILES = {
   heic: ['heic2any.min.js'],
   tiff: ['pako_inflate.min.js', 'UTIF.js'],
   // Lectern's own code that is only needed sometimes (a name with a "/" is looked up inside app/, not app/lib/)
-  formats: ['jszip.min.js', 'modules/formats.js'],
+  odf:     ['jszip.min.js', 'modules/fmt-common.js', 'modules/fmt-odf.js'],
+  rtf:     ['modules/fmt-common.js', 'modules/fmt-rtf.js'],
+  media:   ['modules/fmt-common.js', 'modules/fmt-media.js'],
+  images:  ['modules/fmt-common.js', 'modules/fmt-images.js'],
+  archive: ['jszip.min.js', 'modules/fmt-common.js', 'modules/fmt-archive.js'],
+  epub:    ['jszip.min.js', 'modules/fmt-common.js', 'modules/fmt-epub.js'],
+  sheets:  ['xlsx.full.min.js', 'modules/fmt-xlsx.js'],
+  selftest: ['jszip.min.js', 'modules/selftest-data.js', 'modules/selftest.js'],
+  legacy:  ['xlsx.full.min.js', 'modules/fmt-common.js', 'modules/fmt-rtf.js', 'modules/legacy.js'],
   ink:     ['modules/ink.js'],
+  office:  ['jszip.min.js', 'modules/office.js'],
 };
 const scriptLoads = {};
 const libLoads = {};
@@ -137,6 +146,18 @@ function loadScript(file) {
   }
   return scriptLoads[file];
 }
+// One look for "nothing to show / loading / could not open": a centred icon (or spinner), a title, one sentence, optional buttons.
+// opts: { icon: 'i-search', spinner: true, actions: [[label, fn], …] }
+function stateNode(title, text, opts) {
+  opts = opts || {};
+  const el = h('div', 'state' + (opts.spinner ? ' state-loading' : ''));
+  if (opts.icon) { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'icon'); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#' + opts.icon); s.appendChild(u); el.appendChild(s); }
+  if (title) el.appendChild(h('div', 'state-title', title));
+  if (text) el.appendChild(h('div', 'state-text', text));
+  for (const [label, fn] of opts.actions || []) { const b = h('button', 'btn-link', label); b.type = 'button'; b.onclick = fn; el.appendChild(b); }
+  return el;
+}
+
 function lib(name) {
   if (!libLoads[name]) {
     libLoads[name] = (async () => {
@@ -341,14 +362,12 @@ function makeEntry(file, ext) {
 function addFiles(list, replace) {
   const incoming = [];
   const subs = [];
-  let skipped = 0;
   for (const file of list) {
     const name = file.name;
     if (name.startsWith('~$') || name.startsWith('.')) continue;   // Office temp files
     const ext = getExt(name);
     if (EXT_TO_KIND[ext]) incoming.push(makeEntry(file, ext));
     else if (SUB_EXT.includes(ext)) subs.push(file);
-    else if (LEGACY_EXT.includes(ext)) skipped++;
   }
   state.subs = replace ? subs : state.subs.concat(subs);
 
@@ -364,13 +383,11 @@ function addFiles(list, replace) {
     }
     state.files.filter((e) => !seen.has(e.key)).forEach(releaseEntry);
     state.files = next;
-    state.skipped = skipped;
     relinkQueue();
     Q.items = Q.items.filter((it) => it.entry && next.includes(it.entry));   // files that are gone from the new folder leave the queue
   } else {
     const have = new Set(state.files.map((e) => e.key));
     for (const e of incoming) if (!have.has(e.key)) { state.files.push(e); have.add(e.key); }
-    state.skipped += skipped;
   }
   state.cardsEnter = true;          // the next render lets the cards slide in one after another
   render();
@@ -427,8 +444,6 @@ async function scanDirectory(dir, prefix, depth, out) {
         const file = await handle.getFile();
         file._path = prefix + name;
         out.push(file);
-      } else if (LEGACY_EXT.includes(ext)) {
-        out.push({ name });                                   // only needed for the "skipped" counter
       }
     }
   }
@@ -558,3 +573,6 @@ function subsFor(entry) {
   });
   return found.sort((a, b) => a.name.length - b.name.length);
 }
+
+// Lectern.html#selftest opens the self-check page (see modules/selftest.js)
+if (location.hash === '#selftest') window.addEventListener('load', () => setTimeout(() => lib('selftest').then(() => SELFTEST.run()).catch((e) => console.error(e)), 300));
