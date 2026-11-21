@@ -70,10 +70,13 @@ const Tip = (function () {
     const r = node.getBoundingClientRect();
     el.style.left = '0px'; el.style.top = '0px';
     const w = el.offsetWidth, hh = el.offsetHeight;
-    let y = r.top - hh - 10, below = false;
-    if (y < 8) { y = r.bottom + 10; below = true; }
+    let y = r.top - hh - 12, below = false;
+    if (y < 8) { y = r.bottom + 12; below = true; }
     el.style.setProperty('--ty', below ? '-4px' : '4px');
-    el.style.left = clamp(r.left + r.width / 2 - w / 2, 8, window.innerWidth - w - 8) + 'px';
+    const left = clamp(r.left + r.width / 2 - w / 2, 8, window.innerWidth - w - 8);
+    el.style.left = left + 'px';
+    el.style.setProperty('--ax', clamp(r.left + r.width / 2 - left, 12, w - 12) + 'px');     // the little arrow points at the middle of the button
+    el.classList.toggle('below', below);
     el.style.top = y + 'px';
     visible = true;
     el.setAttribute('aria-hidden', 'false');
@@ -103,16 +106,21 @@ const Tip = (function () {
    ===================================================================== */
 const Marks = (function () {
   let all = {};
-  try { all = JSON.parse(localStorage.getItem('fv-marks') || '{}') || {}; } catch (e) { all = {}; }
+  function load() {                                          // { key: { a: [pages], t } }; the first versions stored a bare array
+    try { all = JSON.parse(localStorage.getItem('fv-marks') || '{}') || {}; } catch (e) { all = {}; }
+    for (const k in all) if (Array.isArray(all[k])) all[k] = { a: all[k], t: 0 };
+  }
+  load();
   let sig = '';
   const key = () => (V.entry ? V.entry.path + '|' + V.entry.size : '');
   const total = (d) => (d.pages && d.pages.length > 1 ? d.pages.length : d.count);
   const usable = () => { const d = V.driver; return !!d && !d.isMedia && $('vMsg').hidden && total(d) > 1; };
-  const list = () => all[key()] || [];
+  const list = () => { const m = all[key()]; return m && !m.d && m.a ? m.a : []; };
   function save() {
     const keys = Object.keys(all);
-    if (keys.length > 300) delete all[keys[0]];
-    try { localStorage.setItem('fv-marks', JSON.stringify(all)); } catch (e) { /* private window: marks last until the page closes */ }
+    if (keys.length > 300) keys.sort((a, b) => all[a].t - all[b].t).slice(0, keys.length - 300).forEach((k) => delete all[k]);
+    savePref('fv-marks', JSON.stringify(all));
+    drivePush();
   }
   function ratio(d, i, n) {                                  // where the mark of page i sits on the progress bar
     if (d instanceof ScrollViewer && d.pages && d.pages[i]) {
@@ -128,7 +136,7 @@ const Marks = (function () {
     const at = arr.indexOf(i);
     if (at >= 0) arr.splice(at, 1); else arr.push(i);
     arr.sort((a, b) => a - b);
-    if (arr.length) all[k] = arr; else delete all[k];
+    all[k] = arr.length ? { a: arr, t: Date.now() } : { d: 1, t: Date.now() };
     save(); sig = ''; refresh();
     showToast(at >= 0 ? 'Bookmark removed' : 'Bookmarked page ' + (i + 1));
   }
@@ -149,7 +157,7 @@ const Marks = (function () {
     sig = s;
     $('vMarks').replaceChildren(...arr.map((i) => { const t = document.createElement('i'); t.style.left = (ratio(d, i, total(d)) * 100) + '%'; return t; }));
   }
-  return { toggle, jump, refresh, has: (i) => list().includes(i) };
+  return { toggle, jump, refresh, has: (i) => list().includes(i), reload() { load(); sig = ''; refresh(); } };
 })();
 $('vMark').onclick = () => Marks.toggle();
 

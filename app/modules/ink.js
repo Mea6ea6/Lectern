@@ -2,7 +2,8 @@
 /* =====================================================================
    Lectern — pen, marker and eraser over the page (loaded on first use).
 
-   • The file is never changed. Drawings live only in memory, per page, until the file is closed.
+   • The file is never changed. Drawings live only in memory, per page, until the file is closed
+     (unless "Keep place on the drive" is on: then they are also saved next to the files, see drive.js).
    • Strokes are stored relative to the page element (x and y both as a fraction of its WIDTH),
      so they follow zoom, scrolling and window size.
    • While Draw is on, the canvas catches the pointer, so the normal swipe / tap gestures are off;
@@ -168,6 +169,30 @@ const Pen = (function () {
     }
     redraw();
     refreshButtons();
+    persist();
+  }
+  /* ----- remembered on the flash drive (only with "Keep place on the drive"; see drive.js) ----- */
+  const fileKey = () => (V.entry ? posKey(V.entry) : '');
+  const round = (pts) => pts.map((q) => [Math.round(q[0] * 10000) / 10000, Math.round(q[1] * 10000) / 10000]);
+  function persist() {
+    const k = fileKey();
+    if (!k || typeof driveInkSet !== 'function' || !driveOn()) return;
+    const pages = {};
+    self.pages.forEach((pg, pk) => { if (pg.strokes.length) pages[pk] = pg.strokes.map((s) => Object.assign({}, s, { pts: round(s.pts) })); });
+    driveInkSet(k, pages);
+  }
+  function restore() {                                       // the drawings of this file saved on the drive come back
+    const saved = typeof driveInkGet === 'function' && fileKey() ? driveInkGet(fileKey()) : null;
+    if (!saved || [...self.pages.values()].some((pg) => pg.strokes.length)) return;
+    for (const pk in saved) {
+      const ids = new Map();                                 // stroke groups get fresh ids so they never clash with new strokes
+      const strokes = saved[pk].map((s) => {
+        if (s.g !== undefined) { if (!ids.has(s.g)) ids.set(s.g, ++strokeId); return Object.assign({}, s, { g: ids.get(s.g) }); }
+        return s;
+      });
+      self.pages.set(pk, { strokes, undo: [], redo: [] });
+    }
+    if (self.on) { refreshButtons(); redraw(); }
   }
   function trimUndo() { const u = page().undo; while (u.length > 60) u.shift(); }
 
@@ -317,21 +342,21 @@ const Pen = (function () {
     if (!pg.undo.length) return;
     pg.redo.push(pg.strokes);
     pg.strokes = pg.undo.pop();
-    redraw(); refreshButtons();
+    redraw(); refreshButtons(); persist();
   }
   function redo() {
     const pg = page();
     if (!pg.redo.length) return;
     pg.undo.push(pg.strokes);
     pg.strokes = pg.redo.pop();
-    redraw(); refreshButtons();
+    redraw(); refreshButtons(); persist();
   }
   function clear() {
     const pg = page();
     if (!pg.strokes.length) return;
     pg.undo.push(pg.strokes.slice()); pg.redo = []; trimUndo();
     pg.strokes = [];
-    redraw(); refreshButtons();
+    redraw(); refreshButtons(); persist();
     showToast('Cleared — Undo brings it back');
   }
   $('inkUndo').onclick = undo;
@@ -428,7 +453,7 @@ const Pen = (function () {
   }
   refreshButtons();
 
-  Object.assign(self, { toggle, reset, sync, redraw, undo, redo, setTool });
+  Object.assign(self, { toggle, reset, restore, sync, redraw, undo, redo, setTool });
   return self;
 })();
 window.Pen = Pen;

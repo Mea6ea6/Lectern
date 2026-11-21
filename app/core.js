@@ -4,7 +4,7 @@
    Vanilla JS, no build step. Runs from Lectern.html (USB stick) and as a PWA.
 
    THE CODE IS SPLIT INTO PLAIN SCRIPTS (Lectern.html loads them in this order, they share one global scope):
-     core.js (1-4)  ·  list.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
+     core.js (1-4)  ·  drive.js (memory on the flash drive)  ·  list.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
    They are not ES modules on purpose: modules do not load from a file:// address, and Lectern runs from a flash drive.
    A function declared in a later file is not yet known while an earlier file runs its top-level code.
 
@@ -234,7 +234,10 @@ function decodeText(buffer, partial) {
 function loadPref(key, fallback) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : v; } catch (e) { return fallback; }
 }
-function savePref(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* fine */ } }
+function savePref(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { /* fine */ }
+  if (typeof driveSettingChanged === 'function') driveSettingChanged(key);     // drive.js: settings may travel with the flash drive
+}
 
 // A tiny key-value store in IndexedDB (used to remember the last folder).
 // The connection is opened once and reused; a failed open is retried next time.
@@ -435,7 +438,7 @@ $('pickFiles').onchange = (e) => {
 /* ----- Folder handle: scan, remember, rescan (Chrome / Edge) ----- */
 async function scanDirectory(dir, prefix, depth, out) {
   for await (const [name, handle] of dir.entries()) {
-    if (name.startsWith('.') || name.startsWith('~$')) continue;
+    if (name.startsWith('.') || name.startsWith('~$') || name === MEMORY_FILE || name === INK_FILE) continue;
     if (handle.kind === 'directory') {
       if (depth < 5) await scanDirectory(handle, prefix + name + '/', depth + 1, out);
     } else {
@@ -460,14 +463,16 @@ async function loadFromHandle(handle, remember) {
     try { await kvSet('dir', handle); } catch (e) { console.warn('Could not remember the folder:', e); }
   }
   addFiles(out, true);
+  driveLoad();
 }
 
 async function reopenStored() {
   const handle = state.stored;
   if (!handle) return;
   try {
-    let perm = await handle.queryPermission({ mode: 'read' });
-    if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'read' });
+    const mode = loadPref('fv-drive', '0') === '1' ? 'readwrite' : 'read';     // "Keep place on the drive" needs to write
+    let perm = await handle.queryPermission({ mode });
+    if (perm !== 'granted') perm = await handle.requestPermission({ mode });
     if (perm !== 'granted') return;
     await loadFromHandle(handle, false);
   } catch (err) {

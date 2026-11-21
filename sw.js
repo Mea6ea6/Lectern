@@ -1,11 +1,12 @@
 /* Lectern service worker — keeps the whole app in the browser, so it opens with no internet at all.
    Generated from sw.template.js by make-sw.py (do not edit sw.js by hand). */
-const CACHE = 'lectern-d42a8b9bf1';
+const CACHE = 'lectern-7d5560c256';
 const FILES = [
   "./",
   "Lectern.html",
   "manifest.webmanifest",
   "app/core.js",
+  "app/drive.js",
   "app/errors.js",
   "app/extras.js",
   "app/fonts.css",

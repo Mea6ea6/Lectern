@@ -445,6 +445,9 @@ button:disabled { cursor: default; }
   touch-action: pan-y;                  /* pinching is done by the app itself (see Zoomer in app.js) */
 }
 .stage.zoomed { touch-action: pan-x pan-y; }
+/* Everything inside the page inherits it. Without this, boxes with overflow:hidden inside a slide count as their own scroll
+   containers with touch-action:auto, so the browser itself took over swipes (page turns were cancelled) and pinched the whole page. */
+:where(.stage) :where(*) { touch-action: inherit; }
 .page-ghosts { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }   /* the page that is sliding away */
 .paging .stage { overflow-x: clip; }
 .content { margin: auto; padding: calc(12px + var(--bt)) 12px calc(12px + var(--bb)); }   /* the page sits between the bars, scrolls under them */
@@ -529,6 +532,9 @@ button:disabled { cursor: default; }
   font-weight: 600; text-align: left;
 }
 .menu-item .grow { flex: 1; }
+.menu-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.menu-sub .btn-link { padding: 2px 10px; margin-left: 4px; font-size: 12px; background: var(--surface-3); }
+.menu-sub .btn-link:hover { background: var(--surface-2); filter: brightness(1.15); }
 .menu-item:disabled { opacity: .4; }
 .stepper {
   display: flex; gap: 8px; width: 236px;          /* separate buttons (zoom: − 100% +, rotate: left right), no common track */
@@ -590,7 +596,8 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .sheet .rn { background: #f3f3f3; color: #777; font-weight: 600; text-align: center; position: sticky; left: 0; z-index: 1; }
 .sheet th.rn { z-index: 3; }
 .sheet-note { padding: 12px 16px; color: #888; font-size: 13px; background: #fff; }
-.sheet-note .btn-link { margin-left: 4px; padding: 2px 4px; border: 0; background: none; font: inherit; color: #111; text-decoration: underline; cursor: pointer; border-radius: 4px; }
+.sheet-note .btn-link { margin-left: 6px; padding: 3px 10px; font: inherit; font-weight: 600; color: #111; border-radius: 8px; }
+.sheet-note .btn-link:hover { background: rgba(0,0,0,.08); }
 .odf-chart { background: #fff; margin: 8px 0; }
 .odp-shape svg { width: 100%; height: 100%; }
 
@@ -763,6 +770,19 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .q-name small { color: var(--ink-soft); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .q-btn { min-height: 40px; min-width: 40px; background: var(--surface-3); }
 .q-btn .icon { width: 20px; height: 20px; }
+/* Empty queue: faint placeholder rows */
+.q-ghost { pointer-events: none; user-select: none; margin-top: 14px; }
+.q-ghost .q-row { box-shadow: none; }
+.q-ghost .q-row:nth-child(1) { opacity: .6; }
+.q-ghost .q-row:nth-child(2) { opacity: .4; }
+.q-ghost .q-row:nth-child(3) { opacity: .22; }
+.q-ghost .q-num { opacity: .6; }
+.q-tag { width: 34px; height: 18px; border-radius: 6px; background: var(--surface-3); }
+.q-bar { display: block; height: 10px; width: 62%; border-radius: 5px; background: var(--surface-3); }
+.q-bar.short { width: 34%; height: 8px; margin-top: 7px; }
+.q-ghost .q-name { padding: 6px 0; }
+.q-hint { margin-top: 18px; }
+.q-hint b { font-weight: 700; }
 .queue-dialog .modal-actions { justify-content: center; margin-top: 26px; }
 .queue-dialog .modal-title { text-align: center; }
 .queue-dialog .modal-text { text-align: center; }
@@ -970,6 +990,12 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
   display: flex; align-items: center; gap: 8px;
 }
 [data-theme="dark"] .tip { background: #2c2c2c; }
+/* The small arrow (like the Dock's labels) pointing at the button */
+.tip::after {
+  content: ''; position: absolute; left: var(--ax, 50%); bottom: -4px; width: 9px; height: 9px; margin-left: -4.5px;
+  background: inherit; border-radius: 0 0 2px 0; transform: rotate(45deg); box-shadow: 2px 2px 3px rgb(0 0 0 / .18);
+}
+.tip.below::after { bottom: auto; top: -4px; border-radius: 2px 0 0 0; box-shadow: -1px -1px 2px rgb(0 0 0 / .12); }
 .tip.show { opacity: 1; transform: translateY(0); }
 .tip-ghost { transition: opacity .16s, transform .16s; }   /* the previous tooltip, fading out while the next one fades in */
 .tip kbd {
@@ -1220,7 +1246,10 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .ppt-xs .ppt-body p { font-size: 21px; margin-bottom: 6px; }
 
 .cf-icon { margin-right: 6px; font-size: .95em; letter-spacing: -.05em; }
-.btn-link { background: none; border: 0; padding: 4px 6px; font: inherit; color: var(--ink); text-decoration: underline; cursor: pointer; border-radius: 6px; }
+/* Small quiet button (no underlined links anywhere): the background is drawn on hover */
+.btn-link { background: transparent; border: 0; padding: 6px 12px; font: inherit; font-weight: 600; color: var(--ink); text-decoration: none; cursor: pointer; border-radius: var(--r-md); transition: background .15s ease, transform .12s ease; }
+.btn-link:hover { background: var(--surface-2); }
+.btn-link:active { transform: scale(.96); }
 
 /* Self-check page (Lectern.html#selftest) */
 .selftest { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); overflow: auto; }
@@ -1252,3 +1281,21 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .state-loading::before { content: ""; width: 36px; height: 36px; border-radius: 50%; border: 4px solid var(--surface-3); border-top-color: var(--ink); animation: spin .8s linear infinite; }
 .no-results { padding: 60px 40px; }
 .rtf-page .state { color: #888; }
+
+/* ---------- Recent files row ---------- */
+.recent { display: flex; align-items: center; gap: 10px; padding: 0 var(--pad) 14px; }
+.recent[hidden] { display: none; }
+.recent-toggle {
+  display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 6px 10px 6px 6px; border-radius: var(--r-md);
+  font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft);
+}
+.recent-toggle .icon { width: 16px; height: 16px; transition: transform .2s ease; }
+.recent-toggle[aria-expanded="false"] .icon { transform: rotate(-90deg); }
+.recent-list { display: flex; gap: 8px; min-width: 0; overflow: hidden; }
+.recent.collapsed .recent-list { display: none; }
+.recent-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; max-width: 240px; padding: 6px 14px;
+  background: var(--surface-2); border-radius: var(--r-md); box-shadow: var(--sh-1); text-align: left;
+}
+.recent-item b { max-width: 100%; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-item small { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }

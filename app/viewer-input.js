@@ -72,7 +72,7 @@ scrub.addEventListener('pointerup', endScrub);
 scrub.addEventListener('pointercancel', endScrub);
 
 /* ----- Mouse / touch ----- */
-// With a mouse in fullscreen the bars stay out of the way: they come when the pointer goes to the bottom edge (both bars together),
+// With a mouse in fullscreen the bars stay out of the way: they come when the pointer goes to the bottom or top edge (both bars together),
 // stay while the pointer is on them, and leave soon after it goes away. Moving the mouse in the middle does nothing.
 // (A finger works differently: a tap in the middle shows or hides them.) The pointer itself hides after a moment without moving.
 let hideBarsTimer = 0, cursorTimer = 0;
@@ -89,7 +89,7 @@ V.el.addEventListener('pointermove', (e) => {
   const r = V.el.getBoundingClientRect(), shown = barsShown();
   const topH = V.el.querySelector('.vbar-top').getBoundingClientRect().height, botH = V.el.querySelector('.vbar-bottom').getBoundingClientRect().height;
   const fromBottom = r.bottom - e.clientY, fromTop = e.clientY - r.top;
-  const inside = fromBottom <= Math.max(70, shown ? botH + 12 : 0) || (shown && fromTop <= topH + 8);     // the edge that calls the bars, or the bars themselves
+  const inside = fromBottom <= Math.max(70, shown ? botH + 12 : 0) || fromTop <= Math.max(50, shown ? topH + 8 : 0);     // the bottom or top edge calls the bars, or the bars themselves
   V.uiHover = inside;
   if (inside) { clearTimeout(hideBarsTimer); hideBarsTimer = 0; showUi(); }
   else hideBarsSoon();
@@ -143,21 +143,31 @@ function doubleTapZoom(x, y) {
   zoomMove((V.view.zoom > 1.05 ? 1 : 1.5) / V.view.zoom);
   zoomEnd();
 }
+/* Two fingers are a pinch only when the distance between them really changes. On a touch board a swipe often lands as two contacts
+   (finger + knuckle or palm) that travel together: that is a swipe, not a zoom, so it must not scale the page. */
 V.stage.addEventListener('touchstart', (e) => {
   if (e.touches.length !== 2 || Laser.on || (window.Pen && Pen.on)) return;
   const [a, b] = e.touches;
-  pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1 };
-  zoomBegin((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+  pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2, armed: false, swipe: false };
 }, { passive: true });
 V.stage.addEventListener('touchmove', (e) => {
-  if (!pinch || e.touches.length !== 2) return;
-  e.preventDefault();
+  if (!pinch || pinch.swipe || e.touches.length !== 2) return;
   const [a, b] = e.touches;
-  zoomMove(Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / pinch.d);
+  const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), cx = (a.clientX + b.clientX) / 2, cy = (a.clientY + b.clientY) / 2;
+  if (!pinch.armed) {
+    const dd = Math.abs(d - pinch.d), dc = Math.hypot(cx - pinch.cx, cy - pinch.cy);
+    if (dd > 20 && dd > dc) { pinch.armed = true; pinch.d = d || 1; zoomBegin(cx, cy); }     // the fingers moved apart / together: zoom
+    else if (dc > 30) pinch.swipe = true;                                                     // they moved along together: a swipe, leave it alone
+    return;
+  }
+  e.preventDefault();
+  zoomMove(d / pinch.d);
 }, { passive: false });
 ['touchend', 'touchcancel'].forEach((ev) => V.stage.addEventListener(ev, (e) => {
   if (!pinch || e.touches.length >= 2) return;
-  pinch = null; Zoomer.lastEnd = Date.now(); zoomEnd();
+  const was = pinch.armed;
+  pinch = null;
+  if (was) { Zoomer.lastEnd = Date.now(); zoomEnd(); }
 }));
 V.stage.addEventListener('wheel', (e) => {
   if (!e.ctrlKey || Laser.on) return;
@@ -182,25 +192,35 @@ function mediaTap(touch) {
 }
 
 // Taps: edges turn pages, the middle shows/hides the bars; a swipe turns pages too
-let pointerStart = null;
-V.stage.addEventListener('pointerdown', (e) => { pointerStart = { x: e.clientX, y: e.clientY, time: Date.now() }; });
-V.stage.addEventListener('pointercancel', () => { pointerStart = null; });
+const starts = new Map();                  // every finger / pointer that is down: id -> where and when it started
+V.stage.addEventListener('pointerdown', (e) => {
+  const now = Date.now();
+  starts.forEach((v, k) => { if (now - v.time > 1500) starts.delete(k); });     // a finger that lifted outside the page leaves no trace
+  starts.set(e.pointerId, { x: e.clientX, y: e.clientY, time: Date.now(), primary: e.isPrimary });
+});
+V.stage.addEventListener('pointercancel', (e) => { starts.delete(e.pointerId); });
 V.stage.addEventListener('pointerup', (e) => {
+  const pointerStart = starts.get(e.pointerId);
+  starts.delete(e.pointerId);
   if (!pointerStart) return;
   const dx = e.clientX - pointerStart.x;
   const dy = e.clientY - pointerStart.y;
-  const quick = Date.now() - pointerStart.time < 600;
-  pointerStart = null;
   const touch = e.pointerType !== 'mouse';
+  const held = Date.now() - pointerStart.time;
   if (Laser.on && touch) return;           // a finger is the laser: no swipes or edge taps
-  if (pinch || Date.now() - Zoomer.lastEnd < 400) return;     // the end of a pinch is not a tap
+  if ((pinch && pinch.armed) || Date.now() - Zoomer.lastEnd < 400) return;     // the end of a pinch is not a tap
   const pageBased = V.driver && !(V.driver instanceof ScrollViewer) && !V.driver.isMedia;
 
   if (touch && pageBased && V.view.zoom <= 1 && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    starts.clear();                                       // a second contact of the same swipe must not turn another page
     navigate(dx < 0 ? 'next' : 'prev');
     return;
   }
-  if (!quick || Math.abs(dx) > 10 || Math.abs(dy) > 10) return;
+  if (!pointerStart.primary || pinch || starts.size) return;         // two or more contacts at once are never a tap
+  // A finger on a big board is slower and less steady than a mouse click: a touch may last a little longer and wander a little
+  // (not in scrolling documents, where a short drag is a scroll and must not turn a page)
+  const slack = touch && (pageBased || (V.driver && V.driver.isMedia)) ? 22 : 10;
+  if (held >= (touch ? 900 : 600) || Math.abs(dx) > slack || Math.abs(dy) > slack) return;
   if (V.driver && V.driver.isMedia) {       // video / audio: edges = 5 seconds, the middle = play / pause
     const mx = (e.clientX - V.stage.getBoundingClientRect().left) / V.stage.getBoundingClientRect().width;
     if (mx < 0.22 && (touch || V.immersive)) navigate('prev');

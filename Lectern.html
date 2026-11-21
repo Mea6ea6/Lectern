@@ -149,6 +149,9 @@
           <button class="menu-item" id="sLarge" type="button" aria-pressed="false" title="Bigger buttons and text, easier to read from the back of the room">
             <svg class="icon"><use href="#i-plus"/></svg><span class="grow">Large interface</span><span class="switch"></span>
           </button>
+          <button class="menu-item" id="sDrive" type="button" aria-pressed="false" title="Save your place, bookmarks, zoom, drawings and settings next to your files, so they travel with the flash drive (Chrome / Edge)">
+            <svg class="icon"><use href="#i-folder"/></svg><span class="grow"><span>Keep place on the drive</span><small class="menu-sub" id="sDriveSub" hidden></small></span><span class="switch"></span>
+          </button>
         </div>
       </div>
     </div>
@@ -182,6 +185,14 @@
   </div>
   <!-- The file-type chips slide open under the toolbar when the Filter button is pressed (closed by default) -->
   <div class="chips-wrap" id="chipsWrap" aria-hidden="true"><div class="chips-in"><div class="chips" id="chips"></div></div></div>
+
+  <!-- Recently opened files of the folder: one quiet row, can be collapsed (the choice is remembered) -->
+  <div class="recent" id="recent" hidden>
+    <button class="recent-toggle" id="recentToggle" type="button" aria-expanded="true" title="Hide recent files">
+      <svg class="icon"><use href="#i-chev"/></svg><span>Recent</span>
+    </button>
+    <div class="recent-list" id="recentList"></div>
+  </div>
 
   <main>
     <section id="empty" class="empty">
@@ -282,7 +293,7 @@
   </div>
 
   <div class="vbar vbar-bottom">
-    <div class="scrub" id="vScrub" role="slider" aria-label="Position in file">
+    <div class="scrub" id="vScrub" role="slider" aria-label="Position in file" title="Position in the file">
       <span class="scrub-tip" id="scrubTip" hidden></span>
       <div class="scrub-track"><i id="vProgress"></i></div>
       <div class="scrub-marks" id="vMarks"></div>
@@ -509,6 +520,7 @@
 <div class="tip" id="tip" role="tooltip" aria-hidden="true"></div>
 
 <script src="app/core.js"></script>
+<script src="app/drive.js"></script>
 <script src="app/errors.js"></script>
 <script src="app/list.js"></script>
 <script src="app/viewers.js"></script>

@@ -41,6 +41,8 @@ async function openViewer(entry) {
   V.el.classList.remove('is-media');
 
   V.entry = entry;
+  recentTouch(entry);
+  if (window.Pen) Pen.restore();
   V.openedAt = Date.now();
   V.lastIndex = -1;                             // the first page of a file is not animated
   V.posReady = false; V.jumping = false; V.posHold = null; resumeClose(false); V.posReady = false;
@@ -73,6 +75,7 @@ async function openViewer(entry) {
     const driver = new VIEWER_CLASSES[entry.viewer](V.content, V.stage, V.view);
     driver.entry = entry;
     V.view.fit = driver.defaultFit;
+    viewRestore(entry);
     driver.onChange = updateBar;
     driver.onEnded = () => { if (V.driver === driver) upNextShow(); };
     installPageGhost(driver);
@@ -104,6 +107,7 @@ function closeViewer() {
   V.openToken++;
   upNextClose(false);
   posSave();
+  if (V.viewTimer) { clearTimeout(V.viewTimer); viewSave(); }
   V.posReady = false; resumeClose(false); V.posReady = false;
   setLaser(false);
   closeTimerDialog();
@@ -117,6 +121,7 @@ function closeViewer() {
   setImmersive(false);
   closeDriver();
   V.entry = null;
+  renderRecent();
   Link.key = 0; linkPush();
   V.el.classList.remove('is-media');
   V.el.hidden = true;
@@ -213,10 +218,11 @@ function animatePage(d) {
 const RESUME_MS = 20000, POS_KEY = 'fv-pos', POS_MAX = 300;
 const posKey = (e) => e.name + '|' + e.file.size;
 function posRead() { try { return JSON.parse(loadPref(POS_KEY, '{}')) || {}; } catch (e) { return {}; } }
-function posWrite(map) {
+function posWrite(map, fromDrive) {
   const keys = Object.keys(map);
   if (keys.length > POS_MAX) keys.sort((a, b) => map[a].t - map[b].t).slice(0, keys.length - POS_MAX).forEach((k) => delete map[k]);   // forget the oldest
   savePref(POS_KEY, JSON.stringify(map));
+  if (!fromDrive) drivePush();
 }
 const MEDIA_MIN = 120;                    // only recordings longer than two minutes are worth remembering
 const trackable = (d) => !!d && (d.isMedia ? !!d.el && d.el.duration > MEDIA_MIN : (d instanceof ScrollViewer || d.count > 1));
@@ -230,7 +236,7 @@ function posSave() {
   const at = posNow(d);
   if (V.posHold != null) { if (media ? Math.abs(at - V.posHold) < 3 : scroll ? Math.abs(at - V.posHold) < .03 : at === V.posHold) return; V.posHold = null; }   // the offer was ignored and you have not moved yet: keep the old place
   const finished = media ? at > d.el.duration - 10 : scroll ? at > .97 : at >= d.count - 1;
-  if (finished || (media ? at < 10 : scroll ? at < .03 : at <= 0)) delete map[key];     // at the start or at the very end there is nothing to continue
+  if (finished || (media ? at < 10 : scroll ? at < .03 : at <= 0)) map[key] = { d: 1, t: Date.now() };     // at the start or at the very end there is nothing to continue
   else map[key] = media ? { p: Math.round(at), n: Math.round(d.el.duration), t: Date.now() }
                         : { p: scroll ? Math.round(at * 1000) / 1000 : at, n: scroll ? 0 : d.count, t: Date.now() };
   posWrite(map);
@@ -249,7 +255,8 @@ function resumeLabel(e, saved) {
 function resumeOffer() {
   const d = V.driver, e = V.entry;
   V.posReady = false;
-  const saved = trackable(d) ? posRead()[posKey(e)] : null;
+  let saved = trackable(d) ? posRead()[posKey(e)] : null;
+  if (saved && saved.d) saved = null;
   V.posHold = null;
   const same = saved && (d.isMedia ? Math.abs(saved.n - Math.round(d.el.duration)) <= 1 && saved.p > 10
                                    : d instanceof ScrollViewer ? !saved.n : saved.n === d.count && saved.p > 0 && saved.p < d.count - 1);
@@ -432,9 +439,29 @@ function applyView() {
   if (V.driver) V.driver.refit();
   updateBar();
 }
-function setZoom(value) { V.view.zoom = clamp(value, 0.25, 4); applyView(); }
-function setFit(fit) { V.view.fit = fit; V.view.zoom = 1; applyView(); }
-function rotate(dir) { V.view.rot = (V.view.rot + dir * 90 + 360) % 360; applyView(); }
+function setZoom(value) { V.view.zoom = clamp(value, 0.25, 4); applyView(); viewSaveSoon(); }
+function setFit(fit) { V.view.fit = fit; V.view.zoom = 1; applyView(); viewSaveSoon(); }
+function rotate(dir) { V.view.rot = (V.view.rot + dir * 90 + 360) % 360; applyView(); viewSaveSoon(); }
+/* Zoom, fit and rotation are remembered per file (name + size), like the place; the default view is not stored. */
+const VIEW_KEY = 'fv-view';
+function viewSaveSoon() { clearTimeout(V.viewTimer); V.viewTimer = setTimeout(viewSave, 600); }
+function viewSave() {
+  const e = V.entry, d = V.driver;
+  V.viewTimer = 0;
+  if (!e || !d || d.isMedia) return;
+  let map = {}; try { map = JSON.parse(loadPref(VIEW_KEY, '{}')) || {}; } catch (x) { map = {}; }
+  const v = V.view, key = posKey(e), now = Date.now();
+  map[key] = v.zoom === 1 && v.fit === d.defaultFit && v.rot === 0 ? { d: 1, t: now } : { z: Math.round(v.zoom * 1000) / 1000, f: v.fit, r: v.rot, t: now };
+  const keys = Object.keys(map);
+  if (keys.length > POS_MAX) keys.sort((a, b) => map[a].t - map[b].t).slice(0, keys.length - POS_MAX).forEach((k) => delete map[k]);
+  savePref(VIEW_KEY, JSON.stringify(map));
+  drivePush();
+}
+function viewRestore(entry) {
+  let s = null; try { s = (JSON.parse(loadPref(VIEW_KEY, '{}')) || {})[posKey(entry)]; } catch (x) { /* none */ }
+  if (!s || s.d || typeof s.z !== 'number' || !['page', 'width'].includes(s.f) || ![0, 90, 180, 270].includes(s.r)) return;
+  V.view.zoom = clamp(s.z, 0.25, 4); V.view.fit = s.f; V.view.rot = s.r;
+}
 
 let toastTimer = null;
 function showToast(text, ms) {
@@ -495,6 +522,20 @@ function applyLarge(on) {
 }
 applyLarge(loadPref('fv-large', '0') === '1');
 $('sLarge').onclick = () => { const on = !document.body.classList.contains('large-ui'); savePref('fv-large', on ? '1' : '0'); applyLarge(on); };
+// "Keep place on the drive": remembered pages are also written next to the files (Chrome / Edge, needs a chosen folder)
+function applyDrive(on) { $('sDrive').setAttribute('aria-pressed', String(on)); driveStatus(); }
+applyDrive(loadPref('fv-drive', '0') === '1');
+$('sDrive').onclick = async () => {
+  if (loadPref('fv-drive', '0') === '1') { savePref('fv-drive', '0'); applyDrive(false); return; }
+  driveWarned = false;
+  if (!state.handle) { showToast('Choose a folder first (Chrome or Edge)'); return; }
+  let ok = false;
+  try { ok = (await state.handle.requestPermission({ mode: 'readwrite' })) === 'granted'; } catch (e) { /* refused */ }
+  if (!ok) { showToast('Not allowed — the place is kept on this computer only'); return; }
+  savePref('fv-drive', '1'); applyDrive(true);
+  await driveLoad(); drivePush(posRead());
+  showToast('Your place, bookmarks and settings now travel with the drive');
+};
 $('mFull').onclick = () => { closeMenu(); togglePageFullscreen(); };
 syncFullUI();
 
@@ -667,7 +708,7 @@ async function toggleInk() {
   if (Laser.on) setLaser(false);               // the pen and the laser pointer don't mix
   if (window.Pen) { Pen.toggle(); return; }
   if (!V.driver || !V.driver.canDraw) return;
-  try { await lib('ink'); Pen.toggle(); }
+  try { await lib('ink'); Pen.restore(); Pen.toggle(); }
   catch (err) { console.warn(err); showToast('Could not load the pen tools'); }
 }
 $('vInk').onclick = toggleInk;

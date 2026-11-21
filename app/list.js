@@ -68,6 +68,7 @@ function render() {
   renderStatus();
   renderChips();
   renderActions();
+  renderRecent();
 
   const list = visibleFiles();
   $('grid').classList.toggle('no-blur', list.length > 80);   // blur behind hundreds of cards would make scrolling heavy
@@ -608,7 +609,20 @@ function renderQueueDialog(first) {
   const loaded = Q.items.filter((it) => it.entry).length;
 
   if (!Q.items.length) {
-    box.appendChild(stateNode('The queue is empty', 'Press + on a file card (or Q) to add the files for this lesson.', { icon: 'i-queue' }));
+    // empty: three faint placeholder rows show what the queue will look like, with one line of help below
+    const ghost = h('div', 'q-list q-ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    for (let i = 1; i <= 3; i++) {
+      const row = h('div', 'q-row');
+      const name = h('span', 'q-name');
+      name.append(h('i', 'q-bar'), h('i', 'q-bar short'));
+      row.append(h('span', 'q-num', String(i)), h('i', 'q-tag'), name);
+      ghost.appendChild(row);
+    }
+    box.appendChild(ghost);
+    const hint = h('p', 'modal-text q-hint');
+    hint.append('Add files with ', h('b', '', '+'), ' on a card, or press ', h('kbd', '', 'Q'));
+    box.appendChild(hint);
   } else {
     box.appendChild(h('p', 'modal-text', 'Put the files in order, then press Start. Inside a file, [ and ] jump to the next and previous one.'));
     const list = h('div', 'q-list');
@@ -871,3 +885,48 @@ async function thumbText(entry) {
   snippet.appendChild(document.createTextNode(lines.slice(1).join(' ').slice(0, 360)));
   entry.thumbNode = snippet;
 }
+
+
+/* ----- Recent files: the last files opened from this folder (remembered with the place; travels with the drive) ----- */
+const RECENT_KEY = 'fv-recent', RECENT_SHOW = 4;
+function recentTouch(entry) {                       // called when a file is opened
+  let map = {};
+  try { map = JSON.parse(loadPref(RECENT_KEY, '{}')) || {}; } catch (e) { map = {}; }
+  map[posKey(entry)] = { n: entry.name, t: Date.now() };
+  const keys = Object.keys(map);
+  if (keys.length > 40) keys.sort((a, b) => map[a].t - map[b].t).slice(0, keys.length - 40).forEach((k) => delete map[k]);
+  savePref(RECENT_KEY, JSON.stringify(map));
+  drivePush();
+}
+function recentLabel(entry, saved) {                // the second line: where you stopped
+  if (!saved || saved.d) return (entry.ext || '').toUpperCase();
+  if (entry.kind === 'video' || entry.kind === 'audio') {
+    const s = Math.floor(saved.p), m = Math.floor(s / 60);
+    return 'At ' + (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0');
+  }
+  if (!saved.n) return Math.round(saved.p * 100) + '% read';
+  return (entry.kind === 'pptx' ? 'Slide ' : entry.kind === 'xlsx' ? 'Sheet ' : 'Page ') + (saved.p + 1) + ' of ' + saved.n;
+}
+function renderRecent() {
+  const box = $('recent');
+  let recent = {}, pos = {};
+  try { recent = JSON.parse(loadPref(RECENT_KEY, '{}')) || {}; pos = JSON.parse(loadPref('fv-pos', '{}')) || {}; } catch (e) { /* none */ }
+  const byKey = new Map(state.files.map((e) => [posKey(e), e]));
+  const items = Object.keys(recent).filter((k) => byKey.has(k) && !recent[k].d).sort((a, b) => recent[b].t - recent[a].t).slice(0, RECENT_SHOW);
+  const searching = !!$('search').value.trim();
+  box.hidden = !state.files.length || !items.length || searching;
+  if (box.hidden) return;
+  const hide = loadPref('fv-recent-hide', '0') === '1';
+  box.classList.toggle('collapsed', hide);
+  $('recentToggle').setAttribute('aria-expanded', String(!hide));
+  $('recentToggle').title = hide ? 'Show recent files' : 'Hide recent files';
+  $('recentList').replaceChildren(...items.map((k) => {
+    const entry = byKey.get(k);
+    const b = h('button', 'recent-item');
+    b.type = 'button'; b.title = 'Open ' + entry.name;
+    b.append(h('b', '', entry.name.replace(/\.[^.]+$/, '')), h('small', '', recentLabel(entry, pos[k])));
+    b.onclick = () => openCard(entry);
+    return b;
+  }));
+}
+$('recentToggle').onclick = () => { savePref('fv-recent-hide', loadPref('fv-recent-hide', '0') === '1' ? '0' : '1'); renderRecent(); };
