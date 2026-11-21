@@ -12,7 +12,7 @@
    ===================================================================== */
 const MEMORY_FILE = 'Lectern-memory.json', INK_FILE = 'Lectern-drawings.json';
 const SYNC_MAPS = { pos: 'fv-pos', marks: 'fv-marks', view: 'fv-view', recent: 'fv-recent' };
-const SYNC_PREFS = ['fv-theme', 'fv-large', 'fv-hints', 'fv-anim'];
+const SYNC_PREFS = ['fv-theme', 'fv-large', 'fv-hints', 'fv-anim', 'fv-viewmode', 'fv-folders'];
 const INK_MAX = 60;                                  // drawn files kept in the drawings file (the oldest go first)
 let driveApplying = false, driveTimer = 0, inkDirty = false, driveWarned = false;
 const driveLast = { ok: 0, failed: false };      // result of the latest write, for the status line in the menu
@@ -52,6 +52,8 @@ function applySettings(s) {
     if (s['fv-theme']) setAppearance('theme', s['fv-theme']);
     if (s['fv-large'] != null) applyLarge(s['fv-large'] === '1');
     if (s['fv-hints'] != null) applyHints(s['fv-hints'] === '1');
+    if (s['fv-viewmode'] && typeof setViewMode === 'function') setViewMode(s['fv-viewmode'], false);
+    if (s['fv-folders'] != null && typeof setFoldersOn === 'function') setFoldersOn(s['fv-folders'] !== '0', false);
     if (s['fv-anim'] != null) { V.pageAnim = s['fv-anim'] === '1'; if (!V.el.hidden && V.driver) updateBar(); }
     savePref('fv-set-t', String(s.t));
   } finally { setTimeout(() => { driveApplying = false; }, 800); }       // the theme change runs a moment later
@@ -79,7 +81,6 @@ async function driveLoad() {
   const ink = await readJson(INK_FILE);
   if (ink && ink.files) driveMerge(DriveInk, ink.files);
   if (typeof Marks !== 'undefined') Marks.reload();
-  if (typeof renderRecent === 'function') renderRecent();
   if (V.entry && window.Pen) Pen.restore();
 }
 

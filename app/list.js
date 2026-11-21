@@ -7,13 +7,39 @@
    5. THE FILE LIST
    --------------------------------------------------------------------- */
 
-function visibleFiles() {
-  const q = state.query.trim().toLowerCase();
-  const list = state.files.filter((e) =>
-    (state.filter === 'all' || e.kind === state.filter) &&
-    (!q || e.name.toLowerCase().includes(q)));
+/* ---------------------------------------------------------------------
+   Folders and views.  The files keep the folder they were in (entry.dirs); with "Show folders" on, the list shows one
+   folder at a time (folders first, then the files) with a path bar above. Three views: icons (cards), list (rows) and
+   columns (one column per opened folder + a preview, like the Finder). Searching always looks through everything.
+   --------------------------------------------------------------------- */
+const VIEWS = ['icons', 'list', 'columns'];
+state.view = VIEWS.includes(loadPref('fv-viewmode', 'icons')) ? loadPref('fv-viewmode', 'icons') : 'icons';
+state.folders = loadPref('fv-folders', '1') !== '0';     // "Show folders"
+state.path = [];                                          // icons / list: the folder shown · columns: the chain of opened folders
+const FOLDER_IDS = new Map(), FOLDER_BY_ID = new Map();
+function folderId(path) {
+  let id = FOLDER_IDS.get(path);
+  if (!id) { id = -(FOLDER_IDS.size + 1); FOLDER_IDS.set(path, id); FOLDER_BY_ID.set(id, path); }
+  return id;
+}
+const dirSegs = (p) => (p ? p.split('/') : []);
+const underDir = (e, segs) => segs.every((s, i) => e.dirs[i] === s);
 
-  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+// Which folder each file is in. A folder picked the classic way (or dropped) has its own name as the first part of every path: that is the root, not a folder.
+function computeDirs() {
+  const segsOf = (e) => { const p = e.path.split('/'); p.pop(); return p; };
+  let strip = 0, rootName = state.handle ? state.folderName : '';
+  if (!state.handle && state.files.length) {
+    const all = state.files.map(segsOf);
+    if (all.every((x) => x.length) && new Set(all.map((x) => x[0])).size === 1) { strip = 1; rootName = all[0][0]; }
+  }
+  for (const e of state.files) { e.dirs = segsOf(e).slice(strip); e.dir = e.dirs.join('/'); e.rootName = rootName; }
+}
+const hasFolders = () => state.files.some((e) => e.dirs && e.dirs.length);
+const foldersOn = () => state.folders && !state.query.trim() && hasFolders();     // the folder structure is shown (a search is always flat)
+
+const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+function sortFiles(list) {
   const sorters = {
     name: byName,
     date: (a, b) => b.modified - a.modified || byName(a, b),
@@ -22,6 +48,41 @@ function visibleFiles() {
   };
   return list.sort(sorters[state.sort]);
 }
+// The files that pass the filter and the search
+function matchingFiles() {
+  const q = state.query.trim().toLowerCase();
+  return state.files.filter((e) => (state.filter === 'all' || e.kind === state.filter) && (!q || e.name.toLowerCase().includes(q)));
+}
+// The content of one folder (dir = 'A/B' or ''): its sub-folders (with the number of matching files inside) and its own files
+function listDir(dir, pool) {
+  const base = dirSegs(dir), n = base.length, sub = new Map(), files = [];
+  for (const e of pool) {
+    if (e.dirs.length < n || !underDir(e, base)) continue;
+    if (e.dirs.length === n) files.push(e);
+    else {
+      const name = e.dirs[n], f = sub.get(name) || { name, path: base.concat(name).join('/'), count: 0 };
+      f.count++; sub.set(name, f);
+    }
+  }
+  const folders = [...sub.values()].sort(byName).map((f) => ({ ...f, folder: true, id: folderId(f.path) }));
+  return { folders, files: sortFiles(files) };
+}
+// Everything that has to be on the screen in icons / list view (folders first)
+function currentItems() {
+  const pool = matchingFiles();
+  if (!foldersOn()) return sortFiles(pool);
+  while (state.path.length && !state.files.some((e) => underDir(e, state.path))) state.path.pop();     // the folder is gone (another folder was chosen)
+  const { folders, files } = listDir(state.path.join('/'), pool);
+  return [...folders, ...files];
+}
+// Items of the column `i` in columns view
+function columnItems(i, pool) {
+  if (!foldersOn()) return { folders: [], files: sortFiles(pool) };
+  return listDir(state.path.slice(0, i).join('/'), pool);
+}
+
+const shortDate = (ms) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+function folderCount(n) { return n + ' ' + plural(n, ['file', 'files']); }
 
 function createCard(entry) {
   const card = h('div', 'card k-' + entry.kind);
@@ -55,6 +116,163 @@ function createCard(entry) {
   if (entry.thumbNode) putThumb(entry);
   return card;
 }
+function createFolderCard(f) {
+  const card = h('div', 'card card-folder');
+  card.dataset.id = f.id;
+  card.title = f.name;
+  const thumb = h('span', 'thumb');
+  thumb.append(icon('i-folder'), h('span', 'folder-count', folderCount(f.count)));
+  const foot = h('span', 'card-foot');
+  const glyph = h('span', 'card-glyph'); glyph.appendChild(icon('i-folder'));
+  foot.append(glyph, h('span', 'card-name', f.name));
+  card.append(thumb, foot);
+  card.onclick = () => openFolder(f.path);
+  return card;
+}
+
+// List view: one row per file / folder
+function createRow(entry) {
+  const row = h('div', 'row card k-' + entry.kind);          // "card" so the queue marks and hover colours work the same
+  row.dataset.id = entry.id;
+  row.title = entry.name;
+  const qb = h('button', 'card-queue');
+  qb.type = 'button';
+  qb.onclick = (e) => { e.stopPropagation(); queueToggle(entry); };
+  const info = h('button', 'card-info');
+  info.type = 'button'; info.title = 'Details (Space)'; info.setAttribute('aria-label', 'Details');
+  info.appendChild(icon('i-info'));
+  const name = h('span', 'row-name');
+  name.append(h('b', '', entry.base));
+  if (state.query.trim() || !foldersOn()) { const where = whereText(entry, true); if (where) name.append(h('small', '', where)); }
+  row.append(qb, h('span', 'tag tag-' + entry.kind, entry.tag), name, h('span', 'row-date', shortDate(entry.modified)), h('span', 'row-size', formatSize(entry.size)), info);
+  row.onclick = () => { select(entry.id, false); openCard(entry); };
+  info.onclick = (e) => { e.stopPropagation(); select(entry.id, false); openInfo(entry); };
+  entry.card = row; entry.qMark = undefined; markQueue(entry);
+  return row;
+}
+function createFolderRow(f) {
+  const row = h('div', 'row card card-folder');
+  row.dataset.id = f.id;
+  const glyph = h('span', 'row-glyph'); glyph.appendChild(icon('i-folder'));
+  const chev = h('span', 'row-chev'); chev.appendChild(icon('i-next'));
+  row.append(glyph, h('span', 'row-kind', 'Folder'), h('span', 'row-name', f.name), h('span', 'row-date', ''), h('span', 'row-size', folderCount(f.count)), chev);
+  row.onclick = () => openFolder(f.path);
+  return row;
+}
+
+// Columns view
+function createColRow(item, i) {
+  const row = h('div', 'crow' + (item.folder ? ' is-folder' : ' k-' + item.kind));
+  row.dataset.id = item.id;
+  if (item.folder) {
+    const glyph = h('span', 'crow-glyph'); glyph.appendChild(icon('i-folder'));
+    const chev = h('span', 'crow-chev'); chev.appendChild(icon('i-next'));
+    row.append(glyph, h('span', 'crow-name', item.name), chev);
+    row.onclick = () => { state.path = state.path.slice(0, i).concat(item.name); state.selectedId = item.id; render(); };
+  } else {
+    row.append(h('i', 'crow-dot'), h('span', 'crow-name', item.base));
+    row.onclick = () => { state.path = state.path.slice(0, i); state.selectedId = item.id; render(); };
+    row.ondblclick = () => openCard(item);
+    item.card = row; item.qMark = undefined;
+  }
+  return row;
+}
+function createPreview(entry) {
+  const box = h('div', 'col col-preview');
+  const pic = h('div', 'cv-thumb');
+  entry.pvThumb = pic;
+  if (entry.thumbNode) { const c = cloneThumb(entry.thumbNode); if (c) pic.appendChild(c); }
+  else if (!entry.thumbRequested) { entry.thumbRequested = true; thumbQueue.push(entry); runThumbQueue(); }
+  const meta = h('dl', 'cv-meta');
+  const row = (k, v) => meta.append(h('dt', '', k), h('dd', '', v));
+  row('Kind', KIND_NAMES[entry.ext] || entry.tag);
+  row('Size', formatSize(entry.size));
+  row('Modified', fullDate(entry.modified));
+  row('Where', whereText(entry));
+  const open = h('button', 'btn btn-primary', 'Open');
+  open.type = 'button'; open.title = 'Open this file (Enter)'; open.onclick = () => openCard(entry);
+  const q = h('button', 'btn');
+  q.type = 'button';
+  const inQ = queueIndexOf(entry) >= 0;
+  q.append(icon(inQ ? 'i-trash' : 'i-plus'), h('span', '', inQ ? 'Remove from queue' : 'Add to queue'));
+  q.title = inQ ? 'Take it out of the class queue (Q)' : 'Add to the class queue (Q)';
+  q.onclick = () => queueToggle(entry);
+  const det = h('button', 'btn btn-icon');
+  det.type = 'button'; det.title = 'Details (Space)'; det.setAttribute('aria-label', 'Details'); det.appendChild(icon('i-info')); det.onclick = () => openInfo(entry);
+  const acts = h('div', 'cv-actions');
+  acts.append(open, q, det);
+  box.append(pic, h('div', 'cv-name', entry.name), meta, acts);
+  return box;
+}
+function renderColumns(pool) {
+  const grid = $('grid');
+  const scrolls = Array.from(grid.querySelectorAll('.col')).map((c) => c.scrollTop);
+  const flat = !foldersOn();
+  if (flat) state.path = [];
+  const cols = [];
+  const total = flat ? 1 : state.path.length + 1;
+  let any = false;
+  for (let i = 0; i < total; i++) {
+    const { folders, files } = columnItems(i, pool);
+    const col = h('div', 'col');
+    for (const f of folders) {
+      const r = createColRow(f, i);
+      if (state.path[i] === f.name) r.classList.add('open');
+      if (f.id === state.selectedId) r.classList.add('selected');
+      col.appendChild(r);
+    }
+    for (const e of files) { const r = createColRow(e, i); if (e.id === state.selectedId) r.classList.add('selected'); col.appendChild(r); }
+    if (folders.length || files.length) any = true;
+    cols.push(col);
+  }
+  const sel = selectedEntry();
+  if (sel && pool.includes(sel)) cols.push(createPreview(sel));
+  grid.replaceChildren(...cols);
+  cols.forEach((c, i) => { if (scrolls[i]) c.scrollTop = scrolls[i]; });
+  const on = grid.querySelector('.selected');
+  if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  grid.scrollLeft = grid.scrollWidth;
+  fitPageThumbs(grid);
+  return any;
+}
+function updatePreview() {                      // the queue changed: only the buttons of the preview column are different
+  const old = $('grid').querySelector('.col-preview'), sel = selectedEntry();
+  if (old && sel) { old.replaceWith(createPreview(sel)); fitPageThumbs($('grid')); }
+}
+
+function openFolder(path) {
+  state.path = dirSegs(path);
+  state.selectedId = null;
+  state.cardsEnter = true;
+  window.scrollTo(0, 0);
+  render();
+}
+function folderUp() {
+  if (!state.path.length) return;
+  const left = state.path.join('/');
+  state.path.pop();
+  state.selectedId = folderId(left);          // the folder we came from is highlighted
+  state.cardsEnter = true;
+  render();
+}
+function renderCrumbs() {
+  const nav = $('crumbs');
+  const show = foldersOn() && state.view !== 'columns';
+  nav.hidden = !show;
+  if (!show) return;
+  const root = state.folderName || 'All files';
+  const parts = [{ name: root, path: '', home: true }];
+  state.path.forEach((seg, i) => parts.push({ name: seg, path: state.path.slice(0, i + 1).join('/') }));
+  nav.replaceChildren(...parts.flatMap((p, i) => {
+    const b = h('button', 'crumb' + (i === parts.length - 1 ? ' here' : ''));
+    b.type = 'button';
+    if (p.home) b.appendChild(icon('i-home'));
+    b.append(h('span', '', p.name));
+    b.title = i === parts.length - 1 ? 'You are here' : 'Go to ' + p.name;
+    b.onclick = () => { if (i < parts.length - 1) openFolder(p.path); };
+    return i ? [h('span', 'crumb-sep', '›'), b] : [b];
+  }));
+}
 
 function render() {
   relinkQueue();
@@ -68,24 +286,34 @@ function render() {
   renderStatus();
   renderChips();
   renderActions();
-  renderRecent();
+  renderCrumbs();
 
-  const list = visibleFiles();
-  $('grid').classList.toggle('no-blur', list.length > 80);   // blur behind hundreds of cards would make scrolling heavy
-  $('grid').replaceChildren(...list.map(createCard));
-  if (state.cardsEnter) {                                  // only right after files were loaded, not on every filter / search
-    state.cardsEnter = false;
-    list.forEach((e, i) => e.card.style.setProperty('--i', String(Math.min(i, 14))));
-    $('grid').classList.add('enter');
-    clearTimeout(render.enterTimer);
-    render.enterTimer = setTimeout(() => $('grid').classList.remove('enter'), 1000);
+  const grid = $('grid');
+  grid.classList.toggle('as-list', state.view === 'list');
+  grid.classList.toggle('as-cols', state.view === 'columns');
+  const pool = matchingFiles();
+  let count;
+  if (state.view === 'columns') {
+    count = renderColumns(pool) ? 1 : 0;
+    if (state.selectedId !== null && !grid.querySelector('.selected')) state.selectedId = null;
+  } else {
+    const list = currentItems();
+    count = list.length;
+    grid.classList.toggle('no-blur', list.length > 80);   // blur behind hundreds of cards would make scrolling heavy
+    const files = list.filter((e) => !e.folder);
+    grid.replaceChildren(...list.map((it) => (state.view === 'list' ? (it.folder ? createFolderRow(it) : createRow(it)) : (it.folder ? createFolderCard(it) : createCard(it)))));
+    if (state.cardsEnter) {                                  // only right after files were loaded, not on every filter / search
+      state.cardsEnter = false;
+      list.forEach((it, i) => { const el = it.folder ? grid.children[i] : it.card; if (el) el.style.setProperty('--i', String(Math.min(i, 14))); });
+      grid.classList.add('enter');
+      clearTimeout(render.enterTimer);
+      render.enterTimer = setTimeout(() => grid.classList.remove('enter'), 1000);
+    }
+    if (!list.some((it) => it.id === state.selectedId)) state.selectedId = list.length ? list[0].id : null;
+    markSelected(false);
+    if (state.view === 'icons') for (const e of files) thumbObserver.observe(e.card);   // thumbnails only for visible cards
   }
-  $('noResults').hidden = !hasFiles || list.length > 0;
-
-  if (!list.some((e) => e.id === state.selectedId)) state.selectedId = list.length ? list[0].id : null;
-  markSelected(false);
-
-  for (const e of list) thumbObserver.observe(e.card);   // thumbnails only for visible cards
+  $('noResults').hidden = !hasFiles || count > 0;
 }
 
 function renderActions() {
@@ -98,8 +326,46 @@ function renderActions() {
   });
   $('btnRefresh').hidden = !state.handle;
   $('btnQueue').hidden = !state.files.length && !Q.items.length;
+  $('btnRecent').hidden = !state.files.length;
   $('qCount').textContent = Q.items.length ? String(Q.items.length) : '';
+  // folder controls only when there is something to switch: files that really are in folders
+  const folders = hasFolders();
+  $('btnFolders').hidden = !folders;
+  $('sFolders').hidden = !folders;
+  // saving next to the files needs a folder picked with the folder picker (Chrome / Edge)
+  $('sDrive').hidden = !(window.showDirectoryPicker && state.handle);
+  if (window.driveStatus) driveStatus();
+  viewButtons();
 }
+function viewButtons() {
+  document.querySelectorAll('#viewSeg [data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
+  $('btnFolders').setAttribute('aria-pressed', String(state.folders));
+  $('btnFolders').dataset.tip = state.folders ? 'Folders are shown — click for one flat list' : 'Show folders';
+  $('sFolders').setAttribute('aria-pressed', String(state.folders));
+}
+function setViewMode(v, save = true) {
+  if (!VIEWS.includes(v) || v === state.view) return;
+  // the folder shown: icons / list name it directly, columns name it by the chain (a selected folder is part of the chain)
+  if (state.view === 'columns' && v !== 'columns' && state.selectedId < 0 && state.path.length) state.path = state.path.slice(0, -1);
+  if (v === 'columns') { const sel = selectedEntry(); if (!sel) state.selectedId = null; }
+  state.view = v;
+  if (save) savePref('fv-viewmode', v);
+  state.cardsEnter = v !== 'columns';
+  render();
+}
+function setFoldersOn(on, save = true) {
+  on = !!on;
+  if (on === state.folders) return;
+  state.folders = on;
+  state.path = [];
+  if (save) savePref('fv-folders', on ? '1' : '0');
+  state.cardsEnter = true;
+  render();
+}
+document.querySelectorAll('#viewSeg [data-view]').forEach((b) => { b.onclick = () => setViewMode(b.dataset.view); });
+$('btnFolders').onclick = () => setFoldersOn(!state.folders);
+$('sFolders').onclick = () => setFoldersOn(!state.folders);
+
 
 function renderStatus() {
   if (state.note) { $('status').textContent = state.note; return; }
@@ -198,26 +464,76 @@ function openCard(entry) {
 }
 
 function markSelected(scroll) {
-  for (const card of $('grid').children) {
+  for (const card of $('grid').querySelectorAll('[data-id]')) {
     const on = Number(card.dataset.id) === state.selectedId;
     card.classList.toggle('selected', on);
-    if (on && scroll) card.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    if (on && scroll) card.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   }
 }
 
+// The arrow keys. Icons: along the cards · list: up and down · columns: up / down inside the column, left = the folder before, right = into the folder
 function moveSelection(dx, dy) {
-  const cards = Array.from($('grid').children);
+  if (state.view === 'columns') return moveInColumns(dx, dy);
+  const cards = Array.from($('grid').children).filter((c) => c.dataset.id);
   if (!cards.length) return;
   let i = cards.findIndex((c) => Number(c.dataset.id) === state.selectedId);
   if (i < 0) i = 0;
   i += dx;
   if (dy) {
-    const perRow = cards.filter((c) => c.offsetTop === cards[0].offsetTop).length || 1;
+    const perRow = state.view === 'list' ? 1 : (cards.filter((c) => c.offsetTop === cards[0].offsetTop).length || 1);
     i += dy * perRow;
   }
   select(Number(cards[clamp(i, 0, cards.length - 1)].dataset.id), true);
 }
+function moveInColumns(dx, dy) {
+  const pool = matchingFiles();
+  const sel = state.selectedId;
+  const flat = !foldersOn();
+  // the column the selection is in: a folder sits in the column before its own contents, a file in the last one
+  const colOf = sel === null ? state.path.length : (sel < 0 ? state.path.length - 1 : state.path.length);
+  if (dy) {
+    const { folders, files } = columnItems(Math.max(0, colOf), pool), items = [...folders, ...files];
+    if (!items.length) return;
+    let i = items.findIndex((it) => it.id === sel);
+    i = i < 0 ? (dy > 0 ? 0 : items.length - 1) : clamp(i + dy, 0, items.length - 1);
+    const it = items[i], base = state.path.slice(0, Math.max(0, colOf));
+    state.path = it.folder ? base.concat(it.name) : base;
+    state.selectedId = it.id;
+    render();
+  } else if (dx < 0 && !flat && sel !== null) {
+    const base = state.path.slice(0, sel < 0 ? state.path.length - 1 : state.path.length);
+    if (!base.length) return;
+    state.selectedId = folderId(base.join('/'));
+    state.path = base;
+    render();
+  } else if (dx > 0 && sel !== null && sel < 0) {
+    const { folders, files } = columnItems(state.path.length, pool), first = folders[0] || files[0];
+    if (!first) return;
+    state.path = first.folder ? state.path.concat(first.name) : state.path;
+    state.selectedId = first.id;
+    render();
+  } else if (dx > 0 && sel === null) moveInColumns(0, 1);
+}
 function selectedEntry() { return state.files.find((e) => e.id === state.selectedId); }
+// Enter: a file opens, a folder is entered
+function activateSelected() {
+  const entry = selectedEntry();
+  if (entry) { openCard(entry); return true; }
+  if (state.selectedId !== null && state.selectedId < 0) {
+    if (state.view === 'columns') moveInColumns(1, 0);
+    else openFolder(FOLDER_BY_ID.get(state.selectedId));
+    return true;
+  }
+  return false;
+}
+// The mouse decides what Space, Enter and Q act on: the file under the pointer is the selected one (columns keep their own chain)
+$('grid').addEventListener('pointerover', (e) => {
+  if (e.pointerType !== 'mouse' || state.view === 'columns') return;
+  const el = e.target.closest('[data-id]');
+  if (!el || !$('grid').contains(el)) return;
+  const id = Number(el.dataset.id);
+  if (id !== state.selectedId) select(id, false);
+});
 
 
 /* ---------------------------------------------------------------------
@@ -225,6 +541,8 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
    as before; for the listed elements the setter now plays an in/out animation
    (CSS classes anim-in / anim-out) and only really hides after the out-animation.
    --------------------------------------------------------------------- */
+let BOOTING = true;                                     // while the page starts, things that start hidden just are hidden (no fade-out on load)
+window.addEventListener('load', () => setTimeout(() => { BOOTING = false; }, 0));
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
@@ -240,6 +558,7 @@ function selectedEntry() { return state.files.find((e) => e.id === state.selecte
         if (v === logical) return;
         logical = v;
         clearTimeout(timer);
+        if (BOOTING) { native.set.call(el, v); return; }
         if (!v) {                                           // appear
           native.set.call(el, false);
           el.classList.remove('anim-out');
@@ -344,10 +663,11 @@ function cloneThumb(node) {
   return node.cloneNode(true);
 }
 
-function whereText(entry) {
-  const i = entry.path.lastIndexOf('/');
-  const dir = i >= 0 ? entry.path.slice(0, i) : '';
-  return [entry.root, dir].filter(Boolean).join(' / ') || 'Selected files';
+// Where a file is: the chosen folder and the folders inside it  ("Lessons / Week 3")
+function whereText(entry, short) {
+  const parts = [...(entry.dirs || [])];
+  if (!short && entry.rootName) parts.unshift(entry.rootName);
+  return parts.join(' / ') || (short ? '' : 'Selected files');
 }
 
 function openInfo(entry) {
@@ -416,9 +736,10 @@ async function loadDetails(entry) {
   const dateText = (v) => { const d = new Date(v); return isNaN(d) ? '' : fullDate(d.getTime()); };
 
   try {
-    if (VIEWER_LIB[entry.viewer]) {
-      await lib(VIEWER_LIB[entry.viewer]);
-      await VIEWER_CLASSES[entry.viewer].details(entry, add, dateText);
+    if (VIEWER_LIB[entry.viewer]) await lib(VIEWER_LIB[entry.viewer]);
+    const own = VIEWER_LIB[entry.viewer] && VIEWER_CLASSES[entry.viewer];
+    if (own && typeof own.details === 'function') {
+      await own.details(entry, add, dateText);
 
     } else if (entry.kind === 'pdf') {
       await lib('pdf');
@@ -543,7 +864,8 @@ function queueChanged() {
     $('qCount').animate([{ scale: 1.4 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)' });
   }
   $('qCount').textContent = countText;
-  if (!M.el.hidden && M.body.classList.contains('queue-dialog')) renderQueueDialog();
+  if (!M.el.hidden && M.body.classList.contains('queue-dialog') && !M.body.classList.contains('recent-dialog')) renderQueueDialog();
+  if (state.view === 'columns') updatePreview();
   updateQueueNav();
 }
 
@@ -553,6 +875,7 @@ function markQueue(entry, i = queueIndexOf(entry)) {
   entry.qMark = i;
   const btn = entry.card.querySelector('.card-queue');
   entry.card.classList.toggle('queued', i >= 0);
+  if (!btn) return;
   if (i >= 0) { const num = h('span', 'qn', String(i + 1)), x = icon('i-trash'); x.classList.add('qx'); btn.replaceChildren(num, x); }
   else btn.replaceChildren(icon('i-plus'));
   btn.title = i >= 0 ? 'In the class queue (place ' + (i + 1) + ') — click to remove (Q)' : 'Add to the class queue (Q)';
@@ -711,9 +1034,10 @@ async function runThumbQueue() {
   while (thumbQueue.length && V.el.hidden) {
     const entry = thumbQueue.shift();
     try {
-      if (VIEWER_LIB[entry.viewer]) {          // the newer formats make their own thumbnails
-        await lib(VIEWER_LIB[entry.viewer]);
-        await VIEWER_CLASSES[entry.viewer].thumb(entry);
+      if (VIEWER_LIB[entry.viewer]) await lib(VIEWER_LIB[entry.viewer]);
+      const own = VIEWER_LIB[entry.viewer] && VIEWER_CLASSES[entry.viewer];
+      if (own && typeof own.thumb === 'function') {   // the newer formats make their own thumbnails
+        await own.thumb(entry);
       } else switch (entry.kind) {
         case 'pdf':   await thumbPdf(entry); break;
         case 'xlsx':  await thumbXlsx(entry); break;
@@ -731,8 +1055,13 @@ async function runThumbQueue() {
 }
 
 function putThumb(entry) {
+  if (entry.pvThumb && entry.pvThumb.isConnected && entry.thumbNode) {      // the preview column of the columns view
+    const c = cloneThumb(entry.thumbNode);
+    if (c) { entry.pvThumb.replaceChildren(c); fitPageThumbs(entry.pvThumb); }
+  }
   if (!entry.card || !entry.thumbNode) return;
   const thumb = entry.card.querySelector('.thumb');
+  if (!thumb) return;
   thumb.replaceChildren(entry.thumbNode, ...thumb.querySelectorAll('.tag, .card-queue'));   // picture + the buttons on top
   fitPageThumbs(thumb);
 }
@@ -887,19 +1216,20 @@ async function thumbText(entry) {
 }
 
 
-/* ----- Recent files: the last files opened from this folder (remembered with the place; travels with the drive) ----- */
-const RECENT_KEY = 'fv-recent', RECENT_SHOW = 4;
+/* ----- Recent files: the files opened lately from this folder (remembered with the place; travels with the drive) ----- */
+const RECENT_KEY = 'fv-recent', RECENT_SHOW = 12;
+const recentMap = () => { try { return JSON.parse(loadPref(RECENT_KEY, '{}')) || {}; } catch (e) { return {}; } };
 function recentTouch(entry) {                       // called when a file is opened
-  let map = {};
-  try { map = JSON.parse(loadPref(RECENT_KEY, '{}')) || {}; } catch (e) { map = {}; }
+  const map = recentMap();
   map[posKey(entry)] = { n: entry.name, t: Date.now() };
   const keys = Object.keys(map);
   if (keys.length > 40) keys.sort((a, b) => map[a].t - map[b].t).slice(0, keys.length - 40).forEach((k) => delete map[k]);
   savePref(RECENT_KEY, JSON.stringify(map));
   drivePush();
+  if (!M.el.hidden && M.body.classList.contains('recent-dialog')) renderRecentDialog();
 }
-function recentLabel(entry, saved) {                // the second line: where you stopped
-  if (!saved || saved.d) return (entry.ext || '').toUpperCase();
+function recentLabel(entry, saved) {                // where you stopped
+  if (!saved || saved.d) return '';
   if (entry.kind === 'video' || entry.kind === 'audio') {
     const s = Math.floor(saved.p), m = Math.floor(s / 60);
     return 'At ' + (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0');
@@ -907,26 +1237,95 @@ function recentLabel(entry, saved) {                // the second line: where yo
   if (!saved.n) return Math.round(saved.p * 100) + '% read';
   return (entry.kind === 'pptx' ? 'Slide ' : entry.kind === 'xlsx' ? 'Sheet ' : 'Page ') + (saved.p + 1) + ' of ' + saved.n;
 }
-function renderRecent() {
-  const box = $('recent');
-  let recent = {}, pos = {};
-  try { recent = JSON.parse(loadPref(RECENT_KEY, '{}')) || {}; pos = JSON.parse(loadPref('fv-pos', '{}')) || {}; } catch (e) { /* none */ }
-  const byKey = new Map(state.files.map((e) => [posKey(e), e]));
-  const items = Object.keys(recent).filter((k) => byKey.has(k) && !recent[k].d).sort((a, b) => recent[b].t - recent[a].t).slice(0, RECENT_SHOW);
-  const searching = !!$('search').value.trim();
-  box.hidden = !state.files.length || !items.length || searching;
-  if (box.hidden) return;
-  const hide = loadPref('fv-recent-hide', '0') === '1';
-  box.classList.toggle('collapsed', hide);
-  $('recentToggle').setAttribute('aria-expanded', String(!hide));
-  $('recentToggle').title = hide ? 'Show recent files' : 'Hide recent files';
-  $('recentList').replaceChildren(...items.map((k) => {
-    const entry = byKey.get(k);
-    const b = h('button', 'recent-item');
-    b.type = 'button'; b.title = 'Open ' + entry.name;
-    b.append(h('b', '', entry.name.replace(/\.[^.]+$/, '')), h('small', '', recentLabel(entry, pos[k])));
-    b.onclick = () => openCard(entry);
-    return b;
-  }));
+function agoText(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  if (m < 60 * 24) return Math.round(m / 60) + ' h ago';
+  if (m < 60 * 24 * 7) return Math.round(m / 1440) + ' d ago';
+  return shortDate(t);
 }
-$('recentToggle').onclick = () => { savePref('fv-recent-hide', loadPref('fv-recent-hide', '0') === '1' ? '0' : '1'); renderRecent(); };
+function recentItems() {
+  const recent = recentMap();
+  let pos = {};
+  try { pos = JSON.parse(loadPref('fv-pos', '{}')) || {}; } catch (e) { /* none */ }
+  const byKey = new Map(state.files.map((e) => [posKey(e), e]));
+  return Object.keys(recent).filter((k) => byKey.has(k) && !recent[k].d).sort((a, b) => recent[b].t - recent[a].t).slice(0, RECENT_SHOW)
+    .map((k) => ({ key: k, entry: byKey.get(k), t: recent[k].t, saved: pos[k] }));
+}
+function openRecent() { if (M.el.hidden) renderRecentDialog(true); else renderRecentDialog(); }
+function renderRecentDialog(first) {
+  const box = h('div');
+  box.appendChild(h('h2', 'modal-title', 'Recent files'));
+  const items = recentItems();
+  if (!items.length) {
+    const ghost = h('div', 'q-list q-ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 3; i++) {
+      const row = h('div', 'q-row'), name = h('span', 'q-name');
+      name.append(h('i', 'q-bar'), h('i', 'q-bar short'));
+      row.append(h('i', 'q-tag'), name);
+      ghost.appendChild(row);
+    }
+    box.appendChild(ghost);
+    box.appendChild(h('p', 'modal-text q-hint', 'Files you open will be listed here, with the place where you stopped'));
+  } else {
+    box.appendChild(h('p', 'modal-text', 'Click a file to open it again.'));
+    const list = h('div', 'q-list');
+    for (const it of items) {
+      const row = h('div', 'q-row r-row');
+      row.tabIndex = 0;
+      row.title = 'Open ' + it.entry.name;
+      const info = h('span', 'q-name');
+      info.append(h('b', '', it.entry.base), h('small', '', [recentLabel(it.entry, it.saved), agoText(it.t)].filter(Boolean).join(' · ')));
+      const x = h('button', 'vbtn vbtn-icon q-btn');
+      x.type = 'button'; x.title = 'Remove from the list'; x.setAttribute('aria-label', 'Remove from the list'); x.appendChild(icon('i-x'));
+      x.onclick = (ev) => { ev.stopPropagation(); const map = recentMap(); map[it.key] = { d: 1, t: Date.now() }; savePref(RECENT_KEY, JSON.stringify(map)); drivePush(); renderRecentDialog(); };
+      const go = () => { closeModal(); openViewer(it.entry); };
+      row.onclick = go;
+      row.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); go(); } };
+      row.append(h('span', 'tag tag-' + it.entry.kind, it.entry.tag), info, x);
+      list.appendChild(row);
+    }
+    box.appendChild(list);
+    const clear = h('button', 'btn q-clear-btn', 'Clear the list');
+    clear.type = 'button'; clear.title = 'Forget which files were opened (your places in them stay)';
+    clear.onclick = () => { const map = recentMap(), t = Date.now(); for (const k of Object.keys(map)) map[k] = { d: 1, t }; savePref(RECENT_KEY, JSON.stringify(map)); drivePush(); renderRecentDialog(); };
+    box.appendChild(h('div', 'q-clear-row')).appendChild(clear);
+  }
+  const actions = h('div', 'modal-actions');
+  const close = h('button', 'btn', 'Close');
+  close.type = 'button'; close.title = 'Close this window (Esc)'; close.onclick = closeModal;
+  actions.append(close);
+  box.appendChild(actions);
+  if (first) {
+    openModal(box, { cls: 'queue-dialog recent-dialog' });
+  } else {
+    const old = M.body.querySelector('.q-list'), top = old ? old.scrollTop : 0;
+    M.body.replaceChildren(box);
+    const now = M.body.querySelector('.q-list');
+    if (now) now.scrollTop = top;
+  }
+}
+$('btnRecent').onclick = openRecent;
+
+/* ----- Sticky header: slides away while scrolling down, returns at the first scroll up ----- */
+(function stickyBar() {
+  const bar = $('homebar');
+  let last = window.scrollY, away = false;
+  const setAway = (v) => { if (v !== away) { away = v; bar.classList.toggle('away', v); } };
+  const busy = () => !$('settings').hidden || !$('sortMenu').hidden || bar.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+  window.addEventListener('scroll', () => {
+    if (document.body.classList.contains('viewing')) return;
+    const y = Math.max(0, window.scrollY), dy = y - last;
+    last = y;
+    bar.classList.toggle('stuck', y > 4);
+    if (y < bar.offsetHeight) setAway(false);
+    else if (dy > 6 && !busy()) setAway(true);
+    else if (dy < -3) setAway(false);
+  }, { passive: true });
+  bar.addEventListener('focusin', () => setAway(false));
+  const setH = () => document.documentElement.style.setProperty('--hbh', bar.offsetHeight + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setH).observe(bar);
+  setH();
+})();

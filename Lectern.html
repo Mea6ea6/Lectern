@@ -84,6 +84,11 @@
     <symbol id="i-pause"    viewBox="0 0 24 24"><path d="M7 5v14M17 5v14" stroke-width="3.6"/></symbol>
     <symbol id="i-back5"    viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/><text x="12" y="15.6" text-anchor="middle" font-size="8.5" font-weight="800" stroke="none" fill="currentColor" style="font-family:Inter,sans-serif">5</text></symbol>
     <symbol id="i-fwd5"     viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/><text x="12" y="15.6" text-anchor="middle" font-size="8.5" font-weight="800" stroke="none" fill="currentColor" style="font-family:Inter,sans-serif">5</text></symbol>
+    <symbol id="i-view-icons" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+    <symbol id="i-view-list"  viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" /></symbol>
+    <symbol id="i-view-cols"  viewBox="0 0 24 24"><path d="M3.5 4.5h17v15h-17zM9.2 4.5v15M14.8 4.5v15"/></symbol>
+    <symbol id="i-history"    viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4.5v4.2h4.2M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-home"       viewBox="0 0 24 24"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5"/></symbol>
     <symbol id="i-queue"    viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h7M18 14v6M15 17h6"/></symbol>
     <symbol id="i-up"       viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
     <symbol id="i-down"     viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
@@ -102,6 +107,8 @@
 
 <!-- ============ HOME: file list ============ -->
 <div id="home">
+  <!-- Sticky header: the title bar, the toolbar and the folder path stay together; it slides away when you scroll down and comes back when you scroll up a little -->
+  <div class="homebar" id="homebar">
   <header class="topbar">
     <div class="brand">
       <h1>Lectern</h1>
@@ -111,43 +118,50 @@
       <span class="link-pill off" hidden><i class="dot"></i><span class="lp-text"></span></span>
       <button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button>
       <div class="anchor">
-        <button class="btn btn-icon" id="btnSettings" type="button" title="More" aria-label="More">
+        <button class="btn btn-icon" id="btnSettings" type="button" title="More" aria-label="More" aria-haspopup="true">
           <svg class="icon"><use href="#i-sliders"/></svg>
         </button>
-        <!-- The "More" menu of the home screen: file actions (shown once there are files), install, appearance -->
+        <!-- The "More" menu of the home screen, grouped like the one in the viewer -->
         <div class="popover" id="settings" hidden>
           <div id="headFiles" hidden>
+            <div class="menu-head">Files</div>
             <button class="menu-item reopen-btn" type="button" data-close hidden title="Open the folder from last time">
-              <svg class="icon"><use href="#i-folder"/></svg><span class="reopen-label">Reopen last folder</span>
+              <svg class="icon"><use href="#i-folder"/></svg><span class="grow reopen-label">Reopen last folder</span>
             </button>
             <button class="menu-item" id="btnFolder" type="button" data-close title="Choose another folder">
-              <svg class="icon"><use href="#i-folder"/></svg><span>Choose folder</span>
+              <svg class="icon"><use href="#i-folder"/></svg><span class="grow">Choose folder</span>
             </button>
             <button class="menu-item" id="btnFiles" type="button" data-close title="Add single files to the list">
-              <svg class="icon"><use href="#i-addfile"/></svg><span>Add files</span>
+              <svg class="icon"><use href="#i-addfile"/></svg><span class="grow">Add files</span>
             </button>
             <button class="menu-item" id="btnRefresh" type="button" data-close hidden title="Rescan the folder for new files">
-              <svg class="icon"><use href="#i-refresh"/></svg><span>Rescan folder</span>
+              <svg class="icon"><use href="#i-refresh"/></svg><span class="grow">Rescan folder</span>
+            </button>
+            <button class="menu-item" id="sFolders" type="button" aria-pressed="true" title="Show the folders of your files, or one flat list of everything">
+              <svg class="icon"><use href="#i-folder"/></svg><span class="grow">Show folders</span><span class="switch"></span>
             </button>
             <div class="menu-gap"></div>
           </div>
           <button class="menu-item" id="btnInstall" type="button" data-close hidden title="Install Lectern as an app">
-            <svg class="icon"><use href="#i-install"/></svg><span>Install as app</span>
+            <svg class="icon"><use href="#i-install"/></svg><span class="grow">Install as app</span>
           </button>
-          <div class="pop-row"><span class="pop-label">Theme</span>
+          <div class="menu-head">Appearance</div>
+          <div class="menu-row"><span class="menu-label">Theme</span>
             <div class="seg">
               <button type="button" data-theme-set="light" title="Light theme">Light</button>
               <button type="button" data-theme-set="dark" title="Dark theme">Dark</button>
             </div>
           </div>
-          <button class="menu-item" id="sFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
-            <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
+          <button class="menu-item" id="sLarge" type="button" aria-pressed="false" title="Bigger buttons and text, easier to read from the back of the room">
+            <svg class="icon"><use href="#i-plus"/></svg><span class="grow">Large interface</span><span class="switch"></span>
           </button>
           <button class="menu-item" id="sHints" type="button" aria-pressed="true" title="Show or hide the tips at the bottom of the page">
             <svg class="icon"><use href="#i-info"/></svg><span class="grow">Show tips</span><span class="switch"></span>
           </button>
-          <button class="menu-item" id="sLarge" type="button" aria-pressed="false" title="Bigger buttons and text, easier to read from the back of the room">
-            <svg class="icon"><use href="#i-plus"/></svg><span class="grow">Large interface</span><span class="switch"></span>
+          <div class="menu-gap"></div>
+          <div class="menu-head">Window</div>
+          <button class="menu-item" id="sFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
+            <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
           </button>
           <button class="menu-item" id="sDrive" type="button" aria-pressed="false" title="Save your place, bookmarks, zoom, drawings and settings next to your files, so they travel with the flash drive (Chrome / Edge)">
             <svg class="icon"><use href="#i-folder"/></svg><span class="grow"><span>Keep place on the drive</span><small class="menu-sub" id="sDriveSub" hidden></small></span><span class="switch"></span>
@@ -157,41 +171,53 @@
     </div>
   </header>
 
-  <!-- One row: sort + filter on the left, search in the middle (takes the free width), queue on the right -->
+  <!-- One row, left to right: how the files are shown · how they are ordered · search · what you will show -->
   <div class="toolbar" id="toolbar" hidden>
-    <div class="dd" id="sortDD">
-      <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sort the files">
-        <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
+    <div class="tb-group" id="tbView">
+      <div class="seg tb-seg" id="viewSeg" role="group" aria-label="View">
+        <button type="button" data-view="icons" aria-pressed="true" title="Icons" aria-label="Icons"><svg class="icon"><use href="#i-view-icons"/></svg></button>
+        <button type="button" data-view="list" aria-pressed="false" title="List" aria-label="List"><svg class="icon"><use href="#i-view-list"/></svg></button>
+        <button type="button" data-view="columns" aria-pressed="false" title="Columns" aria-label="Columns"><svg class="icon"><use href="#i-view-cols"/></svg></button>
+      </div>
+      <button class="btn btn-icon tb-folders" id="btnFolders" type="button" aria-pressed="true" title="Show folders" aria-label="Show folders">
+        <svg class="icon"><use href="#i-folder"/></svg>
+      </button>
+    </div>
+    <div class="tb-group">
+      <div class="dd" id="sortDD">
+        <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sort the files">
+          <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
+          <svg class="icon"><use href="#i-chev"/></svg>
+        </button>
+        <div class="dd-menu" id="sortMenu" role="listbox" hidden>
+          <button type="button" role="option" data-sort="name" title="Sort by name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
+          <button type="button" role="option" data-sort="date" title="Newest files first"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
+          <button type="button" role="option" data-sort="size" title="Largest files first"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
+          <button type="button" role="option" data-sort="type" title="Group by file type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
+        </div>
+      </div>
+      <button class="btn dd-btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="chipsWrap" title="Show file types">
+        <span class="dd-cap">Filter</span><span class="dd-val" id="filterVal">All</span>
         <svg class="icon"><use href="#i-chev"/></svg>
       </button>
-      <div class="dd-menu" id="sortMenu" role="listbox" hidden>
-        <button type="button" role="option" data-sort="name" title="Sort by name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
-        <button type="button" role="option" data-sort="date" title="Newest files first"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
-        <button type="button" role="option" data-sort="size" title="Largest files first"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
-        <button type="button" role="option" data-sort="type" title="Group by file type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
-      </div>
     </div>
-    <button class="btn dd-btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="chipsWrap" title="Show file types">
-      <span class="dd-cap">Filter</span><span class="dd-val" id="filterVal">All</span>
-      <svg class="icon"><use href="#i-chev"/></svg>
-    </button>
     <label class="search" title="Search by name">
       <svg class="icon"><use href="#i-search"/></svg>
       <input id="search" type="search" placeholder="Search by name" autocomplete="off">
     </label>
-    <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
-      <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
-    </button>
+    <div class="tb-group">
+      <button class="btn" id="btnRecent" type="button" hidden title="Files you opened lately">
+        <svg class="icon"><use href="#i-history"/></svg><span>Recent</span>
+      </button>
+      <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
+        <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
+      </button>
+    </div>
   </div>
   <!-- The file-type chips slide open under the toolbar when the Filter button is pressed (closed by default) -->
   <div class="chips-wrap" id="chipsWrap" aria-hidden="true"><div class="chips-in"><div class="chips" id="chips"></div></div></div>
-
-  <!-- Recently opened files of the folder: one quiet row, can be collapsed (the choice is remembered) -->
-  <div class="recent" id="recent" hidden>
-    <button class="recent-toggle" id="recentToggle" type="button" aria-expanded="true" title="Hide recent files">
-      <svg class="icon"><use href="#i-chev"/></svg><span>Recent</span>
-    </button>
-    <div class="recent-list" id="recentList"></div>
+  <!-- Where you are inside the folders -->
+  <nav class="crumbs" id="crumbs" aria-label="Folder path" hidden></nav>
   </div>
 
   <main>
@@ -411,6 +437,7 @@
 
   <!-- “More” menu -->
   <div class="menu" id="vMenu" hidden>
+    <div class="menu-head media-only">Playback</div>
     <div class="menu-row media-only">
       <span class="menu-label">Speed</span>
       <div class="stepper">
@@ -429,6 +456,7 @@
       <svg class="icon"><use href="#i-repeat"/></svg><span class="grow">Repeat</span><span class="switch"></span>
     </button>
     <div class="menu-gap media-only"></div>
+    <div class="menu-head doc-only">View</div>
     <div class="menu-row doc-only">
       <span class="menu-label">Zoom</span>
       <div class="stepper">
@@ -452,6 +480,7 @@
       </div>
     </div>
     <div class="menu-gap doc-only"></div>
+    <div class="menu-head">Tools</div>
     <button class="menu-item" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
       <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
     </button>
@@ -468,6 +497,7 @@
       <svg class="icon"><use href="#i-presenter"/></svg><span class="grow" id="mPresenterText">Presenter view</span><kbd>P</kbd>
     </button>
     <div class="menu-gap"></div>
+    <div class="menu-head">Window</div>
     <button class="menu-item" id="mFull" type="button" aria-pressed="false" title="Hide the browser's bars (Esc to leave)">
       <svg class="icon"><use href="#i-full"/></svg><span class="grow">Fullscreen window</span><span class="switch"></span>
     </button>

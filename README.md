@@ -11,7 +11,7 @@ Open presentations, PDFs, documents, spreadsheets, photos, video and more straig
 
 <a href="https://github.com/Mea6ea6/Lectern/raw/main/downloads/Lectern-v1.0.0.zip"><img src="https://img.shields.io/badge/%E2%AC%87%20Download%20for%20flash%20drive-Lectern%20v1.0.0%20(zip)-1c1c1c?style=for-the-badge" alt="Download Lectern v1.0.0 for a flash drive"></a>
 &nbsp;
-<a href="https://lectern-wheat.vercel.app"><img src="https://img.shields.io/badge/Open%20in%20the%20browser-lectern--blush.vercel.app-ffffff?style=for-the-badge&labelColor=ffffff&color=ffffff&logoColor=1c1c1c" alt="Open Lectern in the browser"></a>
+<a href="https://lectern-wheat.vercel.app"><img src="https://img.shields.io/badge/Open%20in%20the%20browser-lectern--wheat.vercel.app-ffffff?style=for-the-badge&labelColor=ffffff&color=ffffff&logoColor=1c1c1c" alt="Open Lectern in the browser"></a>
 
 <sub>Unzip, copy the <code>Lectern</code> folder to a flash drive, double-click <code>Lectern.html</code>. The zip also has <code>HOW-TO-USE.txt</code>.</sub>
 
@@ -162,9 +162,19 @@ With a mouse, the bars stay hidden in fullscreen: move the pointer to the top or
 
 Swipes and pinches are handled by Lectern itself. A swipe that lands as two contacts (finger plus knuckle or palm) is a swipe, not a zoom: the page is zoomed only when the fingers really move apart or together. Inside the page everything inherits `touch-action: pan-y`, so the browser does not take swipes over or zoom the whole page.
 
+## Folders and views
+
+Files keep the folder they were in. With **Show folders** on (the folder button next to the view switch, or More → Show folders) the home screen shows one folder at a time, folders first, with a path bar above (Backspace or Alt+← goes one folder up). Turn it off for one flat list of everything. Searching always looks through all folders; the file's full path from the chosen folder is shown in its Details. Three views, remembered between launches:
+
+- **Icons** — cards with a preview;
+- **List** — one row per file: type, name, date, size;
+- **Columns** — like the Finder: one column per opened folder and a preview with Open / Add to queue on the right.
+
+The header (title, view, sort, filter, search, Recent, Queue) stays on top, slides away while you scroll down and comes back at the first scroll up. Controls that cannot work in the current situation (for example "Keep place on the drive" without a chosen folder, or "Presenter view" for a picture) are not shown.
+
 ## Recent files
 
-When a folder is open, one quiet row above the files shows the last few files you opened from it, with the place you stopped at ("Slide 20 of 55"). Click one to open it. The small **Recent** button at the left of the row folds it away; the choice is remembered. The row is hidden while you search. The list travels with the drive when "Keep place on the drive" is on.
+The **Recent** button (left of Queue) opens a list of the last files you opened from the folder, with the place you stopped at ("Slide 20 of 55") and when. Click a file to open it again; the cross removes it, "Clear the list" forgets them all. The list travels with the drive when "Keep place on the drive" is on.
 
 ## Keep place on the drive
 

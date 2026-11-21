@@ -396,7 +396,7 @@ document.addEventListener('keydown', (e) => {
   document.body.classList.add('kbd-nav');             // the selected card is only drawn while the keyboard is in use (see style.css)
   switch (e.key) {
     case 'ArrowRight': e.preventDefault(); return moveSelection(1, 0);
-    case 'ArrowLeft':  e.preventDefault(); return moveSelection(-1, 0);
+    case 'ArrowLeft':  e.preventDefault(); if (e.altKey) return state.view !== 'columns' && foldersOn() ? folderUp() : undefined; return moveSelection(-1, 0);
     case 'ArrowDown':  e.preventDefault(); return moveSelection(0, 1);
     case 'ArrowUp':    e.preventDefault(); return moveSelection(0, -1);
     case ' ': {                                  // Space = details (like Quick Look)
@@ -404,11 +404,13 @@ document.addEventListener('keydown', (e) => {
       if (entry) { e.preventDefault(); openInfo(entry); }
       return;
     }
-    case 'Enter': {                              // Enter = open the file
-      const entry = selectedEntry();
-      if (entry) { e.preventDefault(); openCard(entry); }
+    case 'Enter': {                              // Enter = open the file (a folder: go into it)
+      if (activateSelected()) e.preventDefault();
       return;
     }
+    case 'Backspace':                            // one folder up
+      if (state.view !== 'columns' && foldersOn() && state.path.length) { e.preventDefault(); folderUp(); }
+      return;
     case '/': e.preventDefault(); $('search').focus(); return;
   }
   if (e.code === 'KeyQ') {                       // Q = add / remove the selected file in the class queue

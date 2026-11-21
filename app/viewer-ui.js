@@ -121,7 +121,6 @@ function closeViewer() {
   setImmersive(false);
   closeDriver();
   V.entry = null;
-  renderRecent();
   Link.key = 0; linkPush();
   V.el.classList.remove('is-media');
   V.el.hidden = true;
@@ -330,8 +329,8 @@ function updateMediaBar(d) {
   $('mCC').hidden = !d.hasSubs;
   $('mCC').setAttribute('aria-pressed', String(d.subsOn));
   $('mSubs').setAttribute('aria-pressed', String(d.subsOn));
-  $('mSubs').disabled = !d.hasSubs;
-  $('mSubsFile').disabled = !d.hasPicture;
+  $('mSubs').hidden = !d.hasSubs;
+  $('mSubsFile').hidden = !d.hasPicture;
   $('mLoop').setAttribute('aria-pressed', String(d.loop));
   $('mInk').hidden = !d.canDraw;
   $('mInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
@@ -396,7 +395,7 @@ function updateBar() {
   $('vInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
   Marks.refresh();
   notesRefresh();
-  $('mPresenter').disabled = !(presenterOn() || (ready && presentable()));
+  if (typeof syncPresenterItem === 'function') syncPresenterItem();
   linkPush();
 
   // Video / audio: play button, big play button
@@ -414,7 +413,8 @@ function updateBar() {
     b.setAttribute('aria-pressed', String(b.dataset.fit === V.view.fit));
     b.disabled = !ready || !d.canFit;
   });
-  $('mRotL').disabled = $('mRotR').disabled = !ready || !d.canRotate;
+  $('mRotL').closest('.menu-row').hidden = !(ready && d.canRotate);          // what a file can't do is not offered
+  document.querySelector('[data-fit]').closest('.menu-row').hidden = !(ready && d.canFit);
   $('mAwake').setAttribute('aria-pressed', String(V.awake));
   $('mAnim').setAttribute('aria-pressed', String(V.pageAnim));
 }
@@ -663,10 +663,7 @@ async function updateWakeLock() {
   } catch (err) { /* the browser said no — nothing to do */ }
 }
 document.addEventListener('visibilitychange', updateWakeLock);
-if (!navigator.wakeLock) {
-  $('mAwake').disabled = true;
-  $('mAwakeText').textContent = 'Keep screen on (not supported here)';
-}
+if (!navigator.wakeLock) $('mAwake').hidden = true;           // this browser can't keep the screen on: no switch
 
 /* ----- Buttons ----- */
 // After any click the page gets the focus back, so Space and arrows keep turning pages

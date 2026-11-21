@@ -175,7 +175,7 @@ function notesFill() {
 }
 function notesRefresh() {
   const d = V.driver, has = !!d && !!d.hasNotes && $('vMsg').hidden;
-  $('mNotes').disabled = !has;
+  $('mNotes').hidden = !has || (typeof Link !== 'undefined' && Link.role === 'companion');
   if (Notes.open && !has) notesToggle(false);
   else notesFill();
 }

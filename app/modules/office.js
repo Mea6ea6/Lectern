@@ -94,18 +94,18 @@ const OFC = (() => {
 
   /* ----- text measuring for wrapped labels ----- */
   let measureCtx = null;
-  function textWidth(text, size, bold) {
+  function textWidth(text, size, bold, font) {
     if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-    measureCtx.font = (bold ? 'bold ' : '') + size + 'px Arial, Helvetica, sans-serif';
+    measureCtx.font = (bold ? 'bold ' : '') + size + 'px ' + (font ? '"' + font + '", serif' : 'Arial, Helvetica, sans-serif');
     return measureCtx.measureText(text).width;
   }
-  function wrapText(text, size, maxW, bold) {
+  function wrapText(text, size, maxW, bold, font) {
     const lines = [];
     for (const para of String(text).split('\n')) {
       let line = '';
       for (const word of para.split(/\s+/).filter(Boolean)) {
         const t = line ? line + ' ' + word : word;
-        if (line && textWidth(t, size, bold) > maxW) { lines.push(line); line = word; } else line = t;
+        if (line && textWidth(t, size, bold, font) > maxW) { lines.push(line); line = word; } else line = t;
       }
       lines.push(line);
     }
@@ -402,19 +402,20 @@ const OFC = (() => {
       // text
       const paras = (s.paras || []).filter((p) => p.text !== undefined);
       if (paras.some((p) => p.text.trim())) {
-        const inset = 7, maxW = Math.max(10, w - inset * 2);
+        const inset = s.word ? 9.6 : 7, insetY = s.word ? 4.8 : 7, maxW = Math.max(10, w - inset * 2);
         let lines = [];
         for (const p of paras) {
           const size = p.size || 14, color = p.color || '#222';
-          const wr = p.text.trim() ? wrapText(p.text, size, maxW, p.bold) : [''];
-          for (const ln of wr) lines.push({ ln, size, color, bold: p.bold, align: p.align || s.align || 'l' });
+          const wr = p.text.trim() ? wrapText(p.text, size, maxW, p.bold, p.font) : [''];
+          wr.forEach((ln, k) => lines.push({ ln, size, color, bold: p.bold, font: p.font, align: p.align || s.align || 'l', before: k ? 0 : (p.before || 0), after: k === wr.length - 1 ? (p.after || 0) : 0 }));
         }
-        const lh = (l) => l.size * 1.25, total = lines.reduce((a, l) => a + lh(l), 0);
-        let y = s.anchor === 'b' ? h - inset - total : s.anchor === 't' ? inset : (h - total) / 2;
+        const lh = (l) => l.size * (s.word ? 1.15 : 1.25) + l.before + l.after, total = lines.reduce((a, l) => a + lh(l), 0);
+        let y = s.anchor === 'b' ? h - insetY - total : s.anchor === 't' ? insetY : (h - total) / 2;
         for (const l of lines) {
-          y += lh(l);
+          y += l.before + l.size * (s.word ? 1.15 : 1.25);
           const x = l.align === 'ctr' ? w / 2 : l.align === 'r' ? w - inset : inset, an = l.align === 'ctr' ? 'middle' : l.align === 'r' ? 'end' : 'start';
-          if (l.ln) g += '<text x="' + x + '" y="' + (y - l.size * 0.27) + '" text-anchor="' + an + '" font-size="' + l.size + '" ' + (l.bold ? 'font-weight="bold" ' : '') + 'fill="' + l.color + '" font-family="Arial, Helvetica, sans-serif">' + esc(l.ln) + '</text>';
+          if (l.ln) g += '<text x="' + x + '" y="' + (y - l.size * 0.27) + '" text-anchor="' + an + '" font-size="' + l.size + '" ' + (l.bold ? 'font-weight="bold" ' : '') + 'fill="' + l.color + '" font-family="' + (l.font ? esc(l.font) + ', serif' : 'Arial, Helvetica, sans-serif') + '">' + esc(l.ln) + '</text>';
+          y += l.after;
         }
       }
       out.push(g + '</g></g>');
@@ -422,12 +423,14 @@ const OFC = (() => {
     return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + out.join('') + '</svg>';
   }
   // Reads text paragraphs of a txBody / txbxContent into [{ text, size, bold, color, align }]
-  function readParas(body, theme) {
+  function readParas(body, theme, sc) {
     const out = [];
     for (const p of all(body, 'p')) {
       if (p.parentNode && p.parentNode.localName === 'p') continue;
       const runs = all(p, 'r').filter((r) => r.parentNode === p || true);
-      let text = '', size = 0, bold = false, color = null;
+      let text = '', size = 0, bold = false, color = null, font = '';
+      const ppr0 = kid(p, 'pPr'), sid = ppr0 && kid(ppr0, 'pStyle') ? attr(kid(ppr0, 'pStyle'), 'val', null) : null;
+      const st = sc ? sc.resolve(sid) : null;
       for (const r of runs) {
         const t = kid(r, 't'); if (!t) continue;
         text += t.textContent;
@@ -435,13 +438,25 @@ const OFC = (() => {
         if (rp) {
           const sz = num(rp.getAttribute('sz'), 0) / 100 || num(attr(kid(rp, 'sz'), 'val'), 0) / 2;       // DrawingML: 1/100 pt · Word: half-points
           if (sz && !size) size = sz * 96 / 72;
+          const rf = kid(rp, 'rFonts'); if (rf && !font) font = attr(rf, 'ascii', '') || attr(rf, 'hAnsi', '');
           if (rp.getAttribute('b') === '1' || (kid(rp, 'b') && attr(kid(rp, 'b'), 'val', '1') !== '0')) bold = true;
           if (!color) { const f = kid(rp, 'solidFill'); color = f ? colorOf(f, theme) : null; const wc = kid(rp, 'color'), wv = attr(wc, 'val', null); if (!color && wv && wv !== 'auto') color = '#' + wv; }
         }
       }
       if (all(p, 'br').length) text += '\n'.repeat(all(p, 'br').length);        // line breaks inside a paragraph
-      const ppr = kid(p, 'pPr'), jc = ppr && (attr(ppr, 'algn', null) || attr(kid(ppr, 'jc'), 'val', null));
-      out.push({ text, size, bold, color, align: jc === 'ctr' || jc === 'center' ? 'ctr' : jc === 'r' || jc === 'right' ? 'r' : 'l' });
+      const ppr = kid(p, 'pPr'); let jc = ppr && (attr(ppr, 'algn', null) || attr(kid(ppr, 'jc'), 'val', null));
+      let before = 0, after = 0;
+      if (st) {                                                       // what the paragraph style and the document defaults say
+        if (!size && st.size) size = st.size * 96 / 72;
+        if (!bold && st.bold) bold = true;
+        if (!font) font = st.font || '';
+        before = st.before; after = st.after;
+        if (!jc && st.jc) jc = st.jc;
+      }
+      const sp = ppr && kid(ppr, 'spacing');
+      if (sp) { if (attr(sp, 'before', null) !== null) before = num(attr(sp, 'before', 0), 0) / 15; if (attr(sp, 'after', null) !== null) after = num(attr(sp, 'after', 0), 0) / 15; }
+      font = String(font || '').replace(/\s+(Bold|Regular|Italic|Light|Medium|Semibold|Black)$/i, '');
+      out.push({ text, size, bold, color, font, before, after, align: jc === 'ctr' || jc === 'center' ? 'ctr' : jc === 'r' || jc === 'right' ? 'r' : 'l' });
     }
     return out;
   }
@@ -456,7 +471,7 @@ const OFC = (() => {
     };
   }
   // Collects the shapes of a wps:wsp / wpg:wgp / dsp:drawing node, in the coordinates of the outermost box
-  function collectShapes(root, theme, out, map) {
+  function collectShapes(root, theme, out, map, sc) {
     map = map || { sx: 1, sy: 1, dx: 0, dy: 0 };
     for (const n of Array.from(root.children)) {
       const ln = n.localName;
@@ -464,7 +479,7 @@ const OFC = (() => {
         const gp = kid(n, 'grpSpPr'), xf = xfrmOf(gp);
         let m = map;
         if (xf && xf.cw && xf.ch) { const sx = xf.w / xf.cw, sy = xf.h / xf.ch; m = { sx: map.sx * sx, sy: map.sy * sy, dx: map.dx + map.sx * (xf.x - xf.cx * sx), dy: map.dy + map.sy * (xf.y - xf.cy * sy) }; }
-        collectShapes(n, theme, out, m);
+        collectShapes(n, theme, out, m, sc);
       } else if (ln === 'wsp' || ln === 'sp' || ln === 'cxnSp') {
         const sp = kid(n, 'spPr'), xf = xfrmOf(sp);
         if (!xf) continue;
@@ -477,13 +492,13 @@ const OFC = (() => {
         out.push({
           x: map.dx + xf.x * map.sx, y: map.dy + xf.y * map.sy, w: xf.w * map.sx, h: xf.h * map.sy, rot: xf.rot, flipH: xf.flipH, flipV: xf.flipV,
           prst: geom ? geom.getAttribute('prst') : (ln === 'cxnSp' ? 'line' : 'rect'), fill: ln === 'cxnSp' ? 'none' : fill, line, lineW: lnNode ? num(lnNode.getAttribute('w'), 12700) / EMU : 1,
-          paras: body ? readParas(body, theme) : [], anchor: anc === 'b' ? 'b' : anc === 't' ? 't' : 'ctr',
+          paras: body ? readParas(body, theme, sc) : [], word: ln === 'wsp', anchor: anc === 'b' ? 'b' : anc === 't' ? 't' : (ln === 'wsp' && !anc ? 't' : 'ctr'),
         });
       } else if (ln === 'pic') { /* pictures inside groups are left out */ }
     }
   }
 
-  async function svgToPng(svg, W, H, scale) {
+  async function svgToPng(svg, W, H, scale, clear) {
     const img = new Image();
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     try {
@@ -491,8 +506,68 @@ const OFC = (() => {
       const cv = document.createElement('canvas');
       cv.width = Math.round(W * scale); cv.height = Math.round(H * scale);
       const cx = cv.getContext('2d');
-      cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+      if (!clear) { cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); }
       cx.drawImage(img, 0, 0, cv.width, cv.height);
+      const blob = await new Promise((ok) => cv.toBlob(ok, 'image/png'));
+      return new Uint8Array(await blob.arrayBuffer());
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+
+  // The paragraph styles of a .docx (font, size, bold, spacing), resolved through "based on" — text boxes drawn as pictures need them
+  function styleContext(stylesXml) {
+    const doc = stylesXml ? parse(stylesXml) : null;
+    const byId = new Map();
+    let def = { font: '', size: 0 };
+    if (doc && !first(doc, 'parsererror')) {
+      const dd = first(doc, 'docDefaults'), rf = dd && first(dd, 'rFonts'), sz = dd && first(dd, 'sz');
+      def = { font: rf ? (attr(rf, 'ascii', '') || attr(rf, 'hAnsi', '')) : '', size: sz ? num(attr(sz, 'val', 0), 0) / 2 : 0 };
+      for (const st of all(doc, 'style')) if (attr(st, 'type', '') === 'paragraph') byId.set(attr(st, 'styleId', ''), st);
+    }
+    const normal = Array.from(byId.values()).find((st) => st.getAttribute('w:default') === '1' || st.getAttribute('default') === '1');
+    const cache = new Map();
+    function own(st) {
+      const rp = kid(st, 'rPr'), pp = kid(st, 'pPr'), rf = rp && kid(rp, 'rFonts'), sz = rp && kid(rp, 'sz'), b = rp && kid(rp, 'b'), sp = pp && kid(pp, 'spacing'), jc = pp && kid(pp, 'jc');
+      return {
+        font: rf ? (attr(rf, 'ascii', '') || attr(rf, 'hAnsi', '')) : '', size: sz ? num(attr(sz, 'val', 0), 0) / 2 : 0,
+        bold: b ? attr(b, 'val', '1') !== '0' : null,
+        before: sp && attr(sp, 'before', null) !== null ? num(attr(sp, 'before', 0), 0) / 15 : null, after: sp && attr(sp, 'after', null) !== null ? num(attr(sp, 'after', 0), 0) / 15 : null,
+        jc: jc ? attr(jc, 'val', null) : null,
+      };
+    }
+    function chain(id, depth) {
+      const st = byId.get(id);
+      if (!st || depth > 8) return {};
+      const base = kid(st, 'basedOn') ? chain(attr(kid(st, 'basedOn'), 'val', ''), depth + 1) : {}, me = own(st), out = { ...base };
+      for (const k of Object.keys(me)) if (me[k] !== null && me[k] !== 0 && me[k] !== '') out[k] = me[k];
+      return out;
+    }
+    return {
+      resolve(id) {
+        const key = id || '';
+        if (!cache.has(key)) {
+          const nm = normal ? chain(attr(normal, 'styleId', ''), 0) : {}, me = id ? chain(id, 0) : {}, m = { ...nm, ...me };
+          cache.set(key, { font: m.font || def.font, size: m.size || def.size || 10, bold: !!m.bold, before: m.before || 0, after: m.after || 0, jc: m.jc || null });
+        }
+        return cache.get(key);
+      },
+    };
+  }
+  // <a:lum bright contrast> on a picture (Word's "washout" / brightness): applied to the pixels, since the viewer ignores it
+  async function lumPng(bytes, bright, contrast) {
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([bytes]));
+    try {
+      await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error('img')); img.src = url; });
+      const cv = document.createElement('canvas');
+      cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      const cx = cv.getContext('2d');
+      cx.drawImage(img, 0, 0);
+      const d = cx.getImageData(0, 0, cv.width, cv.height), px = d.data;
+      const lut = new Uint8ClampedArray(256);
+      for (let i = 0; i < 256; i++) lut[i] = Math.round(((i / 255 - 0.5) * (1 + contrast) + 0.5 + bright) * 255);
+      for (let i = 0; i < px.length; i += 4) { px[i] = lut[px[i]]; px[i + 1] = lut[px[i + 1]]; px[i + 2] = lut[px[i + 2]]; }
+      cx.putImageData(d, 0, 0);
       const blob = await new Promise((ok) => cv.toBlob(ok, 'image/png'));
       return new Uint8Array(await blob.arrayBuffer());
     } finally { URL.revokeObjectURL(url); }
@@ -528,6 +603,7 @@ const OFC = (() => {
     const theme = themeColors(zip.file('word/theme/theme1.xml') ? await zip.file('word/theme/theme1.xml').async('string') : '');
     const doc = parse(docXml);
     if (first(doc, 'parsererror')) return buf;
+    const sc = styleContext(zip.file('word/styles.xml') ? await zip.file('word/styles.xml').async('string') : '');
 
     // Word keeps shapes inside mc:AlternateContent; use the modern (Choice) version when we can draw it
     for (const ac of all(doc, 'AlternateContent')) {
@@ -540,6 +616,7 @@ const OFC = (() => {
     }
 
     let n = 0;
+    const floats = new Map();
     const drawings = all(doc, 'drawing');
     for (const dr of drawings) {
       const holder = kid(dr, 'inline') || kid(dr, 'anchor');
@@ -556,16 +633,30 @@ const OFC = (() => {
           if (f) svg = chartSvg(await f.async('string'), theme, W, H);
         } else if (/wordprocessingShape$/.test(uri) || /wordprocessingGroup$/.test(uri)) {
           const list = [], top = gd.firstElementChild;
+          // Word text boxes flow text around themselves; the viewer would leave the picture in the line, so it is placed by its offsets instead
+          for (const w of ['wrapSquare', 'wrapTight', 'wrapThrough']) {
+            const wn = kid(holder, w);
+            if (wn && kid(holder, 'positionH') && first(kid(holder, 'positionH'), 'posOffset')) {
+              wn.parentNode.replaceChild(doc.createElementNS(wn.namespaceURI, 'wp:wrapNone'), wn);
+              let par = holder.parentNode; while (par && par.localName !== 'p') par = par.parentNode;
+              if (par) {                                                    // remember how much room the box takes below its paragraph
+                const rec = floats.get(par) || { w: 0, bottom: 0 }, pv = kid(holder, 'positionV');
+                const offV = pv && attr(pv, 'relativeFrom', '') === 'paragraph' && first(pv, 'posOffset') ? num(first(pv, 'posOffset').textContent, 0) / EMU * 0.75 : 0;
+                rec.w += W * 0.75; rec.bottom = Math.max(rec.bottom, offV + H * 0.75 + num(holder.getAttribute('distB'), 0) / EMU * 0.75);
+                floats.set(par, rec);
+              }
+            }
+          }
           if (top && top.localName === 'wsp') {
             // a single shape fills its whole box
             const sp = kid(top, 'spPr'), xf = xfrmOf(sp);
-            const one = []; collectShapes(gd, theme, one);
+            const one = []; collectShapes(gd, theme, one, null, sc);
             if (one.length && xf) { one[0].x = 0; one[0].y = 0; one[0].w = W; one[0].h = H; }
             list.push(...one);
           } else if (top) {
             const gx = xfrmOf(kid(top, 'grpSpPr'));
             const m = gx && gx.cw && gx.ch ? { sx: W / gx.cw, sy: H / gx.ch, dx: -gx.cx * (W / gx.cw), dy: -gx.cy * (H / gx.ch) } : { sx: 1, sy: 1, dx: 0, dy: 0 };
-            collectShapes(top, theme, list, m);
+            collectShapes(top, theme, list, m, sc);
           }
           if (list.length) svg = shapesSvg(list, W, H);
         } else if (/diagram$/.test(uri)) {
@@ -582,7 +673,7 @@ const OFC = (() => {
       } catch (err) { console.warn('Drawing skipped', err); svg = null; }
       if (!svg) continue;
       let png;
-      try { png = await svgToPng(svg, W, H, 2); } catch (err) { continue; }
+      try { png = await svgToPng(svg, W, H, 2, /wordprocessing/.test(uri)); } catch (err) { continue; }
       const name = 'lectern_draw' + (++n) + '.png', rid = 'rIdLectern' + n;
       zip.file('word/media/' + name, png);
       const rel = rels.createElementNS(rels.documentElement.namespaceURI, 'Relationship');
@@ -592,6 +683,36 @@ const OFC = (() => {
       gd.setAttribute('uri', NS.pic);
       gd.replaceChildren(doc.importNode(pic, true));
       changed = true;
+    }
+    // Text can't flow beside boxes that span the line, so in Word the lines after them start below: the same room is added after the paragraph
+    if (floats.size) {
+      const sect = all(doc, 'sectPr').pop(), pg = sect && first(sect, 'pgSz'), mar = sect && first(sect, 'pgMar');
+      const textW = ((pg ? num(attr(pg, 'w', 11906), 11906) : 11906) - (mar ? num(attr(mar, 'left', 1440), 1440) + num(attr(mar, 'right', 1440), 1440) : 2880)) / 20;
+      for (const [par, rec] of floats) {
+        if (rec.w < textW * 0.55) continue;
+        let ppr = kid(par, 'pPr');
+        if (!ppr) { ppr = doc.createElementNS(par.namespaceURI, 'w:pPr'); par.insertBefore(ppr, par.firstChild); }
+        let sp = kid(ppr, 'spacing');
+        if (!sp) { sp = doc.createElementNS(par.namespaceURI, 'w:spacing'); ppr.appendChild(sp); }
+        sp.setAttributeNS(par.namespaceURI, 'w:after', String(Math.round(num(attr(sp, 'after', 0), 0) + Math.max(0, rec.bottom - 18) * 20)));
+        changed = true;
+      }
+    }
+    for (const lum of all(doc, 'lum')) {                         // brightness / contrast of a picture
+      const blip = lum.parentNode, rid = blip && (blip.getAttributeNS(NS.r, 'embed') || blip.getAttribute('r:embed')), path = rid && relTarget(rid), f = path && zip.file(path);
+      if (!f || !blip || blip.localName !== 'blip') continue;
+      const bright = num(lum.getAttribute('bright'), 0) / 100000, contrast = num(lum.getAttribute('contrast'), 0) / 100000;
+      if (!bright && !contrast) continue;
+      try {
+        const out = await lumPng(await f.async('uint8array'), bright, contrast);
+        const name = 'lectern_lum' + (++n) + '.png', nid = 'rIdLectern' + n;
+        zip.file('word/media/' + name, out);
+        const rel = rels.createElementNS(rels.documentElement.namespaceURI, 'Relationship');
+        rel.setAttribute('Id', nid); rel.setAttribute('Type', NS.r + '/image'); rel.setAttribute('Target', 'media/' + name);
+        rels.documentElement.appendChild(rel);
+        blip.setAttributeNS(NS.r, 'r:embed', nid);
+        blip.removeChild(lum); changed = true;
+      } catch (err) { console.warn('Picture brightness skipped', err); }
     }
     if (n) {
       zip.file('word/_rels/document.xml.rels', new XMLSerializer().serializeToString(rels));

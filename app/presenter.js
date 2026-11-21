@@ -32,6 +32,8 @@ const Link = {
 try { if ('BroadcastChannel' in window) Link.ch = new BroadcastChannel('lectern-link'); } catch (e) { /* no link then */ }
 
 const presenterOn = () => Link.role === 'presenter' && Link.alive && Link.peerRole === 'companion';
+// "Presenter view" is only offered when it can work: this browser can link two windows, and the open file is a PDF or a presentation
+function syncPresenterItem() { $('mPresenter').hidden = !Link.ch || Link.role === 'companion' || !(presenterOn() || (V.driver && presentable())); }
 const presentable = () => !!V.entry && !!V.driver && (V.entry.viewer === 'pdf' || V.entry.viewer === 'pptx') && V.driver.count > 0;
 
 /* ----- Presenter window ----- */
@@ -231,7 +233,7 @@ function linkUi() {
   }
   $('mPresenterText').textContent = presenterOn() ? 'Stop presenter view' : 'Presenter view';
   $('mPresenter').dataset.tip = presenterOn() ? 'Close the second window (P)' : 'Presenter view: a second window (P)';
-  $('mPresenter').disabled = !(presenterOn() || (V.driver && presentable()));
+  syncPresenterItem();
   pvRender();
 }
 

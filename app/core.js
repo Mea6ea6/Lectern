@@ -392,6 +392,8 @@ function addFiles(list, replace) {
     const have = new Set(state.files.map((e) => e.key));
     for (const e of incoming) if (!have.has(e.key)) { state.files.push(e); have.add(e.key); }
   }
+  computeDirs();
+  if (replace) state.path = [];
   state.cardsEnter = true;          // the next render lets the cards slide in one after another
   render();
 }
