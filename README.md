@@ -164,11 +164,10 @@ Swipes and pinches are handled by Lectern itself. A swipe that lands as two cont
 
 ## Folders and views
 
-Files keep the folder they were in. With **Show folders** on (the folder button next to the view switch, or More → Show folders) the home screen shows one folder at a time, folders first, with a path bar above (Backspace or Alt+← goes one folder up). Turn it off for one flat list of everything. Searching always looks through all folders; the file's full path from the chosen folder is shown in its Details. Three views, remembered between launches:
+Files keep the folder they were in. With **Show folders** on (the folder button next to the view switch) the home screen shows one folder at a time, folders first, with a path bar above (Backspace or Alt+← goes one folder up). Turn it off for one flat list of everything. Searching always looks through all folders; the file's full path from the chosen folder is shown in its Details. Two views, remembered between launches:
 
 - **Icons** — cards with a preview;
 - **List** — one row per file: type, name, date, size;
-- **Columns** — like the Finder: one column per opened folder and a preview with Open / Add to queue on the right.
 
 The header (title, view, sort, filter, search, Recent, Queue) stays on top, slides away while you scroll down and comes back at the first scroll up. Controls that cannot work in the current situation (for example "Keep place on the drive" without a chosen folder, or "Presenter view" for a picture) are not shown.
 

@@ -396,7 +396,7 @@ document.addEventListener('keydown', (e) => {
   document.body.classList.add('kbd-nav');             // the selected card is only drawn while the keyboard is in use (see style.css)
   switch (e.key) {
     case 'ArrowRight': e.preventDefault(); return moveSelection(1, 0);
-    case 'ArrowLeft':  e.preventDefault(); if (e.altKey) return state.view !== 'columns' && foldersOn() ? folderUp() : undefined; return moveSelection(-1, 0);
+    case 'ArrowLeft':  e.preventDefault(); if (e.altKey) return foldersOn() ? folderUp() : undefined; return moveSelection(-1, 0);
     case 'ArrowDown':  e.preventDefault(); return moveSelection(0, 1);
     case 'ArrowUp':    e.preventDefault(); return moveSelection(0, -1);
     case ' ': {                                  // Space = details (like Quick Look)
@@ -409,7 +409,7 @@ document.addEventListener('keydown', (e) => {
       return;
     }
     case 'Backspace':                            // one folder up
-      if (state.view !== 'columns' && foldersOn() && state.path.length) { e.preventDefault(); folderUp(); }
+      if (foldersOn() && state.path.length) { e.preventDefault(); folderUp(); }
       return;
     case '/': e.preventDefault(); $('search').focus(); return;
   }

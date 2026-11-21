@@ -146,6 +146,6 @@ LICENSES OF THE PARTS INSIDE
 Something does not open on this computer? Add  #selftest  to the address (Lectern.html#selftest) to check every format.
 For the back rows of a big room: More → Large interface.
 Fullscreen: with a mouse move to the top or bottom edge to show the controls; with a finger tap the middle of the page.
-Folders and views: with "Show folders" on, the list shows one folder at a time with a path bar (Backspace = one folder up); turn it off for one flat list. The view switch next to Sort has Icons, List and Columns (like the Finder). The file's full path is in its Details (the "i" button or Space). The header slides away when you scroll down and returns when you scroll up.
+Folders and views: with "Show folders" on, the list shows one folder at a time with a path bar (Backspace = one folder up); turn it off for one flat list. The view switch next to Sort has Icons and List. The file's full path is in its Details (the "i" button or Space). The header slides away when you scroll down and returns when you scroll up.
 Recent files: the "Recent" button (left of Queue) lists the last files you opened and where you stopped; click one to open it again.
 Keep place on the drive (More menu, Chrome/Edge, needs a chosen folder): your place, bookmarks, zoom, drawings and settings are saved in Lectern-memory.json and Lectern-drawings.json next to your files and travel with the flash drive.
