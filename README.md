@@ -47,7 +47,7 @@ A lecture hall computer is a locked-down machine with whatever office software h
 | **Video & audio** | Volume (↑/↓, M), speed 0.25–2× (< >), time and hover time on the bar, frame step (, .), repeat, click = play/pause, double click = fullscreen |
 | **Subtitles** | A .srt / .vtt with the same name next to the video is picked up automatically (C to toggle, or choose a file in More) |
 | **Audio tags & cover** | Title, artist and cover art from mp3 / FLAC / M4A, on the cards and in the player |
-| **Next file** | When a file ends, the next one of the same folder starts at once (video too). The class queue goes first. Repeat: Off / All / One; Shuffle for music; "Play from" a folder, its subfolders or everything. The **Up next** window (next to More) lists the files and lets you drag them to change the order. <kbd>[</kbd> <kbd>]</kbd> or the arrow buttons switch files |
+| **Next file** | When a file ends, the next one of the same folder starts at once (video too). The class queue goes first. Repeat: Off / All / One; Shuffle for music; "Play from" a folder, its subfolders or everything. The **Playlist** window (next to More) lists the files and lets you drag them to change the order. <kbd>[</kbd> <kbd>]</kbd> or the arrow buttons switch files |
 | **More video tools** | <kbd>J</kbd> / <kbd>L</kbd> jump 10 seconds, picture in picture (where the browser has it), audio track choice (where the browser shows several). The More menu shows only what fits the file: music gets no zoom, laser or black screen |
 | **Pen on video** | Pause and draw on the frame (D) |
 | **Class queue** | Pick the files for a lesson, put them in order, flip through them one after another. Cleared when the page reloads or another folder is opened |

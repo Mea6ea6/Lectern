@@ -297,7 +297,7 @@ const UpNext = { open: false, anim: null, timer: 0, target: null };
 
 /* ----- Which file follows a video / song: the class queue first, else the next media file of the same folder -----
    Repeat: off / folder (start again after the last one) / one (loop). Shuffle picks a random file that has not played yet. */
-const MP = { repeat: loadPref('fv-mrep', 'off'), shuffle: loadPref('fv-mshuf', '0') === '1', scope: loadPref('fv-mscope', 'folder'), seen: new Set() };
+const MP = { repeat: loadPref('fv-mrep', 'off'), shuffle: loadPref('fv-mshuf', '0') === '1', scope: loadPref('fv-mscope', 'folder') };
 /* The play list: the files of the same kind from this folder, this folder with its subfolders, or everywhere.
    The person can drag the files in the "Up next" window; the order is kept while the list stays the same. */
 const PL = { list: null, kind: '', scope: '', n: 0 };
@@ -311,9 +311,16 @@ function plBuild(e) {
   const dirs = [...byDir.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   return dirs.flatMap((d) => sortFiles(byDir.get(d)));
 }
+// Shuffle really mixes the list (so the Playlist window shows the order that will play): the playing file first, the rest in random order
+function plShuffle(e) {
+  const rest = PL.list.filter((x) => x !== e);
+  for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  PL.list = [e, ...rest];
+}
 function playlist(e) {
   if (!PL.list || !PL.list.includes(e) || PL.kind !== e.kind || PL.scope !== MP.scope || PL.n !== state.files.length) {
     PL.list = plBuild(e); PL.kind = e.kind; PL.scope = MP.scope; PL.n = state.files.length;
+    if (MP.shuffle) plShuffle(e);
   }
   return PL.list;
 }
@@ -323,9 +330,7 @@ function mediaHasNext(dir) {
   if (!e) return false;
   const list = playlist(e), i = list.indexOf(e);
   if (list.length < 2 || i < 0) return false;
-  if (MP.repeat === 'all') return true;
-  if (MP.shuffle && dir > 0) return list.some((x) => x !== e && !MP.seen.has(x));
-  return !!list[i + dir];
+  return MP.repeat === 'all' || !!list[i + dir];
 }
 function mediaNext(dir) {
   const q = queueNeighbor(dir);
@@ -334,16 +339,6 @@ function mediaNext(dir) {
   if (!e) return null;
   const list = playlist(e), i = list.indexOf(e);
   if (list.length < 2 || i < 0) return null;
-  if (MP.shuffle && dir > 0) {
-    MP.seen.add(e);
-    let rest = list.filter((x) => !MP.seen.has(x));
-    if (!rest.length) {
-      if (MP.repeat !== 'all') return null;
-      MP.seen = new Set([e]);
-      rest = list.filter((x) => x !== e);
-    }
-    return rest[Math.floor(Math.random() * rest.length)];
-  }
   const j = i + dir;
   if (list[j]) return list[j];
   return MP.repeat === 'all' ? list[(j + list.length) % list.length] : null;
@@ -383,9 +378,11 @@ function updateMediaBar(d) {
   $('mTime').textContent = d.label();
   const muted = d.muted;
   $('mMuteIcon').setAttribute('href', muted ? '#i-mute' : '#i-volume');
-  $('mMute').setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
-  $('mMute').dataset.tip = muted ? 'Unmute (M)' : 'Mute (M)';
+  $('mMuteIcon2').setAttribute('href', muted ? '#i-mute' : '#i-volume');
+  $('mMuteB').setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  $('mMuteB').dataset.tip = muted ? 'Unmute (M)' : 'Mute (M)';
   $('mVolume').value = muted ? 0 : Math.round(d.volume * 100);
+  $('mVolVal').textContent = String($('mVolume').value);
   const rate = d.rate, normal = Math.abs(rate - 1) < 0.001;
   $('mSpeed').hidden = normal;                                   // the speed shows only when it is not normal
   $('mSpeed').textContent = fmtRate(rate);
@@ -399,8 +396,14 @@ function updateMediaBar(d) {
   document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.rep === MP.repeat)));
   document.querySelectorAll('#mScope [data-scope]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scope === MP.scope)));
   $('mScopeRow').hidden = !hasFolders();
+  const many = !!V.entry && playlist(V.entry).length > 1;
   $('mShuffle').setAttribute('aria-pressed', String(MP.shuffle));
-  $('mShuffle').hidden = !(V.entry && playlist(V.entry).length > 1);
+  $('mShuffle').hidden = !many;
+  $('mShufB').hidden = !many || d.hasPicture; $('mRepB').hidden = d.hasPicture;       // quick buttons for music only
+  $('mShufB').setAttribute('aria-pressed', String(MP.shuffle));
+  $('mRepB').setAttribute('aria-pressed', String(MP.repeat !== 'off'));
+  $('mRepB').dataset.mode = MP.repeat;
+  $('mRepB').dataset.tip = 'Repeat: ' + (MP.repeat === 'off' ? 'off' : MP.repeat === 'all' ? 'the whole list' : 'this file');
   $('mPrevFile').disabled = !mediaHasNext(-1);
   $('mNextFile').disabled = !mediaHasNext(1);
   $('mPip').hidden = !d.canPip;
@@ -466,12 +469,8 @@ function updateBar() {
   $('vPrev').disabled = $('vSidePrev').disabled = atStart && !prevFile;
   $('vLast').disabled = atEnd;
   $('vNext').disabled = $('vSideNext').disabled = atEnd && !nextFile;
-  if (ready && d.isMedia) {                                       // video / audio: the side arrows switch files
-    $('vSidePrev').disabled = !mediaHasNext(-1);
-    $('vSideNext').disabled = !mediaHasNext(1);
-  }
-  $('vSidePrev').dataset.tip = ready && d.isMedia ? 'Previous file ([)' : 'Previous';
-  $('vSideNext').dataset.tip = ready && d.isMedia ? 'Next file (])' : 'Next';
+  $('vSidePrev').dataset.tip = ready && d.isMedia ? 'Back 5 seconds (←)' : 'Previous';
+  $('vSideNext').dataset.tip = ready && d.isMedia ? 'Forward 5 seconds (→)' : 'Next';
   $('vSidePrev').setAttribute('aria-label', $('vSidePrev').dataset.tip); $('vSideNext').setAttribute('aria-label', $('vSideNext').dataset.tip);
   $('vOverview').disabled = !ready || !d.hasOverview || d.count < 2;
   $('vInk').disabled = !ready || !d.canDraw;
@@ -726,7 +725,7 @@ function renderMq() {
   const e = V.entry;
   if (!e) return;
   const list = playlist(e);
-  $('mqHead').textContent = 'Up next · ' + list.length + (list.length === 1 ? ' file' : ' files');
+  $('mqHead').textContent = 'Playlist · ' + list.length + (list.length === 1 ? ' file' : ' files');
   MQ.start = Math.max(0, list.indexOf(e)); MQ.shown = 0;
   $('mqList').replaceChildren();
   $('mqList').scrollTop = 0;
@@ -738,7 +737,7 @@ $('mqList').addEventListener('scroll', () => {
 }, { passive: true });
 function openMq() {
   if (!V.entry) return;
-  closeOverview();
+  closeOverview(); closeVol();
   $('vMenu').hidden = true; $('vMore').removeAttribute('aria-expanded');
   V.menuOpen = true;
   $('mqMenu').hidden = false;
@@ -798,7 +797,7 @@ $('mqList').addEventListener('pointerdown', (ev) => {
 /* ----- “More” menu ----- */
 function openMenu() {
   closeOverview();
-  closeMq();
+  closeMq(); closeVol();
   V.menuOpen = true;
   $('vMenu').hidden = false;
   $('vMore').setAttribute('aria-expanded', 'true');
@@ -806,14 +805,14 @@ function openMenu() {
 }
 function closeMenu() {
   V.menuOpen = false;
-  closeMq();
+  closeMq(); closeVol();
   $('vMenu').hidden = true;
   $('vMore').removeAttribute('aria-expanded');
   showUi();
 }
 $('vMore').onclick = () => (V.menuOpen ? closeMenu() : openMenu());
 document.addEventListener('pointerdown', (e) => {
-  if (V.menuOpen && !e.target.closest('#vMenu, #vMore, #mMore, #mqMenu, #mQueue')) closeMenu();
+  if (V.menuOpen && !e.target.closest('#vMenu, #vMore, #mMore, #mqMenu, #mQueue, #volPop, #mMute')) closeMenu();
 });
 
 /* ----- Black / white screen (hides the slide, like B and W in PowerPoint) ----- */
@@ -854,8 +853,8 @@ $('vFull').onclick = toggleFullscreen;
 $('vFirst').onclick = () => navigate('first');
 $('vPrev').onclick = () => navigate('prev');
 $('vNext').onclick = () => navigate('next');
-$('vSidePrev').onclick = () => (V.driver && V.driver.isMedia ? queueStep(-1) : navigate('prev'));
-$('vSideNext').onclick = () => (V.driver && V.driver.isMedia ? queueStep(1) : navigate('next'));
+$('vSidePrev').onclick = () => navigate('prev');
+$('vSideNext').onclick = () => navigate('next');
 $('vLast').onclick = () => navigate('last');
 $('vOverview').onclick = () => (V.overviewOpen ? closeOverview() : openOverview());
 $('qPrev').onclick = () => queueStep(-1);
@@ -863,15 +862,37 @@ $('qNext').onclick = () => queueStep(1);
 $('mPlay').onclick = $('mediaBig').onclick = () => { if (V.driver && V.driver.isMedia) V.driver.toggle(); };
 $('mBack').onclick = () => navigate('prev');
 $('mFwd').onclick = () => navigate('next');
-$('mMute').onclick = toggleMute;
-$('mVolume').oninput = () => { const d = V.driver; if (d && d.isMedia) d.setVolume($('mVolume').value / 100); };
+$('mMuteB').onclick = toggleMute;
+function closeVol() { $('volPop').hidden = true; $('mMute').setAttribute('aria-expanded', 'false'); }
+$('mMute').onclick = () => {
+  if (!$('volPop').hidden) return closeMenu();
+  closeOverview(); closeMq();
+  $('vMenu').hidden = true; $('vMore').removeAttribute('aria-expanded');
+  V.menuOpen = true;
+  const pop = $('volPop'), vr = V.el.getBoundingClientRect(), br = $('mMute').getBoundingClientRect();
+  pop.hidden = false;
+  pop.style.right = 'auto';
+  pop.style.left = Math.max(14, Math.min(vr.width - pop.offsetWidth - 14, br.left - vr.left + br.width / 2 - pop.offsetWidth / 2)) + 'px';
+  $('mMute').setAttribute('aria-expanded', 'true');
+  showUi();
+};
+$('mVolume').oninput = () => { const d = V.driver; if (d && d.isMedia) { d.setVolume($('mVolume').value / 100); $('mVolVal').textContent = $('mVolume').value; } };
 $('mSpeed').onclick = $('mSpeedVal').onclick = () => { if (V.driver && V.driver.isMedia) V.driver.setRate(1); };
 $('mSpeedDn').onclick = () => stepRate(-1);
 $('mSpeedUp').onclick = () => stepRate(1);
 $('mCC').onclick = $('mSubs').onclick = toggleSubs;
-document.querySelectorAll('#mScope [data-scope]').forEach((b) => { b.onclick = () => { MP.scope = b.dataset.scope; PL.list = null; MP.seen = new Set(); savePref('fv-mscope', MP.scope); updateBar(); if (!$('mqMenu').hidden) renderMq(); }; });
+document.querySelectorAll('#mScope [data-scope]').forEach((b) => { b.onclick = () => { MP.scope = b.dataset.scope; PL.list = null; savePref('fv-mscope', MP.scope); updateBar(); if (!$('mqMenu').hidden) renderMq(); }; });
 document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => { b.onclick = () => { MP.repeat = b.dataset.rep; savePref('fv-mrep', MP.repeat); updateBar(); }; });
-$('mShuffle').onclick = () => { MP.shuffle = !MP.shuffle; MP.seen = new Set(); savePref('fv-mshuf', MP.shuffle ? '1' : '0'); updateBar(); };
+function setShuffle(on) {
+  MP.shuffle = on; savePref('fv-mshuf', on ? '1' : '0');
+  PL.list = null;                                  // a new list: mixed again each time shuffle is switched on, in folder order when it is off
+  if (V.entry) playlist(V.entry);
+  updateBar();
+  if (!$('mqMenu').hidden) renderMq();
+}
+$('mShuffle').onclick = $('mShufB').onclick = () => setShuffle(!MP.shuffle);
+$('mRepB').onclick = () => { MP.repeat = MP.repeat === 'off' ? 'all' : MP.repeat === 'all' ? 'one' : 'off'; savePref('fv-mrep', MP.repeat); updateBar(); };
+$('mqShuffle').onclick = () => { if (!V.entry) return; PL.list = null; MP.shuffle = true; savePref('fv-mshuf', '1'); playlist(V.entry); updateBar(); renderMq(); };
 $('mPrevFile').onclick = () => queueStep(-1);
 $('mNextFile').onclick = () => queueStep(1);
 $('mPip').onclick = () => { if (V.driver && V.driver.isMedia && V.driver.canPip) V.driver.togglePip(); };

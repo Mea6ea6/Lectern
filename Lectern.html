@@ -177,11 +177,11 @@
   <div class="toolbar" id="toolbar" hidden>
     <div class="tb-group" id="tbView">
       <div class="seg tb-seg" id="viewSeg" role="group" aria-label="View">
-        <button type="button" data-view="icons" aria-pressed="true" title="Icons" aria-label="Icons"><svg class="icon"><use href="#i-view-icons"/></svg></button>
-        <button type="button" data-view="list" aria-pressed="false" title="List" aria-label="List"><svg class="icon"><use href="#i-view-list"/></svg></button>
+        <button type="button" data-view="icons" aria-pressed="true" title="Icons" aria-label="Icons"><svg class="icon"><use href="#i-view-icons"/></svg><span class="tb-lbl">Icons</span></button>
+        <button type="button" data-view="list" aria-pressed="false" title="List" aria-label="List"><svg class="icon"><use href="#i-view-list"/></svg><span class="tb-lbl">List</span></button>
       </div>
       <button class="btn btn-icon tb-folders" id="btnFolders" type="button" aria-pressed="true" title="Show folders" aria-label="Show folders">
-        <svg class="icon"><use href="#i-folder"/></svg>
+        <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Folders</span>
       </button>
     </div>
     <div class="tb-group">
@@ -213,6 +213,7 @@
       <button class="btn" id="btnRecent" type="button" hidden title="Files you opened lately">
         <svg class="icon"><use href="#i-history"/></svg><span>Recent</span>
       </button>
+      <button class="btn btn-icon" id="btnQueuePlay" type="button" hidden title="Play the queue from the first file" aria-label="Play the queue"><svg class="icon"><use href="#i-play"/></svg></button>
       <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
         <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
       </button>
@@ -361,15 +362,14 @@
         <button class="vbtn vbtn-icon" id="mNextFile" type="button" title="Next file (])" aria-label="Next file"><svg class="icon"><use href="#i-last"/></svg></button>
       </div>
       <div class="mright">
-        <div class="vol">
-          <button class="vbtn vbtn-icon" id="mMute" type="button" title="Mute (M)" aria-label="Mute"><svg class="icon"><use id="mMuteIcon" href="#i-volume"/></svg></button>
-          <input type="range" id="mVolume" min="0" max="100" step="1" value="100" title="Volume (↑ ↓)" aria-label="Volume">
-        </div>
+        <button class="vbtn vbtn-icon" id="mMute" type="button" aria-haspopup="true" aria-expanded="false" title="Volume (↑ ↓, M mutes)" aria-label="Volume"><svg class="icon"><use id="mMuteIcon" href="#i-volume"/></svg></button>
         <button class="vbtn" id="mSpeed" type="button" hidden title="Playback speed (&lt; and &gt;). Click to go back to normal">1×</button>
         <button class="vbtn vbtn-icon" id="mCC" type="button" hidden aria-pressed="false" title="Subtitles (C)" aria-label="Subtitles"><svg class="icon"><use href="#i-cc"/></svg></button>
         <button class="vbtn vbtn-icon" id="mPip" type="button" hidden aria-pressed="false" title="Small floating window (picture in picture)" aria-label="Picture in picture"><svg class="icon"><use href="#i-pip"/></svg></button>
         <button class="vbtn vbtn-icon" id="mInk" type="button" hidden aria-pressed="false" title="Pen and marker on the paused picture (D)" aria-label="Pen and marker"><svg class="icon"><use href="#i-draw"/></svg></button>
-        <button class="vbtn vbtn-icon" id="mQueue" type="button" aria-haspopup="true" title="Up next: the order of the files that play" aria-label="Up next"><svg class="icon"><use href="#i-list"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mShufB" type="button" hidden aria-pressed="false" title="Shuffle" aria-label="Shuffle"><svg class="icon"><use href="#i-shuffle"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mRepB" type="button" hidden aria-pressed="false" data-mode="off" title="Repeat" aria-label="Repeat"><svg class="icon"><use href="#i-repeat"/></svg><i class="rep-one">1</i></button>
+        <button class="vbtn vbtn-icon" id="mQueue" type="button" aria-haspopup="true" title="Playlist: the files that play next, in order" aria-label="Playlist"><svg class="icon"><use href="#i-list"/></svg></button>
         <button class="vbtn vbtn-icon" id="mMore" type="button" aria-haspopup="true" title="Speed, subtitles, repeat, tools and settings" aria-label="More"><svg class="icon"><use href="#i-more"/></svg></button>
       </div>
     </div>
@@ -556,9 +556,16 @@
     <span class="resume-bar" id="resumeBar"></span>
   </div>
 
-  <!-- Video / audio: the list of what plays next (drag to change the order) -->
+  <!-- Volume: a small pop-up over the speaker button -->
+  <div class="menu vol-pop" id="volPop" hidden>
+    <button class="vbtn vbtn-icon" id="mMuteB" type="button" title="Mute (M)" aria-label="Mute"><svg class="icon"><use id="mMuteIcon2" href="#i-volume"/></svg></button>
+    <div class="vol"><input type="range" id="mVolume" min="0" max="100" step="1" value="100" title="Volume (↑ ↓)" aria-label="Volume"></div>
+    <span class="vol-val" id="mVolVal">100</span>
+  </div>
+
+  <!-- Video / audio: the playlist, what plays next (drag to change the order) -->
   <div class="menu mq-menu" id="mqMenu" hidden>
-    <div class="menu-head" id="mqHead">Up next</div>
+    <div class="mq-top"><div class="menu-head" id="mqHead">Playlist</div><button class="vbtn vbtn-icon mq-shuf" id="mqShuffle" type="button" title="Shuffle the list again" aria-label="Shuffle again"><svg class="icon"><use href="#i-shuffle"/></svg></button></div>
     <div class="mq-list" id="mqList"></div>
   </div>
 

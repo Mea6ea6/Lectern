@@ -795,7 +795,9 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .mright .vbtn { min-height: 48px; }
 .mright .vbtn:not(.vbtn-icon) { padding: 0 14px; font-variant-numeric: tabular-nums; }
 .vol { display: flex; align-items: center; gap: 4px; }
-.vol input[type="range"] { width: 96px; }
+.vol input[type="range"] { width: 150px; }
+.vol-pop { flex-direction: row; align-items: center; gap: 10px; width: auto; padding: 6px 16px 6px 6px; }
+.vol-pop .vol-val { min-width: 28px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
 /* the menu: the rows for documents are hidden while a video plays, and the other way round */
 .is-media .doc-only, .media-only { display: none; }
 .is-media .media-only { display: flex; }
@@ -1396,8 +1398,20 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .mq-line { position: absolute; left: 4px; right: 4px; height: 3px; border-radius: 3px; background: var(--ink); pointer-events: none; transition: top .1s var(--ease-out); }
 .mq-grip { flex: none; width: 34px; height: 40px; display: grid; place-items: center; border-radius: var(--r-sm, 8px); color: var(--ink-soft); cursor: grab; touch-action: none; }
 .mq-grip .icon { width: 18px; height: 18px; }
-.mq-n { flex: none; width: 28px; text-align: right; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.mq-n { flex: none; width: 46px; padding-right: 12px; box-sizing: border-box; text-align: right; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .mq-t { flex: 1; min-width: 0; }
 .mq-t b { display: block; font-weight: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mq-t small { display: block; font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mq-now { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+
+.mq-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mq-shuf { min-height: 36px; min-width: 36px; }
+.rep-one { display: none; position: absolute; font: 700 9px/1 var(--font, inherit); font-style: normal; translate: 0 1px; }
+#mRepB { position: relative; }
+#mRepB[data-mode="one"] .rep-one { display: block; }
+.tb-lbl { display: none; margin-left: 8px; font-size: 14px; font-weight: 600; }
+@media (min-width: 1180px) {
+  .tb-lbl { display: inline; }
+  .tb-folders { width: auto; padding: 0 14px 0 12px; }
+  .seg[id="viewSeg"] button { width: auto; padding: 0 14px 0 12px; }
+}

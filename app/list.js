@@ -759,6 +759,7 @@ function queueChanged() {
   const place = new Map(Q.items.map((it, i) => [it.entry, i]));
   for (const e of state.files) markQueue(e, place.has(e) ? place.get(e) : -1);   // only cards whose place changed are touched
   $('btnQueue').hidden = !state.files.length && !Q.items.length;
+  $('btnQueuePlay').hidden = !Q.items.some((it) => it.entry);
   const countText = Q.items.length ? String(Q.items.length) : '';
   if ($('qCount').textContent !== countText && countText && !prefersReducedMotion()) {       // the number gives a little hop when it changes
     $('qCount').animate([{ scale: 1.4 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)' });
@@ -819,6 +820,7 @@ function queueStart() {
   const first = Q.items.find((it) => it.entry);
   if (!first) return;
   closeModal();
+  if (first.entry.kind === 'video' || first.entry.kind === 'audio') V.autoplay = true;      // songs and films start playing at once
   openViewer(first.entry);
 }
 
@@ -907,6 +909,7 @@ function renderQueueDialog(first) {
   }
 }
 $('btnQueue').onclick = openQueue;
+$('btnQueuePlay').onclick = queueStart;
 
 
 /* ---------------------------------------------------------------------
