@@ -119,6 +119,10 @@
       <h1>Lectern</h1>
       <p id="status">No files selected</p>
     </div>
+    <label class="search" id="searchBox" title="Search by name" hidden>
+      <svg class="icon"><use href="#i-search"/></svg>
+      <input id="search" type="search" placeholder="Search by name" autocomplete="off">
+    </label>
     <div class="actions">
       <span class="link-pill off" hidden><i class="dot"></i><span class="lp-text"></span></span>
       <button class="timer-pill" type="button" title="Timer" aria-label="Timer" hidden><svg class="icon"><use href="#i-timer"/></svg><span class="tp-text"></span></button>
@@ -128,22 +132,6 @@
         </button>
         <!-- The "More" menu of the home screen, grouped like the one in the viewer -->
         <div class="popover" id="settings" hidden>
-          <div id="headFiles" hidden>
-            <div class="menu-head">Files</div>
-            <button class="menu-item reopen-btn" type="button" data-close hidden title="Open the folder from last time">
-              <svg class="icon"><use href="#i-folder"/></svg><span class="grow reopen-label">Reopen last folder</span>
-            </button>
-            <button class="menu-item" id="btnFolder" type="button" data-close title="Choose another folder">
-              <svg class="icon"><use href="#i-folder"/></svg><span class="grow">Choose folder</span>
-            </button>
-            <button class="menu-item" id="btnFiles" type="button" data-close title="Add single files to the list">
-              <svg class="icon"><use href="#i-addfile"/></svg><span class="grow">Add files</span>
-            </button>
-            <button class="menu-item" id="btnRefresh" type="button" data-close hidden title="Rescan the folder for new files">
-              <svg class="icon"><use href="#i-refresh"/></svg><span class="grow">Rescan folder</span>
-            </button>
-            <div class="menu-gap"></div>
-          </div>
           <button class="menu-item" id="btnInstall" type="button" data-close hidden title="Install Lectern as an app">
             <svg class="icon"><use href="#i-install"/></svg><span class="grow">Install as app</span>
           </button>
@@ -173,49 +161,71 @@
     </div>
   </header>
 
-  <!-- One row, left to right: how the files are shown · how they are ordered · search · what you will show -->
+  <!-- Under the search, in the order you use them: where the files come from · how they look · how they are arranged · lists -->
   <div class="toolbar" id="toolbar" hidden>
-    <div class="tb-group" id="tbView">
-      <div class="seg tb-seg" id="viewSeg" role="group" aria-label="View">
-        <button type="button" data-view="icons" aria-pressed="true" title="Icons" aria-label="Icons"><svg class="icon"><use href="#i-view-icons"/></svg><span class="tb-lbl">Icons</span></button>
-        <button type="button" data-view="list" aria-pressed="false" title="List" aria-label="List"><svg class="icon"><use href="#i-view-list"/></svg><span class="tb-lbl">List</span></button>
+    <div class="tb-group" id="tbFiles">
+      <span class="tb-cap">Files</span>
+      <div class="tb-row">
+        <button class="btn btn-icon tb-btn reopen-btn" type="button" hidden title="Open the folder from last time">
+          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl reopen-label">Reopen last folder</span>
+        </button>
+        <button class="btn btn-icon tb-btn" id="btnFolder" type="button" title="Choose another folder" aria-label="Choose folder">
+          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Choose folder</span>
+        </button>
+        <button class="btn btn-icon tb-btn" id="btnFiles" type="button" title="Add single files to the list" aria-label="Add files">
+          <svg class="icon"><use href="#i-addfile"/></svg><span class="tb-lbl">Add files</span>
+        </button>
+        <button class="btn btn-icon tb-btn" id="btnRefresh" type="button" hidden title="Rescan the folder for new files" aria-label="Rescan folder">
+          <svg class="icon"><use href="#i-refresh"/></svg><span class="tb-lbl">Rescan</span>
+        </button>
       </div>
-      <button class="btn btn-icon tb-folders" id="btnFolders" type="button" aria-pressed="true" title="Show folders" aria-label="Show folders">
-        <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Folders</span>
-      </button>
+    </div>
+    <div class="tb-group" id="tbView">
+      <span class="tb-cap">View</span>
+      <div class="tb-row">
+        <div class="seg tb-seg" id="viewSeg" role="group" aria-label="View">
+          <button type="button" data-view="icons" aria-pressed="true" title="Icons" aria-label="Icons"><svg class="icon"><use href="#i-view-icons"/></svg><span class="tb-lbl">Icons</span></button>
+          <button type="button" data-view="list" aria-pressed="false" title="List" aria-label="List"><svg class="icon"><use href="#i-view-list"/></svg><span class="tb-lbl">List</span></button>
+        </div>
+        <button class="btn btn-icon tb-btn tb-folders" id="btnFolders" type="button" aria-pressed="true" title="Show folders" aria-label="Show folders">
+          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Folders</span>
+        </button>
+      </div>
     </div>
     <div class="tb-group">
-      <div class="dd" id="sortDD">
-        <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sort the files">
-          <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
-          <svg class="icon"><use href="#i-chev"/></svg>
-        </button>
-        <div class="dd-menu" id="sortMenu" role="listbox" hidden>
-          <button type="button" role="option" data-sort="name" title="Sort by name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
-          <button type="button" role="option" data-sort="date" title="Newest files first"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
-          <button type="button" role="option" data-sort="size" title="Largest files first"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
-          <button type="button" role="option" data-sort="type" title="Group by file type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
+      <span class="tb-cap">Arrange</span>
+      <div class="tb-row">
+        <div class="dd" id="sortDD">
+          <button class="btn dd-btn" id="sortBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Sort the files">
+            <span class="dd-cap">Sort</span><span class="dd-val" id="sortVal">Name</span>
+            <svg class="icon"><use href="#i-chev"/></svg>
+          </button>
+          <div class="dd-menu" id="sortMenu" role="listbox" hidden>
+            <button type="button" role="option" data-sort="name" title="Sort by name"><svg class="icon"><use href="#i-check"/></svg>Name</button>
+            <button type="button" role="option" data-sort="date" title="Newest files first"><svg class="icon"><use href="#i-check"/></svg>Newest first</button>
+            <button type="button" role="option" data-sort="size" title="Largest files first"><svg class="icon"><use href="#i-check"/></svg>Largest first</button>
+            <button type="button" role="option" data-sort="type" title="Group by file type"><svg class="icon"><use href="#i-check"/></svg>Type</button>
+          </div>
+        </div>
+        <div class="dd" id="filterDD">
+          <button class="btn dd-btn" id="filterBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Show only some file types">
+            <span class="dd-cap">Filter</span><span class="dd-val" id="filterVal">All</span>
+            <svg class="icon"><use href="#i-chev"/></svg>
+          </button>
+          <div class="dd-menu dd-filter" id="filterMenu" role="group" aria-label="File types" hidden></div>
         </div>
       </div>
-      <div class="dd" id="filterDD">
-        <button class="btn dd-btn" id="filterBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Show only some file types">
-          <span class="dd-cap">Filter</span><span class="dd-val" id="filterVal">All</span>
-          <svg class="icon"><use href="#i-chev"/></svg>
-        </button>
-        <div class="dd-menu dd-filter" id="filterMenu" role="group" aria-label="File types" hidden></div>
-      </div>
     </div>
-    <label class="search" title="Search by name">
-      <svg class="icon"><use href="#i-search"/></svg>
-      <input id="search" type="search" placeholder="Search by name" autocomplete="off">
-    </label>
-    <div class="tb-group">
-      <button class="btn" id="btnRecent" type="button" hidden title="Files you opened lately">
-        <svg class="icon"><use href="#i-history"/></svg><span>Recent</span>
-      </button>
-      <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
-        <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
-      </button>
+    <div class="tb-group tb-end">
+      <span class="tb-cap">Lists</span>
+      <div class="tb-row">
+        <button class="btn" id="btnRecent" type="button" hidden title="Files you opened lately">
+          <svg class="icon"><use href="#i-history"/></svg><span>Recent</span>
+        </button>
+        <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
+          <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
+        </button>
+      </div>
     </div>
   </div>
   <!-- Where you are inside the folders -->
@@ -283,7 +293,7 @@
       <!-- Only when the open file is part of the class queue -->
       <div class="qnav" id="qNav" hidden>
         <button class="vbtn vbtn-icon" id="qPrev" type="button" title="Previous file in the queue ([ or Shift+←)" aria-label="Previous file"><svg class="icon"><use href="#i-prev"/></svg></button>
-        <span class="qpos" id="qPos"></span>
+        <button class="qpos" id="qPos" type="button" aria-haspopup="true" title="All files of the queue" aria-label="Queue"></button>
         <button class="vbtn vbtn-icon" id="qNext" type="button" title="Next file in the queue (] or Shift+→)" aria-label="Next file"><svg class="icon"><use href="#i-next"/></svg></button>
       </div>
     </div>
@@ -437,6 +447,22 @@
         </div>
         <div class="pv-notes-wrap" id="pvNotesWrap"><div class="pv-notes" id="pvNotes"></div></div>
       </div>
+      <!-- Video / audio of the presentation window: the buttons on top, then the queue (can be folded like the notes) -->
+      <div class="pv-media" id="pvMedia">
+        <div class="pv-cap-row"><span class="pv-cap" id="pvMTime">0:00 / 0:00</span><span class="pv-cap" id="pvMState"></span></div>
+        <div class="pv-mbar" id="pvMBar" title="Click to jump"><i id="pvMFill"></i></div>
+        <div class="pv-mbtns">
+          <button class="vbtn vbtn-icon" id="pvMPrevF" type="button" title="Previous file" aria-label="Previous file"><svg class="icon"><use href="#i-first"/></svg></button>
+          <button class="vbtn vbtn-icon" id="pvMBack" type="button" title="Back 5 seconds" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
+          <button class="vbtn vbtn-icon vbtn-solid" id="pvMPlay" type="button" title="Play / pause" aria-label="Play"><svg class="icon"><use id="pvMPlayIcon" href="#i-play"/></svg></button>
+          <button class="vbtn vbtn-icon" id="pvMFwd" type="button" title="Forward 5 seconds" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
+          <button class="vbtn vbtn-icon" id="pvMNextF" type="button" title="Next file" aria-label="Next file"><svg class="icon"><use href="#i-last"/></svg></button>
+        </div>
+        <div class="pv-cap-row"><span class="pv-cap" id="pvQCap">Queue</span>
+          <button class="pv-fold" id="pvQFold" type="button" title="Hide the queue" aria-label="Hide the queue" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
+        </div>
+        <div class="pv-notes-wrap pv-qwrap" id="pvQWrap"><div class="mq-list pv-q" id="pvQList"></div></div>
+      </div>
     </div>
   </aside>
 
@@ -506,7 +532,7 @@
     <button class="menu-item doc-tool" id="mNotes" type="button" title="Speaker notes (N)">
       <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
     </button>
-    <button class="menu-item doc-tool" id="mPresenter" type="button" title="Presenter view: a second window (P)">
+    <button class="menu-item" id="mPresenter" type="button" title="Presenter view: a second window (P)">
       <svg class="icon"><use href="#i-presenter"/></svg><span class="grow" id="mPresenterText">Presenter view</span><kbd>P</kbd>
     </button>
     <div class="menu-gap"></div>
@@ -551,6 +577,12 @@
     <span class="vol-val" id="mVolVal">100</span>
   </div>
 
+  <!-- The class queue while viewing: every file of it; click one to open it, ✕ takes it out, drag to reorder -->
+  <div class="menu mq-menu q-menu" id="qMenu" hidden>
+    <div class="menu-head" id="qHead">Class queue</div>
+    <div class="mq-list" id="qList"></div>
+  </div>
+
   <!-- Video / audio: the playlist, what plays next (drag to change the order) -->
   <div class="menu mq-menu" id="mqMenu" hidden>
     <div class="menu-head" id="mqHead">Playlist</div>
@@ -579,8 +611,11 @@
 <script src="app/drive.js"></script>
 <script src="app/errors.js"></script>
 <script src="app/list.js"></script>
+<script src="app/queue.js"></script>
+<script src="app/thumbs.js"></script>
 <script src="app/viewers.js"></script>
 <script src="app/viewer-ui.js"></script>
+<script src="app/viewer-queue.js"></script>
 <script src="app/viewer-timer.js"></script>
 <script src="app/viewer-input.js"></script>
 <script src="app/extras.js"></script>

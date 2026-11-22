@@ -50,12 +50,12 @@ A lecture hall computer is a locked-down machine with whatever office software h
 | **Next file** | When a file ends, the next one of the same folder starts at once (video too). The class queue goes first. Repeat: Off / All / One; Shuffle for music; "Play from" a folder, its subfolders or everything. The **Playlist** window (next to More) lists the files and lets you drag them to change the order. <kbd>[</kbd> <kbd>]</kbd> or the arrow buttons switch files |
 | **More video tools** | <kbd>J</kbd> / <kbd>L</kbd> jump 10 seconds, picture in picture (where the browser has it), audio track choice (where the browser shows several). The More menu shows only what fits the file: music gets no zoom, laser or black screen |
 | **Pen on video** | Pause and draw on the frame (D) |
-| **Class queue** | Pick the files for a lesson, put them in order, flip through them one after another. Cleared when the page reloads or another folder is opened |
+| **Class queue** | Pick the files for a lesson (documents, slides, films, songs in any mix), put them in order, flip through them one after another. The number in the top bar ("2 / 5") opens the list: click a file, drag to reorder, the cross (on hover) takes a file out. A queue of different kinds is a plain list, with no playlist, shuffle or repeat. Cleared when the page reloads or another folder is opened |
 | **Bookmarks** | Mark pages (<kbd>M</kbd>), see them on the progress bar and in the overview, jump with <kbd>,</kbd> <kbd>.</kbd> |
 | **Laser pointer** | A red dot that follows the mouse or a finger (<kbd>L</kbd>); nothing is drawn on the page |
 | **Timer** | Silent timer (<kbd>T</kbd>): countdown, or count up to a set time. The readout sits quietly in the top bar and in the file list header, and turns red when the time is reached |
 | **Speaker notes** | PPTX and ODP notes in a side panel (<kbd>N</kbd>) |
-| **Presenter view** | Two windows: slides on the projector, a companion window on your laptop with your speech (any file) plus a panel with the current and next slide, the notes and a shared timer (<kbd>P</kbd>). Slides turn from either window (More → Stop presenter view ends it); pen, laser and black screen stay in the presentation window. Works offline, for PDF and PowerPoint |
+| **Presenter view** | Two windows: slides on the projector, a companion window on your laptop with your speech (any file) plus a panel with the current and next slide, the notes and a shared timer (<kbd>P</kbd>). Slides turn from either window (More → Stop presenter view ends it); pen, laser and black screen stay in the presentation window. Works offline, for PDF, PowerPoint, video and audio: for a film or a song the panel has pause, ±5 s, previous / next, a time bar and the queue (click to play, cross to take out, foldable like the notes) |
 | **Page animation** | Pages slide in a few pixels when you turn them (More → Page animation switches it off); cards slide in after a folder is chosen; respects the system's reduced-motion setting |
 | **Fullscreen window** | More (top right) → Fullscreen window hides the browser's bars on any screen (Esc leaves) |
 | **Hints** | Small designed tooltips with key hints appear when you pause over a button |
@@ -134,7 +134,7 @@ A web page can't see the full path of a chosen folder, so Lectern shows the fold
 ```
 Lectern.html            entry point
 app/
-  core.js … presenter.js  application logic (six plain scripts, loaded in order)
+  core.js … presenter.js  application logic (plain scripts, loaded in order: list, queue, thumbs, viewers, viewer-ui, viewer-queue, …)
   style.css             themes, glass system, layout
   fonts/  fonts.css     Inter, bundled locally
   lib/                  PDF, DOCX, PPTX, XLSX, HEIC libraries (loaded on demand)
@@ -170,7 +170,7 @@ Files keep the folder they were in. With **Show folders** on (the folder button 
 - **Icons** — cards with a preview;
 - **List** — one row per file: type, name, date, size;
 
-The header (title, view, sort, filter, search, Recent, Queue) stays on top, slides away while you scroll down and comes back at the first scroll up. Controls that cannot work in the current situation (for example "Keep place on the drive" without a chosen folder, or "Presenter view" for a picture) are not shown.
+The header (title, the search in the middle, and under it the buttons in four groups with small titles: Files, View, Arrange, Lists) stays on top, slides away while you scroll down and comes back at the first scroll up. Controls that cannot work in the current situation (for example "Keep place on the drive" without a chosen folder, or "Presenter view" for a picture) are not shown.
 
 ## Recent files
 

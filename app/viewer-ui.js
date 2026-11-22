@@ -1,6 +1,6 @@
 'use strict';
 /* Lectern — The viewer window: bar, zoom, fullscreen, overview, menu, pen and laser.  One of the app/*.js files that Lectern.html loads in this order:
-   core.js, errors.js, list.js, viewers.js, viewer-ui.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js. They are plain scripts that share one global scope
+   core.js, drive.js, errors.js, list.js, queue.js, thumbs.js, viewers.js, viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js. They are plain scripts that share one global scope
    (no modules, so it also works from a file:// address on a flash drive). The map of everything is at the top of core.js. */
 
 /* ---------------------------------------------------------------------
@@ -296,78 +296,6 @@ $('resumeNo').onclick = () => resumeClose(false);
 const UPNEXT_MS = 8000;
 const UpNext = { open: false, anim: null, timer: 0, target: null };
 
-/* ----- Which file follows a video / song: the class queue first, else the next media file of the same folder -----
-   Repeat: off / folder (start again after the last one) / one (loop). Shuffle picks a random file that has not played yet. */
-const MP = { repeat: loadPref('fv-mrep', 'off'), shuffle: loadPref('fv-mshuf', '0') === '1', scope: loadPref('fv-mscope', 'folder'), anchor: null };
-/* The play list: the files of the same kind from this folder, this folder with its subfolders, or everywhere.
-   The person can drag the files in the "Up next" window; the order is kept while the list stays the same. */
-const PL = { list: null, kind: '', scope: '', n: 0 };
-function plBuild(e) {
-  const base = e.dir || '';
-  let pool = state.files.filter((x) => x.kind === e.kind);
-  if (MP.scope === 'folder') pool = pool.filter((x) => (x.dir || '') === base);
-  else if (MP.scope === 'tree' && base) pool = pool.filter((x) => (x.dir || '') === base || (x.dir || '').startsWith(base + '/'));
-  const byDir = new Map();
-  for (const x of pool) { const d = x.dir || ''; if (!byDir.has(d)) byDir.set(d, []); byDir.get(d).push(x); }
-  const dirs = [...byDir.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  return dirs.flatMap((d) => sortFiles(byDir.get(d)));
-}
-// Shuffle really mixes the list (so the Playlist window shows the order that will play): the playing file first, the rest in random order
-function plShuffle(e) {
-  const rest = PL.list.filter((x) => x !== e);
-  for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
-  PL.list = [e, ...rest];
-}
-function ctxList(e) {
-  if (!PL.list || !PL.list.includes(e) || PL.kind !== e.kind || PL.scope !== MP.scope || PL.n !== state.files.length) {
-    PL.list = plBuild(e); PL.kind = e.kind; PL.scope = MP.scope; PL.n = state.files.length;
-    if (MP.shuffle) plShuffle(e);
-  }
-  return PL.list;
-}
-/* Like Spotify: the songs put in the class queue by hand play first (after the playing one), then the playlist goes on */
-function queuedAfter(e) {
-  const qi = queueIndexOf(e);
-  return Q.items.slice(qi + 1).map((it) => it.entry).filter((x) => x && x !== e);       // any kind: film, song, film, a slide file …
-}
-const playlist = ctxList;
-// Where the playlist goes on after the hand-made queue is played: after the last file that came from the playlist itself
-function ctxBase(e, list) {
-  const a = MP.anchor;
-  return queueIndexOf(e) >= 0 && a && a !== e && list.includes(a) ? list.indexOf(a) : list.indexOf(e);
-}
-function mediaNext(dir) {
-  const e = V.entry;
-  if (!e) return null;
-  const list = ctxList(e), i = ctxBase(e, list);
-  if (i < 0) return null;
-  const queued = new Set(Q.items.map((it) => it.entry));
-  if (dir > 0) {
-    const q = queuedAfter(e);
-    if (q.length) return q[0];
-    if (queueIndexOf(e) >= 0 && !(MP.anchor && list.includes(MP.anchor))) return null;      // a queue that was started by itself ends with its last file
-    for (let j = i + 1; j < list.length; j++) if (!queued.has(list[j])) return list[j];
-    if (MP.repeat === 'all') for (let j = 0; j < i; j++) if (!queued.has(list[j])) return list[j];
-    return null;
-  }
-  if (queueIndexOf(e) >= 0 && list[i] && list[i] !== e) return list[i];       // back from a hand-made queue song: to the one it interrupted
-  if (list[i - 1]) return list[i - 1];
-  return MP.repeat === 'all' && list.length > 1 ? list[list.length - 1] : null;
-}
-const mediaHasNext = (dir) => !!mediaNext(dir);
-// Leaving a file that was put in the queue by hand (it played to the end, or the person went on): it is done, so it leaves the queue
-function leaveQueued(e) {
-  const i = e ? queueIndexOf(e) : -1;
-  if (i >= 0 && MP.repeat !== 'all') { Q.items.splice(i, 1); queueChanged(); }
-}
-// The file ended: the next one starts at once
-function mediaEnded(d) {
-  const n = mediaNext(1);
-  leaveQueued(V.entry);                          // played to the end: it leaves the class queue
-  if (!n) return;
-  V.autoplay = true;
-  openViewer(n);
-}
 function upNextShow(entry) {
   if (!entry || UpNext.open) return;
   UpNext.target = entry;
@@ -410,7 +338,8 @@ function updateMediaBar(d) {
   $('mSubs').setAttribute('aria-pressed', String(d.subsOn));
   $('mSubs').hidden = !d.hasSubs;
   $('mSubsFile').hidden = !d.hasPicture;
-  if (d.loop !== (MP.repeat === 'one')) d.setLoop(MP.repeat === 'one');
+  const loop = MP.repeat === 'one' && !queueMode();
+  if (d.loop !== loop) d.setLoop(loop);
   document.querySelectorAll('#mScope [data-scope]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scope === MP.scope)));
   $('mScopeRow').hidden = !hasFolders();
   const many = !!V.entry && playlist(V.entry).length > 1;
@@ -714,141 +643,9 @@ function closeOverview() {
   showUi();
 }
 
-/* ----- Up next: the list of what plays after this file; drag the grip to change the order ----- */
-function closeMq() { $('mqMenu').hidden = true; $('mQueue').removeAttribute('aria-expanded'); }
-/* The window shows the playing file, then the songs put in the queue by hand (a small gap after them), then the rest of the
-   playlist, 30 rows at a time; more rows are added while you scroll down. */
-const MQ = { all: [], shown: 0, CHUNK: 30 };
-function mqRow(it, withDir) {
-  const x = it.e, row = h('div', 'mq-row' + (it.g === 'cur' ? ' current' : '') + (it.end ? ' mq-end' : ''));
-  row._e = x; row._g = it.g;
-  const grip = h('span', 'mq-grip'); grip.append(icon('i-grip')); grip.dataset.tip = 'Drag to change the order';
-  const t = h('span', 'mq-t'); t.append(h('b', '', x.base || x.name));
-  if (withDir && x.dir) t.append(h('small', '', x.dir.split('/').pop()));
-  const num = h('span', 'mq-n'), numText = h('span', 'mq-num', it.g === 'q' ? '' : String(it.n));
-  if (it.g === 'cur') numText.append(h('i', 'mq-now'));          // the dot of the playing file sits under its number
-  num.append(numText);
-  row.append(grip, num, t);
-  if (it.g === 'q' || it.g === 'c') {                              // any file that is still to come can be taken out in advance
-    const tip = it.g === 'q' ? 'Remove from the queue' : 'Skip it: take it out of the playlist';
-    const x = h('button', 'mq-x'); x.type = 'button'; x.append(icon('i-x')); x.dataset.tip = tip; x.setAttribute('aria-label', tip);
-    row.append(x);
-  }
-  return row;
-}
-function mqMore() {
-  const from = MQ.shown;
-  if (from >= MQ.all.length) return;
-  const to = Math.min(MQ.all.length, from + MQ.CHUNK), withDir = MP.scope !== 'folder';
-  $('mqList').append(...MQ.all.slice(from, to).map((it) => mqRow(it, withDir)));
-  MQ.shown = to;
-}
-function renderMq() {
-  const e = V.entry;
-  if (!e) return;
-  const list = ctxList(e), i = ctxBase(e, list), queued = queuedAfter(e), qset = new Set(Q.items.map((it) => it.entry));
-  const all = [{ e, g: 'cur', n: list.indexOf(e) + 1 }];
-  queued.forEach((x, k) => all.push({ e: x, g: 'q', n: k + 1, end: k === queued.length - 1 }));
-  list.forEach((x, j) => { if (j > i && !qset.has(x)) all.push({ e: x, g: 'c', n: j + 1 }); });
-  MQ.all = all; MQ.shown = 0;
-  $('mqHead').textContent = 'Playlist · ' + list.length + (list.length === 1 ? ' file' : ' files');
-  $('mqList').replaceChildren();
-  $('mqList').scrollTop = 0;
-  mqMore();
-}
-$('mqList').addEventListener('scroll', () => {
-  const b = $('mqList');
-  if (b.scrollTop + b.clientHeight > b.scrollHeight - 160) mqMore();
-}, { passive: true });
-function openMq() {
-  if (!V.entry) return;
-  closeOverview(); closeVol();
-  $('vMenu').hidden = true; $('vMore').removeAttribute('aria-expanded');
-  V.menuOpen = true;
-  $('mqMenu').hidden = false;
-  $('mQueue').setAttribute('aria-expanded', 'true');
-  renderMq();
-  showUi();
-}
-$('mQueue').onclick = () => (!$('mqMenu').hidden ? closeMenu() : openMq());
-$('mqList').addEventListener('click', (ev) => {
-  const row = ev.target.closest('.mq-row');
-  const rm = ev.target.closest('.mq-x');
-  if (rm && row) {
-    const top = $('mqList').scrollTop, i = queueIndexOf(row._e);
-    if (row._g === 'q') { if (i >= 0) { Q.items.splice(i, 1); queueChanged(); } }
-    else PL.list = PL.list.filter((x) => x !== row._e);                // skipped: it is not in this playlist any more (until the list is built again)
-    renderMq(); $('mqList').scrollTop = top; updateBar();
-    return;
-  }
-  if (!row || ev.target.closest('.mq-grip') || row._e === V.entry) return;
-  V.autoplay = true;
-  openViewer(row._e);
-});
-$('mqList').addEventListener('pointerdown', (ev) => {
-  const grip = ev.target.closest('.mq-grip');
-  if (!grip) return;
-  const row = grip.parentNode;
-  if (row._g === 'cur') return;                                       // the playing file stays where it is
-  ev.preventDefault();
-  const box = $('mqList');
-  const rows = [...box.children].filter((r) => r._e);
-  const from = rows.indexOf(row);
-  const same = rows.map((r, i) => (r._g === row._g ? i : -1)).filter((i) => i >= 0);
-  const lo = same[0], hi = same[same.length - 1] + 1;                 // a file moves only inside its own group (queued by hand / playlist)
-  const step = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : 50;
-  const line = h('div', 'mq-line'), ghost = row.cloneNode(true);
-  ghost.className = 'mq-row mq-ghost';
-  const r0 = row.getBoundingClientRect();
-  ghost.style.width = r0.width + 'px'; ghost.style.left = r0.left + 'px';
-  row.classList.add('drag');
-  box.append(line); document.body.append(ghost);
-  let raf = 0, y = ev.clientY, slot = from;
-  const frame = () => {
-    const bb = box.getBoundingClientRect();
-    box.scrollTop += y < bb.top + 28 ? -10 : y > bb.bottom - 28 ? 10 : 0;
-    ghost.style.top = (y - r0.height / 2) + 'px';
-    slot = Math.max(lo, Math.min(hi, Math.round((y - bb.top + box.scrollTop - rows[0].offsetTop - r0.height / 2) / step + 0.5)));
-    line.style.top = (rows[0].offsetTop + slot * step - 2) + 'px';
-    line.hidden = slot === from || slot === from + 1;
-    raf = requestAnimationFrame(frame);
-  };
-  raf = requestAnimationFrame(frame);
-  const move = (m) => { y = m.clientY; };
-  const done = () => {
-    cancelAnimationFrame(raf);
-    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', done); document.removeEventListener('pointercancel', done);
-    ghost.remove(); line.remove(); row.classList.remove('drag');
-    if (slot === from || slot === from + 1) return;
-    box.insertBefore(row, rows[slot] || line.nextSibling);
-    row.animate([{ background: 'var(--surface-3)' }, { background: 'transparent' }], { duration: 500 });
-    const e = V.entry, now = [...box.children].filter((r) => r._e && r._g === row._g);
-    if (row._g === 'q') {                                              // the queue itself changes order
-      const entries = now.map((r) => r._e);
-      const slots = entries.map((x) => queueIndexOf(x)).sort((a, b) => a - b);
-      const items = entries.map((x) => Q.items[queueIndexOf(x)]);
-      slots.forEach((pos, k) => { Q.items[pos] = items[k]; });
-      queueChanged();
-    } else {                                                           // the playlist: the rows that were drawn, then the rest as it was
-      const list = ctxList(e), i = ctxBase(e, list), qset = new Set(Q.items.map((it) => it.entry));
-      const nowE = now.map((r) => r._e), drawn = new Set(nowE);
-      let k = 0;                                                       // the drawn rows take their places in the new order; everything else stays put
-      PL.list = list.slice(0, i + 1).concat(list.slice(i + 1).map((x) => (qset.has(x) || !drawn.has(x) ? x : nowE[k++])));
-    }
-    box.querySelectorAll('.mq-end').forEach((r) => r.classList.remove('mq-end'));
-    const qrows = [...box.children].filter((r) => r._g === 'q');
-    if (qrows.length) qrows[qrows.length - 1].classList.add('mq-end');
-    [...box.children].filter((r) => r._g === 'q').forEach((r, k) => { r.querySelector('.mq-num').textContent = ''; });
-    [...box.children].filter((r) => r._g === 'c').forEach((r) => { r.querySelector('.mq-num').textContent = String(PL.list.indexOf(r._e) + 1); });
-    updateBar();
-  };
-  document.addEventListener('pointermove', move); document.addEventListener('pointerup', done); document.addEventListener('pointercancel', done);
-});
-
 /* ----- “More” menu ----- */
 function openMenu() {
-  closeOverview();
-  closeMq(); closeVol();
+  closeOverview(); closePops();
   V.menuOpen = true;
   $('vMenu').hidden = false;
   $('vMore').setAttribute('aria-expanded', 'true');
@@ -856,14 +653,14 @@ function openMenu() {
 }
 function closeMenu() {
   V.menuOpen = false;
-  closeMq(); closeVol();
+  closePops();
   $('vMenu').hidden = true;
   $('vMore').removeAttribute('aria-expanded');
   showUi();
 }
 $('vMore').onclick = () => (V.menuOpen ? closeMenu() : openMenu());
 document.addEventListener('pointerdown', (e) => {
-  if (V.menuOpen && !e.target.closest('#vMenu, #vMore, #mMore, #mqMenu, #mQueue, #volPop, #mMute')) closeMenu();
+  if (V.menuOpen && !e.target.closest('#vMenu, #vMore, #mMore, #mqMenu, #mQueue, #qMenu, #qPos, #volPop, #mMute')) closeMenu();
 });
 
 /* ----- Black / white screen (hides the slide, like B and W in PowerPoint) ----- */

@@ -15,10 +15,11 @@ HOW TO START FROM A FLASH DRIVE
   2. On the classroom computer plug in the drive and double-click "Lectern.html".
      It opens in the browser (Chrome, Edge, Firefox or Safari).
   3. Press "Choose folder" and pick the "Files" folder (or drag the folder, or
-     single files, into the window).
+     single files, into the window). Once files are shown, "Choose folder",
+     "Add files" and "Rescan" are in the "Files" row under the search box.
        Chrome / Edge   A normal folder picker. The folder is remembered: next time
                        press "Reopen" (the browser asks once for permission).
-                       "Rescan folder" (in the More menu, top right) picks up files you added.
+                       "Rescan" (Files row) picks up files you added.
        Firefox         The browser asks "Upload files to this site?" — answer
                        yes. This is only its standard wording: nothing is
                        uploaded anywhere. Dragging the folder into the window
@@ -45,13 +46,17 @@ SUPPORTED FILES
   WebM are fine in Chrome, Edge, Safari; some .mov files are not).
 
 PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
-  1. Open a PDF or PowerPoint, press P (or More > Presenter view). A second
+  1. Open a PDF, a PowerPoint, a video or a song, press P (or More > Presenter view). A second
      window opens. Drag it to your laptop screen, then press F in the slides window.
   2. In the second window open the file with your speech. On the right it shows the
      current and next slide and the notes. Up / Down (or Page Up / Page Down on a
      clicker) turn the slides; Left / Right turn the speech file. You can also turn
      slides in the first window. The timer is shared.
   3. Pen, laser and black screen work in the slides window only.
+  Video / song: the panel in the second window has the pause, 5 seconds back /
+     forward, previous / next file buttons, a time bar to click, and the queue
+     (click a file to play it, the cross takes it out; the arrow folds the list).
+     Good for a listening exercise: the text on your screen, the sound in the room.
   To end it: More > Stop presenter view (the second window closes).
   If the browser blocks the new window, allow pop-ups for this page.
   Both windows must be in the same browser, as two separate windows (not tabs).
@@ -88,6 +93,13 @@ CLASS QUEUE (the files for one lesson, in order)
   While a file of the queue is open, the arrows in the top bar (or [ and ]) jump
   to the next / previous file. At the very end of a file a second "Next" moves on
   to the next file, so a presentation clicker can run the whole lesson.
+  The number in the top bar ("2 / 5") opens the whole queue: click a file to
+  open it, drag the grip to change the order, the cross (it shows when the
+  mouse is over a file) takes it out. This works for any mix of files: a
+  document, a presentation, two films and a song, one after the other. A queue of
+  different kinds is a plain list, so the playlist, shuffle and repeat buttons
+  are not shown. Films and songs of such a queue start by themselves in turn;
+  documents wait for you (next file: [ ] or the arrows).
   The queue lives while the page is open: after a reload, or when you choose a
   different folder, it starts empty.
 

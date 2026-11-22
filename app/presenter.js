@@ -1,6 +1,6 @@
 'use strict';
 /* Lectern — Presenter view, start-up.  One of the app/*.js files that Lectern.html loads in this order:
-   core.js, errors.js, list.js, viewers.js, viewer-ui.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js. They are plain scripts that share one global scope
+   core.js, drive.js, errors.js, list.js, queue.js, thumbs.js, viewers.js, viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js. They are plain scripts that share one global scope
    (no modules, so it also works from a file:// address on a flash drive). The map of everything is at the top of core.js. */
 
 /* =====================================================================
@@ -19,6 +19,7 @@ const Link = {
   ch: null,
   alive: false, peerRole: '', seen: 0, win: null,
   seq: 0, key: 0,           // presenter: the number of the file now shown (0 = nothing to present)
+  items: [],                // presenter: the files of the rows that the companion shows (a video / song)
   last: '', resent: 0,
   rem: null,                // companion: the file of the presenter { key, name, viewer, ratio, notes, ready }
   pos: null,                // companion: where the presenter is { key, index, count }
@@ -34,13 +35,14 @@ try { if ('BroadcastChannel' in window) Link.ch = new BroadcastChannel('lectern-
 const presenterOn = () => Link.role === 'presenter' && Link.alive && Link.peerRole === 'companion';
 // "Presenter view" is only offered when it can work: this browser can link two windows, and the open file is a PDF or a presentation
 function syncPresenterItem() { $('mPresenter').hidden = !Link.ch || Link.role === 'companion' || !(presenterOn() || (V.driver && presentable())); }
-const presentable = () => !!V.entry && !!V.driver && (V.entry.viewer === 'pdf' || V.entry.viewer === 'pptx') && V.driver.count > 0;
+const presentable = () => !!V.entry && !!V.driver && (V.driver.isMedia || ((V.entry.viewer === 'pdf' || V.entry.viewer === 'pptx') && V.driver.count > 0));
 
 /* ----- Presenter window ----- */
 function linkSendFile() {
   const d = V.driver, e = V.entry;
   if (Link.role !== 'presenter' || !Link.key || !d || !e) return;
-  Link.send({ t: 'file', key: Link.key, name: e.name, viewer: e.viewer, file: e.file, ratio: d.thumbRatio, notes: d.notes || [] });
+  if (d.isMedia) Link.send({ t: 'file', key: Link.key, name: e.base || e.name, viewer: 'media' });          // a film or a song is not copied: only its buttons and queue are shown
+  else Link.send({ t: 'file', key: Link.key, name: e.name, viewer: e.viewer, file: e.file, ratio: d.thumbRatio, notes: d.notes || [] });
 }
 // A file has finished opening
 function linkFile() {
@@ -51,7 +53,14 @@ function linkFile() {
 function linkPush(force) {
   if (Link.role !== 'presenter') return;
   const d = V.driver, ok = !!Link.key && !!d && $('vMsg').hidden;
-  const s = ok ? { t: 'state', key: Link.key, index: d.currentIndex(), count: d.count } : { t: 'state', key: 0 };
+  let s = { t: 'state', key: 0 };
+  if (ok && d.isMedia) {
+    if (!Link.alive && !force) return;
+    const rows = upNextEntries();
+    Link.items = rows.map((r) => r.e);               // the second window refers to a row by its number
+    s = { t: 'state', key: Link.key, media: { playing: d.playing, time: Math.floor(d.el.currentTime || 0), dur: d.el.duration || 0, mode: queueMode() ? 'queue' : 'playlist',
+      rows: rows.slice(0, 40).map((r) => ({ g: r.g, n: r.n, title: r.title, sub: r.sub, hideN: !!r.hideN, end: !!r.end })) } };
+  } else if (ok) s = { t: 'state', key: Link.key, index: d.currentIndex(), count: d.count };
   const sig = JSON.stringify(s);
   if (!force && sig === Link.last) return;
   Link.last = sig;
@@ -61,7 +70,7 @@ function linkSendAll() { linkSendFile(); linkPush(true); if (Timer.active) timer
 function presenterStart() {
   if (Link.role === 'companion') return;
   if (!Link.ch) { showToast('Presenter view needs a newer browser'); return; }
-  if (!presentable()) { showToast('Presenter view works with PDF and PowerPoint files'); return; }
+  if (!presentable()) { showToast('Presenter view works with PDF, PowerPoint, video and audio files'); return; }
   closeMenu();
   Link.role = 'presenter';
   if (!Link.key) linkFile();
@@ -99,9 +108,25 @@ function companionLeave() {                       // the presenter window ended 
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* fine */ }
   linkUi();
 }
-function linkCmd(c) {
+function linkCmd(c, extra) {
   if (!Link.rem || !Link.rem.key) { showToast('No presentation to control yet'); return; }
-  Link.send({ t: 'cmd', key: Link.rem.key, c });
+  Link.send(Object.assign({ t: 'cmd', key: Link.rem.key, c }, extra));
+}
+// The presentation window obeys the companion: turn the page, or (video / song) pause, jump, change the file
+function remoteCmd(m) {
+  const d = V.driver;
+  if (!d.isMedia) { if (['next', 'prev', 'first', 'last'].includes(m.c)) d.go(m.c); return; }
+  const e = Link.items[m.i], same = !!e && (e.base || e.name) === m.n && e !== V.entry;      // the row must still be the same file
+  switch (m.c) {
+    case 'toggle': d.toggle(); break;
+    case 'back': d.skip(-5); break;
+    case 'fwd': d.skip(5); break;
+    case 'seek': d.seek(m.r); break;
+    case 'prevf': queueStep(-1); break;
+    case 'nextf': queueStep(1); break;
+    case 'go': if (same) { if (playable(e)) V.autoplay = true; openViewer(e); } break;
+    case 'rm': if (same) { upNextRemove(e, m.g); updateBar(); } break;
+  }
 }
 
 async function peekPdf(file) {
@@ -149,6 +174,7 @@ async function peekPptx(file, ratio) {
 async function peekLoad(m) {
   const old = Link.peek; Link.peek = null;
   if (old) old.destroy();
+  if (m.viewer === 'media') { Link.rem = { key: m.key, name: m.name, viewer: 'media', notes: [], ready: true }; pvRender(); return; }
   Link.rem = { key: m.key, name: m.name, viewer: m.viewer, ratio: m.ratio || 0.5625, notes: m.notes || [], ready: false };
   pvRender();
   try {
@@ -168,12 +194,14 @@ function pvRender() {
   const empty = $('pvEmpty');
   let msg = '';
   if (!online) msg = 'Waiting for the presentation window…';
-  else if (Link.pos && !Link.pos.key) msg = 'Open a PDF or PowerPoint file in the presentation window.';
+  else if (Link.pos && !Link.pos.key) msg = 'Open a PDF, a PowerPoint file, a video or a song in the presentation window.';
   else if (!pos) msg = 'Loading the presentation…';
   empty.textContent = msg;
   $('pv').classList.toggle('idle', !!msg);
   $('pvTitle').textContent = online && rem && rem.name ? rem.name : 'Presentation';
+  $('pv').classList.toggle('is-media', !msg && rem.viewer === 'media');
   if (msg) { pvJob++; return; }
+  if (rem.viewer === 'media') { pvJob++; pvMedia(pos.media); return; }
 
   const i = pos.index, last = pos.count - 1;
   $('pvPos').textContent = (rem.viewer === 'pdf' ? 'Page ' : 'Slide ') + (i + 1) + ' of ' + pos.count;
@@ -198,6 +226,34 @@ function pvRender() {
   eng.draw(i, $('pvNow'), stale);
   if (i < last) eng.draw(i + 1, $('pvNext'), stale); else $('pvNext').replaceChildren();
 }
+// Video / song: time, the buttons and the queue (rows are drawn again only when they change, so a click is never lost)
+function pvMedia(m) {
+  if (!m) return;
+  $('pvMTime').textContent = fmtTime(m.time) + ' / ' + fmtTime(m.dur);
+  $('pvMFill').style.width = (m.dur > 0 ? Math.min(100, m.time / m.dur * 100) : 0) + '%';
+  $('pvMPlayIcon').setAttribute('href', m.playing ? '#i-pause' : '#i-play');
+  $('pvMPlay').setAttribute('aria-label', m.playing ? 'Pause' : 'Play');
+  $('pvMState').textContent = m.playing ? 'Playing' : 'Paused';
+  $('pvQCap').textContent = m.mode === 'queue' ? 'Queue' : 'Up next';
+  const sig = JSON.stringify(m.rows);
+  if (pvMedia.sig === sig) return;
+  pvMedia.sig = sig;
+  $('pvQList').replaceChildren(...m.rows.map((r, i) => { const row = mqRow(Object.assign({ noGrip: true }, r)); row._i = i; return row; }));
+}
+$('pvQList').addEventListener('click', (ev) => {
+  const row = ev.target.closest('.mq-row');
+  if (!row || row._g === 'cur') return;
+  const n = row.querySelector('.mq-t b').textContent;
+  // the presentation window compares the file name, so a list that changed in the meantime is never obeyed by mistake
+  linkCmd(ev.target.closest('.mq-x') ? 'rm' : 'go', { i: row._i, n, g: row._g });
+});
+$('pvMPlay').onclick = () => linkCmd('toggle');
+$('pvMBack').onclick = () => linkCmd('back');
+$('pvMFwd').onclick = () => linkCmd('fwd');
+$('pvMPrevF').onclick = () => linkCmd('prevf');
+$('pvMNextF').onclick = () => linkCmd('nextf');
+$('pvMBar').onclick = (ev) => { const b = $('pvMBar').getBoundingClientRect(); linkCmd('seek', { r: (ev.clientX - b.left) / b.width }); };
+
 // When the panel changes size, slides drawn as pages of HTML are scaled again
 const pvResize = new ResizeObserver((items) => {
   for (const it of items) {
@@ -261,7 +317,7 @@ function linkReceive(m) {
       }
       break;
     case 'cmd':
-      if (Link.role === 'presenter' && m.key === Link.key && Link.key && V.driver && $('vMsg').hidden && ['next', 'prev', 'first', 'last'].includes(m.c)) V.driver.go(m.c);
+      if (Link.role === 'presenter' && m.key === Link.key && Link.key && V.driver && $('vMsg').hidden) remoteCmd(m);
       break;
     case 'file': if (Link.role === 'companion') peekLoad(m); break;
     case 'state':
@@ -278,21 +334,21 @@ setInterval(() => {
   if (Link.alive && Date.now() - Link.seen > 6000) { Link.alive = false; linkUi(); }
 }, 1500);
 window.addEventListener('pagehide', () => Link.send({ t: 'bye' }));
-// "Hide notes" in the companion's panel (remembered)
-function pvNotesOff(off) {
-  $('pv').classList.toggle('notes-off', off);
-  $('pvFold').setAttribute('aria-expanded', String(!off));
-  $('pvFold').dataset.tip = off ? 'Show notes' : 'Hide notes';
+// The fold buttons of the companion's panel (notes / queue): the whole panel shrinks to its content (or grows back); remembered
+function pvFolder(btn, cls, key, what) {
+  const set = (off) => { $('pv').classList.toggle(cls, off); btn.setAttribute('aria-expanded', String(!off)); btn.dataset.tip = (off ? 'Show ' : 'Hide ') + what; btn.setAttribute('aria-label', btn.dataset.tip); };
+  set(loadPref(key, '0') === '1');
+  btn.onclick = () => {
+    const off = !$('pv').classList.contains(cls), pv = $('pv');
+    savePref(key, off ? '1' : '0');
+    const from = pv.offsetHeight;
+    set(off);
+    const to = pv.offsetHeight;
+    if (!prefersReducedMotion() && from !== to && pv.animate) pv.animate([{ height: from + 'px' }, { height: to + 'px' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  };
 }
-pvNotesOff(loadPref('fv-pv-notes-off', '0') === '1');
-$('pvFold').onclick = () => {
-  const off = !$('pv').classList.contains('notes-off'), pv = $('pv');
-  savePref('fv-pv-notes-off', off ? '1' : '0');
-  const from = pv.offsetHeight;
-  pvNotesOff(off);                                             // the whole panel shrinks to its content (or grows back)
-  const to = pv.offsetHeight;
-  if (!prefersReducedMotion() && from !== to && pv.animate) pv.animate([{ height: from + 'px' }, { height: to + 'px' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
-};
+pvFolder($('pvFold'), 'notes-off', 'fv-pv-notes-off', 'notes');
+pvFolder($('pvQFold'), 'queue-off', 'fv-pv-queue-off', 'the queue');
 $('mPresenter').onclick = () => { if (presenterOn()) { closeMenu(); presenterStop(); } else presenterStart(); };
 
 if (Link.role === 'companion') {

@@ -29,13 +29,6 @@ function zipLoad(file) {
   });
 }
 
-function fmtTime(sec) {
-  if (!isFinite(sec) || sec < 0) sec = 0;
-  const s = Math.floor(sec % 60), m = Math.floor(sec / 60) % 60, hh = Math.floor(sec / 3600);
-  const two = (n) => String(n).padStart(2, '0');
-  return hh ? hh + ':' + two(m) + ':' + two(s) : m + ':' + two(s);
-}
-
 function snippetNode(title, body, cls) {
   const box = h('div', 'snippet' + (cls ? ' ' + cls : ''));
   if (title) box.appendChild(h('b', '', title));

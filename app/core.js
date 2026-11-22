@@ -4,7 +4,7 @@
    Vanilla JS, no build step. Runs from Lectern.html (USB stick) and as a PWA.
 
    THE CODE IS SPLIT INTO PLAIN SCRIPTS (Lectern.html loads them in this order, they share one global scope):
-     core.js (1-4)  ·  drive.js (memory on the flash drive)  ·  list.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
+     core.js (1-4)  ·  drive.js (memory on the flash drive)  ·  list.js, queue.js, thumbs.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
    They are not ES modules on purpose: modules do not load from a file:// address, and Lectern runs from a flash drive.
    A function declared in a later file is not yet known while an earlier file runs its top-level code.
 
@@ -208,6 +208,13 @@ function fullDate(ms) {
 function plural(n, forms) { return n === 1 ? forms[0] : forms[1]; }
 function getExt(name) { const i = name.lastIndexOf('.'); return i < 0 ? '' : name.slice(i + 1).toLowerCase(); }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const s = Math.floor(sec % 60), m = Math.floor(sec / 60) % 60, hh = Math.floor(sec / 3600);
+  const two = (n) => String(n).padStart(2, '0');
+  return hh ? hh + ':' + two(m) + ':' + two(s) : m + ':' + two(s);
+}
+
 
 function decodeXml(s) {
   return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
