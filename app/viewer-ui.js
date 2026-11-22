@@ -328,7 +328,7 @@ function ctxList(e) {
 /* Like Spotify: the songs put in the class queue by hand play first (after the playing one), then the playlist goes on */
 function queuedAfter(e) {
   const qi = queueIndexOf(e);
-  return Q.items.slice(qi + 1).map((it) => it.entry).filter((x) => x && x !== e && x.kind === e.kind);
+  return Q.items.slice(qi + 1).map((it) => it.entry).filter((x) => x && x !== e);       // any kind: film, song, film, a slide file …
 }
 const playlist = ctxList;
 // Where the playlist goes on after the hand-made queue is played: after the last file that came from the playlist itself
@@ -345,6 +345,7 @@ function mediaNext(dir) {
   if (dir > 0) {
     const q = queuedAfter(e);
     if (q.length) return q[0];
+    if (queueIndexOf(e) >= 0 && !(MP.anchor && list.includes(MP.anchor))) return null;      // a queue that was started by itself ends with its last file
     for (let j = i + 1; j < list.length; j++) if (!queued.has(list[j])) return list[j];
     if (MP.repeat === 'all') for (let j = 0; j < i; j++) if (!queued.has(list[j])) return list[j];
     return null;

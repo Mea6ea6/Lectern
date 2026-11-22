@@ -791,6 +791,7 @@ function queueNeighbor(dir) {
 function queueStep(dir) {
   const media = V.driver && V.driver.isMedia;
   const to = media ? mediaNext(dir) : (queueNeighbor(dir) || {}).entry;
+  if (to && (to.kind === 'video' || to.kind === 'audio') && (media || dir > 0)) V.autoplay = true;
   if (to) { if (media && V.driver.playing) V.autoplay = true; if (media && dir > 0) leaveQueued(V.entry); openViewer(to); }
   else if (V.entry && queueIndexOf(V.entry) >= 0) showToast(dir > 0 ? 'This is the last file of the queue' : 'This is the first file of the queue');
 }
@@ -819,6 +820,7 @@ function queueStart() {
   const first = Q.items.find((it) => it.entry);
   if (!first) return;
   closeModal();
+  MP.anchor = null;
   if (first.entry.kind === 'video' || first.entry.kind === 'audio') V.autoplay = true;      // songs and films start playing at once
   openViewer(first.entry);
 }
