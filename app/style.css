@@ -637,9 +637,9 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .info-thumb .snippet-table { width: 190px; height: auto; padding: 0; }
 .info-thumb .mini-table { font-size: 6px; }
 .info-name { font-weight: 700; font-size: 22px; line-height: 1.25; letter-spacing: var(--title-track); word-break: break-word; margin-top: 4px; }
-.info-rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 11px 16px; margin: 0; text-align: left; }
+.info-rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 11px 16px; margin: 0; text-align: left; align-items: baseline; }     /* label and value share the first line's baseline, also when the value takes several lines */
 .info-rows dt {
-  padding-top: 2px; text-align: right; color: var(--ink);
+  padding-top: 0; text-align: right; color: var(--ink);
   font-size: var(--label-size); font-weight: var(--label-weight);
   text-transform: var(--label-case); letter-spacing: var(--label-track);
 }
@@ -1227,7 +1227,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .media-video::cue { background: rgb(0 0 0 / .72); color: #fff; font-family: Inter, system-ui, sans-serif; font-size: 120%; line-height: 1.3; }
 .thumb .media-snip.has-cover { position: relative; padding: 0; width: auto; height: 90%; aspect-ratio: 1; overflow: hidden; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }     /* the cover is a square in the middle of the card */
 .thumb .media-snip.has-cover img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; border-radius: 0; box-shadow: none; }
-.media-snip.has-cover .media-dur { position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: var(--r-pill); background: rgb(0 0 0 / .6); color: #fff; }
+.media-snip.has-cover .media-dur { position: absolute; right: 8px; bottom: 8px; padding: 2px 9px; border-radius: var(--r-pill); background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd); }
 .upnext .resume-text { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
 #upnext.anim-in  { animation: foot-in .34s var(--ease-out) backwards; }
 #upnext.anim-out { animation: foot-out .2s var(--ease-in) forwards; pointer-events: none; }
@@ -1402,7 +1402,11 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .mq-t { flex: 1; min-width: 0; }
 .mq-t b { display: block; font-weight: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mq-t small { display: block; font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mq-now { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+.mq-num { position: relative; display: inline-block; }
+.mq-now { position: absolute; left: 50%; top: 100%; width: 6px; height: 6px; margin: 1px 0 0 -3px; border-radius: 50%; background: var(--ink); }
+.mq-x { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm, 8px); color: var(--ink-soft); }
+.mq-x:hover { background: var(--surface-3); color: var(--ink); }
+.mq-x .icon { width: 16px; height: 16px; }
 
 .mq-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mq-shuf { min-height: 36px; min-width: 36px; }
@@ -1415,3 +1419,12 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
   .tb-folders { width: auto; padding: 0 14px 0 12px; }
   .seg[id="viewSeg"] button { width: auto; padding: 0 14px 0 12px; }
 }
+
+/* A song or film without a picture: the same dark placeholder in the information window as on the card */
+.info-thumb .media-snip { width: 170px; height: 164px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 0; background: #1c1c1c; color: #fff; border-radius: 4px; box-shadow: 0 6px 22px rgba(0,0,0,.35); }
+.info-thumb .media-snip .media-dur { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.info-thumb .media-snip.has-cover { position: relative; width: 164px; overflow: hidden; }
+.info-thumb .media-snip.has-cover img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; border-radius: 0; box-shadow: none; background: none; }
+.info-thumb .media-snip.has-cover .media-dur { position: absolute; right: 8px; bottom: 8px; padding: 2px 9px; border-radius: var(--r-pill); background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); }
+
+.mq-row.mq-end { margin-bottom: 16px; }          /* songs put in the queue by hand end with a small gap, like in Spotify */

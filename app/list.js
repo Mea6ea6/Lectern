@@ -759,7 +759,6 @@ function queueChanged() {
   const place = new Map(Q.items.map((it, i) => [it.entry, i]));
   for (const e of state.files) markQueue(e, place.has(e) ? place.get(e) : -1);   // only cards whose place changed are touched
   $('btnQueue').hidden = !state.files.length && !Q.items.length;
-  $('btnQueuePlay').hidden = !Q.items.some((it) => it.entry);
   const countText = Q.items.length ? String(Q.items.length) : '';
   if ($('qCount').textContent !== countText && countText && !prefersReducedMotion()) {       // the number gives a little hop when it changes
     $('qCount').animate([{ scale: 1.4 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)' });
@@ -792,7 +791,7 @@ function queueNeighbor(dir) {
 function queueStep(dir) {
   const media = V.driver && V.driver.isMedia;
   const to = media ? mediaNext(dir) : (queueNeighbor(dir) || {}).entry;
-  if (to) { if (media && V.driver.playing) V.autoplay = true; openViewer(to); }
+  if (to) { if (media && V.driver.playing) V.autoplay = true; if (media && dir > 0) leaveQueued(V.entry); openViewer(to); }
   else if (V.entry && queueIndexOf(V.entry) >= 0) showToast(dir > 0 ? 'This is the last file of the queue' : 'This is the first file of the queue');
 }
 // Pressed Next at the end of a file (or Previous at its start): the first press only announces the move
@@ -909,7 +908,6 @@ function renderQueueDialog(first) {
   }
 }
 $('btnQueue').onclick = openQueue;
-$('btnQueuePlay').onclick = queueStart;
 
 
 /* ---------------------------------------------------------------------
