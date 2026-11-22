@@ -327,6 +327,7 @@ document.addEventListener('keydown', (e) => {
     if (e.code === 'BracketLeft' || (e.shiftKey && e.key === 'ArrowLeft'))  return act(() => queueStep(-1));
     if (e.code === 'BracketRight' || (e.shiftKey && e.key === 'ArrowRight')) return act(() => queueStep(1));
 
+    if (V.driver && V.driver.isMedia && (e.code === 'KeyJ' || e.code === 'KeyL')) return act(() => { const k = e.code === 'KeyJ' ? -10 : 10; V.driver.skip(k); showToast(k > 0 ? '+10 s' : '−10 s'); showUi(); });
     if (e.code === 'KeyL') return act(() => setLaser(!Laser.on));
     if (e.code === 'KeyT') return act(openTimerDialog);
 

@@ -163,6 +163,16 @@ async function subtitleVtt(file) {
   return 'WEBVTT\n\n' + text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
 }
 
+// What to tell when the browser cannot play a file: the real reason is usually the container or the codec
+function playHint(entry, video) {
+  const ext = entry ? entry.ext : '';
+  const ff = /firefox/i.test(navigator.userAgent), safari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (ext === 'mkv') return (ff || safari ? 'This browser does not play MKV files. ' : 'This MKV uses a codec the browser lacks. ') + 'Chrome or Edge play most of them; or convert the file to MP4 (H.264).';
+  if (ext === 'mov' || ext === 'm4v') return 'The file uses a codec this browser lacks (often HEVC). Try Edge or Safari, or convert it to MP4 (H.264).';
+  if (ext === 'flac' || ext === 'ogg' || ext === 'opus' || ext === 'oga') return safari ? 'Safari plays only some of these. Try Chrome, Edge or Firefox, or convert the file to MP3.' : 'The file may be damaged. Try another browser, or convert it to MP3.';
+  return video ? 'The picture or sound uses a format this browser does not support. Try Chrome or Edge, or convert the file to MP4 (H.264).' : 'The sound uses a format this browser does not support. Try Chrome or Edge, or convert the file to MP3.';
+}
+
 class MediaViewer extends BaseViewer {
   constructor(...args) {
     super(...args);
@@ -185,9 +195,7 @@ class MediaViewer extends BaseViewer {
 
     await new Promise((ok, fail) => {
       el.onloadedmetadata = ok;
-      el.onerror = () => fail(friendly(
-        'This browser can’t play this file',
-        'The sound or picture uses a format this browser does not support. Try Chrome or Edge, or convert the file to MP4 (H.264) or WebM.'));
+      el.onerror = () => fail(friendly('This browser can’t play this file', playHint(this.entry, wantVideo)));
       el.src = this.url;
     });
     el.onerror = null;
@@ -195,7 +203,7 @@ class MediaViewer extends BaseViewer {
     // A video file without a picture (sound only) is shown like audio
     this.hasPicture = wantVideo && el.videoWidth > 0;
     this.canDraw = this.hasPicture;                          // the pen works on a paused picture
-    ['timeupdate', 'play', 'pause', 'ended', 'seeked', 'durationchange', 'volumechange', 'ratechange'].forEach((ev) => el.addEventListener(ev, () => this.onChange()));
+    ['timeupdate', 'play', 'pause', 'ended', 'seeked', 'durationchange', 'volumechange', 'ratechange', 'enterpictureinpicture', 'leavepictureinpicture'].forEach((ev) => el.addEventListener(ev, () => this.onChange()));
     el.addEventListener('ended', () => { if (this.onEnded) this.onEnded(); });
     if (this.hasPicture && el.requestVideoFrameCallback) {   // how long is one frame? (for stepping frame by frame)
       el.addEventListener('playing', () => {
@@ -225,7 +233,7 @@ class MediaViewer extends BaseViewer {
         box.appendChild(img);
       } else box.appendChild(icon('i-music'));
       const sub = tags ? [tags.artist, tags.album].filter(Boolean).join(' · ') : '';
-      box.append(h('div', 'media-title', (tags && tags.title) || (this.entry ? this.entry.base : '')), h('div', 'media-sub', sub || (wantVideo ? 'Sound only' : 'Audio')));
+      box.append(h('div', 'media-title', (tags && tags.title) || (this.entry ? this.entry.base : '')), h('div', 'media-sub', sub || (wantVideo ? 'Sound only. No picture? Try Chrome or Edge.' : 'Audio')));
       this.put(box);
     }
   }
@@ -267,6 +275,24 @@ class MediaViewer extends BaseViewer {
     this.el.muted = m; savePref('fv-muted', m ? '1' : '0');
     if (!m) savePref('fv-vol', String(this.el.volume));
   }
+  // Picture in picture: a small floating window (Chrome, Edge, Safari; Firefox has its own button on the video)
+  get canPip() { return this.hasPicture && !!document.pictureInPictureEnabled && !!this.el.requestPictureInPicture && !this.el.disablePictureInPicture; }
+  get pip() { return document.pictureInPictureElement === this.el; }
+  async togglePip() {
+    try { if (this.pip) await document.exitPictureInPicture(); else await this.el.requestPictureInPicture(); } catch (e) { /* the browser said no */ }
+    this.onChange();
+  }
+  // Several sound tracks (dubbing / original): only where the browser shows them
+  get audioTracks() { const t = this.el && this.el.audioTracks; return t && t.length > 1 ? Array.from(t) : []; }
+  get audioTrackIndex() { return Math.max(0, this.audioTracks.findIndex((t) => t.enabled)); }
+  audioTrackName(i) { const t = this.audioTracks[i]; return t ? (t.label || (t.language ? t.language.toUpperCase() : '') || 'Track ' + (i + 1)) : ''; }
+  nextAudioTrack() {
+    const list = this.audioTracks;
+    if (list.length < 2) return;
+    const to = (this.audioTrackIndex + 1) % list.length;
+    list.forEach((t, i) => { t.enabled = i === to; });
+    this.onChange();
+  }
   get rate() { return this.el.playbackRate; }
   setRate(r) { this.el.playbackRate = clamp(r, 0.25, 2); }
   get loop() { return this.el.loop; }
@@ -307,6 +333,7 @@ class MediaViewer extends BaseViewer {
   }
 
   destroy() {
+    if (this.el && this.pip) { try { document.exitPictureInPicture().catch(() => {}); } catch (e) { /* fine */ } }
     if (this.el) { try { this.el.pause(); } catch (e) { /* fine */ } this.el.removeAttribute('src'); this.el.load(); }
     if (this.url) URL.revokeObjectURL(this.url);
     if (this.trackUrl) URL.revokeObjectURL(this.trackUrl);

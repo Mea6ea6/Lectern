@@ -761,8 +761,9 @@ function queueNeighbor(dir) {
   return null;
 }
 function queueStep(dir) {
-  const n = queueNeighbor(dir);
-  if (n) openViewer(n.entry);
+  const media = V.driver && V.driver.isMedia;
+  const to = media ? mediaNext(dir) : (queueNeighbor(dir) || {}).entry;
+  if (to) { if (media && V.driver.playing) V.autoplay = true; openViewer(to); }
   else if (V.entry && queueIndexOf(V.entry) >= 0) showToast(dir > 0 ? 'This is the last file of the queue' : 'This is the first file of the queue');
 }
 // Pressed Next at the end of a file (or Previous at its start): the first press only announces the move

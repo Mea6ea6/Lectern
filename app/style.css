@@ -811,6 +811,8 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .is-media .doc-only, .media-only { display: none; }
 .is-media .media-only { display: flex; }
 .is-media .menu-gap.media-only { display: block; }
+.is-media .doc-tool, .is-audio .pic-tool, .is-video .audio-only { display: none; }
+.mcenter .vbtn-icon:not(.vbtn-big) { min-height: 48px; }
 .scrub-tip { position: absolute; bottom: 26px; left: 0; z-index: 2; translate: -50% 0; padding: 4px 10px; border-radius: var(--r-pill); background: var(--ink); color: var(--on-ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; box-shadow: var(--sh-2); }
 .vbtn-big { min-height: 60px; min-width: 76px; }
 .vbtn-big .icon { width: 30px; height: 30px; }

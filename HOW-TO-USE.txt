@@ -101,12 +101,15 @@ CONTINUE WHERE YOU STOPPED
 VIDEO AND AUDIO
   Click = play / pause, double click = full screen. Up / Down = volume, M = sound off,
   < and > = speed (0.25x - 2x), , and . = one frame back / forward, C = subtitles,
-  D = pen on the paused picture. More: speed, subtitles file, repeat.
+  D = pen on the paused picture. J / L = 10 seconds back / forward.
+  More: speed, subtitles file, repeat (off / folder / one), shuffle for music,
+  audio track (if the file has several). The little window button = picture in
+  picture. [ and ] = previous / next file of the folder.
   Subtitles: put a .srt or .vtt with the same name next to the video - it is found
   automatically. Recordings longer than 2 minutes offer "Continue from 42:10?".
   Songs show their cover, title and artist (mp3, FLAC, M4A).
-  Queue: when a video or song ends, "Next: ..." counts down 8 seconds and plays the
-  next file of the queue. Enter = play now, Esc = stay here.
+  Folder: when a song or video ends, the next one of the folder starts at once.
+  Queue: the next file of the class queue goes first, also at once.
   (In the video player M is sound; bookmarks are for documents.)
 
 BOOKMARKS

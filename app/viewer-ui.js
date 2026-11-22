@@ -38,7 +38,7 @@ async function openViewer(entry) {
   notesReset();
   V.armed = null;
   Link.key = 0;                                 // nothing to present until the file is open
-  V.el.classList.remove('is-media');
+  V.el.classList.remove('is-media', 'is-audio', 'is-video');
 
   V.entry = entry;
   recentTouch(entry);
@@ -77,12 +77,13 @@ async function openViewer(entry) {
     V.view.fit = driver.defaultFit;
     viewRestore(entry);
     driver.onChange = updateBar;
-    driver.onEnded = () => { if (V.driver === driver) upNextShow(); };
+    driver.onEnded = () => { if (V.driver === driver) mediaEnded(driver); };
     installPageGhost(driver);
     V.pending = null; clearGhosts();
     V.driver = driver;
     V.el.classList.toggle('is-media', driver.isMedia);
     await driver.open(entry.file);
+    if (token === V.openToken && driver.isMedia) { V.el.classList.toggle('is-audio', !driver.hasPicture); V.el.classList.toggle('is-video', !!driver.hasPicture); }
     if (token !== V.openToken) return;
     showMessage('');
     linkFile();
@@ -122,7 +123,7 @@ function closeViewer() {
   closeDriver();
   V.entry = null;
   Link.key = 0; linkPush();
-  V.el.classList.remove('is-media');
+  V.el.classList.remove('is-media', 'is-audio', 'is-video');
   V.el.hidden = true;
   document.body.classList.remove('viewing');
   updateWakeLock();
@@ -291,11 +292,46 @@ $('resumeNo').onclick = () => resumeClose(false);
 
 /* ----- Video / audio finished: the next file of the queue starts by itself after a short countdown ----- */
 const UPNEXT_MS = 8000;
-const UpNext = { open: false, anim: null, timer: 0 };
-function upNextShow() {
-  const n = queueNeighbor(1);
-  if (!n || UpNext.open) return;
-  $('upnextText').textContent = 'Next: ' + (n.entry.base || n.name);
+const UpNext = { open: false, anim: null, timer: 0, target: null };
+
+/* ----- Which file follows a video / song: the class queue first, else the next media file of the same folder -----
+   Repeat: off / folder (start again after the last one) / one (loop). Shuffle picks a random file that has not played yet. */
+const MP = { repeat: loadPref('fv-mrep', 'off'), shuffle: loadPref('fv-mshuf', '0') === '1', seen: new Set() };
+function folderMedia(e) {
+  return sortFiles(state.files.filter((x) => x.kind === e.kind && (x.dir || '') === (e.dir || '')));
+}
+function mediaNext(dir) {
+  const q = queueNeighbor(dir);
+  if (q) return q.entry;
+  const e = V.entry;
+  if (!e) return null;
+  const list = folderMedia(e), i = list.indexOf(e);
+  if (list.length < 2 || i < 0) return null;
+  if (MP.shuffle && dir > 0) {
+    MP.seen.add(e);
+    let rest = list.filter((x) => !MP.seen.has(x));
+    if (!rest.length) {
+      if (MP.repeat !== 'all') return null;
+      MP.seen = new Set([e]);
+      rest = list.filter((x) => x !== e);
+    }
+    return rest[Math.floor(Math.random() * rest.length)];
+  }
+  const j = i + dir;
+  if (list[j]) return list[j];
+  return MP.repeat === 'all' ? list[(j + list.length) % list.length] : null;
+}
+// The file ended: the next one starts at once
+function mediaEnded(d) {
+  const n = mediaNext(1);
+  if (!n) return;
+  V.autoplay = true;
+  openViewer(n);
+}
+function upNextShow(entry) {
+  if (!entry || UpNext.open) return;
+  UpNext.target = entry;
+  $('upnextText').textContent = 'Next: ' + (entry.base || entry.name);
   $('upnext').hidden = false;
   UpNext.open = true;
   if (UpNext.anim) UpNext.anim.cancel();
@@ -309,7 +345,8 @@ function upNextClose(go) {
   clearTimeout(UpNext.timer);
   if (UpNext.anim) { UpNext.anim.cancel(); UpNext.anim = null; }
   $('upnext').hidden = true;
-  if (go) { V.autoplay = true; queueStep(1); }              // the next video / song starts playing on its own
+  const to = UpNext.target; UpNext.target = null;
+  if (go && to) { V.autoplay = true; openViewer(to); }       // the next video / song starts playing on its own
 }
 $('upnextYes').onclick = () => upNextClose(true);
 $('upnextNo').onclick = () => upNextClose(false);
@@ -331,7 +368,18 @@ function updateMediaBar(d) {
   $('mSubs').setAttribute('aria-pressed', String(d.subsOn));
   $('mSubs').hidden = !d.hasSubs;
   $('mSubsFile').hidden = !d.hasPicture;
-  $('mLoop').setAttribute('aria-pressed', String(d.loop));
+  if (d.loop !== (MP.repeat === 'one')) d.setLoop(MP.repeat === 'one');
+  const sib = V.entry ? folderMedia(V.entry).length > 1 || !!queueNeighbor(1) || !!queueNeighbor(-1) : false;
+  document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.rep === MP.repeat)); if (b.dataset.rep === 'all') b.hidden = !sib; });
+  $('mShuffle').setAttribute('aria-pressed', String(MP.shuffle));
+  $('mShuffle').hidden = !sib;
+  $('mPrevFile').hidden = !(sib && mediaNext(-1));
+  $('mNextFile').hidden = !(sib && (MP.shuffle || mediaNext(1)));
+  $('mPip').hidden = !d.canPip;
+  $('mPip').setAttribute('aria-pressed', String(d.pip));
+  const tracks = d.audioTracks;
+  $('mDub').hidden = !tracks.length;
+  if (tracks.length) $('mDubVal').textContent = d.audioTrackName(d.audioTrackIndex);
   $('mInk').hidden = !d.canDraw;
   $('mInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
 }
@@ -404,6 +452,7 @@ function updateBar() {
   $('mPlay').setAttribute('aria-label', media && d.playing ? 'Pause' : 'Play');
   $('mediaBig').hidden = !media || d.playing || !d.hasPicture || (window.Pen && Pen.on);      // sound only: the button in the bar is enough
   if (media) updateMediaBar(d);
+  const lk = $('mLaser').querySelector('kbd'); if (lk) lk.hidden = media;       // in video / audio L jumps 10 seconds ahead
   updateQueueNav();
   if (window.Pen) Pen.sync();
 
@@ -686,7 +735,12 @@ $('mSpeed').onclick = $('mSpeedVal').onclick = () => { if (V.driver && V.driver.
 $('mSpeedDn').onclick = () => stepRate(-1);
 $('mSpeedUp').onclick = () => stepRate(1);
 $('mCC').onclick = $('mSubs').onclick = toggleSubs;
-$('mLoop').onclick = () => { const d = V.driver; if (d && d.isMedia) { d.setLoop(!d.loop); updateBar(); } };
+document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => { b.onclick = () => { MP.repeat = b.dataset.rep; savePref('fv-mrep', MP.repeat); updateBar(); }; });
+$('mShuffle').onclick = () => { MP.shuffle = !MP.shuffle; MP.seen = new Set(); savePref('fv-mshuf', MP.shuffle ? '1' : '0'); updateBar(); };
+$('mPrevFile').onclick = () => queueStep(-1);
+$('mNextFile').onclick = () => queueStep(1);
+$('mPip').onclick = () => { if (V.driver && V.driver.isMedia && V.driver.canPip) V.driver.togglePip(); };
+$('mDub').onclick = () => { if (V.driver && V.driver.isMedia) V.driver.nextAudioTrack(); };
 $('mSubsFile').onclick = () => { closeMenu(); $('subPick').value = ''; $('subPick').click(); };
 $('subPick').onchange = async () => {
   const f = $('subPick').files[0], d = V.driver;

@@ -97,6 +97,9 @@
     <symbol id="i-mute"     viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
     <symbol id="i-cc"       viewBox="0 0 24 24"><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17V7a1.5 1.5 0 0 1 1.5-1.5zM10.5 10.2A2.3 2.3 0 1 0 10.5 13.8M17.5 10.2A2.3 2.3 0 1 0 17.5 13.8"/></symbol>
     <symbol id="i-repeat"   viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a4 4 0 0 0-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 0 0 4-4v-1"/></symbol>
+    <symbol id="i-pip"      viewBox="0 0 24 24"><path d="M3 6h18v12H3zM12 12h7v4h-7z"/></symbol>
+    <symbol id="i-shuffle"  viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-6 6M4 20l16-16M21 16v5h-5M15 15l6 6M4 4l5 5"/></symbol>
+    <symbol id="i-audio"    viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/></symbol>
     <symbol id="i-music"    viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></symbol>
   </defs>
 </svg>
@@ -348,9 +351,11 @@
     <div class="mcontrols" id="mControls">
       <span class="mtime" id="mTime">0:00 / 0:00</span>
       <div class="mcenter">
+        <button class="vbtn vbtn-icon" id="mPrevFile" type="button" hidden title="Previous file ([)" aria-label="Previous file"><svg class="icon"><use href="#i-first"/></svg></button>
         <button class="vbtn vbtn-icon vbtn-big" id="mBack" type="button" title="Back 5 seconds (←)" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
         <button class="vbtn vbtn-icon vbtn-big vbtn-solid" id="mPlay" type="button" title="Play / pause (Space)" aria-label="Play"><svg class="icon"><use id="mPlayIcon" href="#i-play"/></svg></button>
         <button class="vbtn vbtn-icon vbtn-big" id="mFwd" type="button" title="Forward 5 seconds (→)" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mNextFile" type="button" hidden title="Next file (])" aria-label="Next file"><svg class="icon"><use href="#i-last"/></svg></button>
       </div>
       <div class="mright">
         <div class="vol">
@@ -359,6 +364,7 @@
         </div>
         <button class="vbtn" id="mSpeed" type="button" hidden title="Playback speed (&lt; and &gt;). Click to go back to normal">1×</button>
         <button class="vbtn vbtn-icon" id="mCC" type="button" hidden aria-pressed="false" title="Subtitles (C)" aria-label="Subtitles"><svg class="icon"><use href="#i-cc"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mPip" type="button" hidden aria-pressed="false" title="Small floating window (picture in picture)" aria-label="Picture in picture"><svg class="icon"><use href="#i-pip"/></svg></button>
         <button class="vbtn vbtn-icon" id="mInk" type="button" hidden aria-pressed="false" title="Pen and marker on the paused picture (D)" aria-label="Pen and marker"><svg class="icon"><use href="#i-draw"/></svg></button>
         <button class="vbtn vbtn-icon" id="mMore" type="button" aria-haspopup="true" title="Speed, subtitles, repeat, tools and settings" aria-label="More"><svg class="icon"><use href="#i-more"/></svg></button>
       </div>
@@ -448,8 +454,19 @@
     <button class="menu-item media-only" id="mSubsFile" type="button" title="Pick a .srt or .vtt file for this video">
       <svg class="icon"><use href="#i-plus"/></svg><span class="grow">Choose a subtitles file…</span>
     </button>
-    <button class="menu-item media-only" id="mLoop" type="button" aria-pressed="false" title="Play this file again and again">
-      <svg class="icon"><use href="#i-repeat"/></svg><span class="grow">Repeat</span><span class="switch"></span>
+    <div class="menu-row media-only">
+      <span class="menu-label">Repeat</span>
+      <div class="seg" id="mRepeat">
+        <button type="button" data-rep="off" title="Play each file once">Off</button>
+        <button type="button" data-rep="all" title="After the last file of the folder, start again from the first">Folder</button>
+        <button type="button" data-rep="one" title="Play this file again and again">One</button>
+      </div>
+    </div>
+    <button class="menu-item media-only audio-only" id="mShuffle" type="button" aria-pressed="false" title="Play the files of the folder in random order">
+      <svg class="icon"><use href="#i-shuffle"/></svg><span class="grow">Shuffle</span><span class="switch"></span>
+    </button>
+    <button class="menu-item media-only" id="mDub" type="button" hidden title="Switch to the next audio track (language)">
+      <svg class="icon"><use href="#i-audio"/></svg><span class="grow">Audio track</span><kbd id="mDubVal"></kbd>
     </button>
     <div class="menu-gap media-only"></div>
     <div class="menu-head doc-only">View</div>
@@ -477,19 +494,19 @@
     </div>
     <div class="menu-gap doc-only"></div>
     <div class="menu-head">Tools</div>
-    <button class="menu-item" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
+    <button class="menu-item pic-tool" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
       <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
     </button>
     <button class="menu-item" id="mTimer" type="button" title="Lesson timer (T)">
       <svg class="icon"><use href="#i-timer"/></svg><span class="grow">Timer</span><kbd>T</kbd>
     </button>
-    <button class="menu-item" id="mBlack" type="button" title="Black screen (B)">
+    <button class="menu-item pic-tool" id="mBlack" type="button" title="Black screen (B)">
       <svg class="icon"><use href="#i-black"/></svg><span class="grow">Black screen</span><kbd>B</kbd>
     </button>
-    <button class="menu-item" id="mNotes" type="button" title="Speaker notes (N)">
+    <button class="menu-item doc-tool" id="mNotes" type="button" title="Speaker notes (N)">
       <svg class="icon"><use href="#i-notes"/></svg><span class="grow">Speaker notes</span><kbd>N</kbd>
     </button>
-    <button class="menu-item" id="mPresenter" type="button" title="Presenter view: a second window (P)">
+    <button class="menu-item doc-tool" id="mPresenter" type="button" title="Presenter view: a second window (P)">
       <svg class="icon"><use href="#i-presenter"/></svg><span class="grow" id="mPresenterText">Presenter view</span><kbd>P</kbd>
     </button>
     <div class="menu-gap"></div>
