@@ -88,6 +88,7 @@ async function openViewer(entry) {
     showMessage('');
     linkFile();
     updateBar();
+    if (driver.isMedia && !$('mqMenu').hidden) renderMq();
     if (auto && driver.isMedia) driver.toggle(); else resumeOffer();
     if (!Resume.open && loadPref('fv-esc', '0') !== '1') { savePref('fv-esc', '1'); showToast('Press Esc to go back to your files', 3200); }     // said once, then never again
   } catch (err) {
@@ -296,16 +297,42 @@ const UpNext = { open: false, anim: null, timer: 0, target: null };
 
 /* ----- Which file follows a video / song: the class queue first, else the next media file of the same folder -----
    Repeat: off / folder (start again after the last one) / one (loop). Shuffle picks a random file that has not played yet. */
-const MP = { repeat: loadPref('fv-mrep', 'off'), shuffle: loadPref('fv-mshuf', '0') === '1', seen: new Set() };
-function folderMedia(e) {
-  return sortFiles(state.files.filter((x) => x.kind === e.kind && (x.dir || '') === (e.dir || '')));
+const MP = { repeat: loadPref('fv-mrep', 'off'), shuffle: loadPref('fv-mshuf', '0') === '1', scope: loadPref('fv-mscope', 'folder'), seen: new Set() };
+/* The play list: the files of the same kind from this folder, this folder with its subfolders, or everywhere.
+   The person can drag the files in the "Up next" window; the order is kept while the list stays the same. */
+const PL = { list: null, kind: '', scope: '', n: 0 };
+function plBuild(e) {
+  const base = e.dir || '';
+  let pool = state.files.filter((x) => x.kind === e.kind);
+  if (MP.scope === 'folder') pool = pool.filter((x) => (x.dir || '') === base);
+  else if (MP.scope === 'tree' && base) pool = pool.filter((x) => (x.dir || '') === base || (x.dir || '').startsWith(base + '/'));
+  const byDir = new Map();
+  for (const x of pool) { const d = x.dir || ''; if (!byDir.has(d)) byDir.set(d, []); byDir.get(d).push(x); }
+  const dirs = [...byDir.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  return dirs.flatMap((d) => sortFiles(byDir.get(d)));
+}
+function playlist(e) {
+  if (!PL.list || !PL.list.includes(e) || PL.kind !== e.kind || PL.scope !== MP.scope || PL.n !== state.files.length) {
+    PL.list = plBuild(e); PL.kind = e.kind; PL.scope = MP.scope; PL.n = state.files.length;
+  }
+  return PL.list;
+}
+function mediaHasNext(dir) {
+  if (queueNeighbor(dir)) return true;
+  const e = V.entry;
+  if (!e) return false;
+  const list = playlist(e), i = list.indexOf(e);
+  if (list.length < 2 || i < 0) return false;
+  if (MP.repeat === 'all') return true;
+  if (MP.shuffle && dir > 0) return list.some((x) => x !== e && !MP.seen.has(x));
+  return !!list[i + dir];
 }
 function mediaNext(dir) {
   const q = queueNeighbor(dir);
   if (q) return q.entry;
   const e = V.entry;
   if (!e) return null;
-  const list = folderMedia(e), i = list.indexOf(e);
+  const list = playlist(e), i = list.indexOf(e);
   if (list.length < 2 || i < 0) return null;
   if (MP.shuffle && dir > 0) {
     MP.seen.add(e);
@@ -369,12 +396,13 @@ function updateMediaBar(d) {
   $('mSubs').hidden = !d.hasSubs;
   $('mSubsFile').hidden = !d.hasPicture;
   if (d.loop !== (MP.repeat === 'one')) d.setLoop(MP.repeat === 'one');
-  const sib = V.entry ? folderMedia(V.entry).length > 1 || !!queueNeighbor(1) || !!queueNeighbor(-1) : false;
-  document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.rep === MP.repeat)); if (b.dataset.rep === 'all') b.hidden = !sib; });
+  document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.rep === MP.repeat)));
+  document.querySelectorAll('#mScope [data-scope]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scope === MP.scope)));
+  $('mScopeRow').hidden = !hasFolders();
   $('mShuffle').setAttribute('aria-pressed', String(MP.shuffle));
-  $('mShuffle').hidden = !sib;
-  $('mPrevFile').hidden = !(sib && mediaNext(-1));
-  $('mNextFile').hidden = !(sib && (MP.shuffle || mediaNext(1)));
+  $('mShuffle').hidden = !(V.entry && playlist(V.entry).length > 1);
+  $('mPrevFile').disabled = !mediaHasNext(-1);
+  $('mNextFile').disabled = !mediaHasNext(1);
   $('mPip').hidden = !d.canPip;
   $('mPip').setAttribute('aria-pressed', String(d.pip));
   const tracks = d.audioTracks;
@@ -438,6 +466,13 @@ function updateBar() {
   $('vPrev').disabled = $('vSidePrev').disabled = atStart && !prevFile;
   $('vLast').disabled = atEnd;
   $('vNext').disabled = $('vSideNext').disabled = atEnd && !nextFile;
+  if (ready && d.isMedia) {                                       // video / audio: the side arrows switch files
+    $('vSidePrev').disabled = !mediaHasNext(-1);
+    $('vSideNext').disabled = !mediaHasNext(1);
+  }
+  $('vSidePrev').dataset.tip = ready && d.isMedia ? 'Previous file ([)' : 'Previous';
+  $('vSideNext').dataset.tip = ready && d.isMedia ? 'Next file (])' : 'Next';
+  $('vSidePrev').setAttribute('aria-label', $('vSidePrev').dataset.tip); $('vSideNext').setAttribute('aria-label', $('vSideNext').dataset.tip);
   $('vOverview').disabled = !ready || !d.hasOverview || d.count < 2;
   $('vInk').disabled = !ready || !d.canDraw;
   $('vInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
@@ -665,9 +700,105 @@ function closeOverview() {
   showUi();
 }
 
+/* ----- Up next: the list of what plays after this file; drag the grip to change the order ----- */
+function closeMq() { $('mqMenu').hidden = true; $('mQueue').removeAttribute('aria-expanded'); }
+/* The window shows the playing file and what follows it, 30 at a time; more rows are added while you scroll down.
+   (A list of 1800 songs is never drawn whole, so the window opens at once.) */
+const MQ = { start: 0, shown: 0, CHUNK: 30 };
+function mqRow(x, i, withDir) {
+  const row = h('div', 'mq-row' + (x === V.entry ? ' current' : ''));
+  row._e = x;
+  const grip = h('span', 'mq-grip'); grip.append(icon('i-grip')); grip.dataset.tip = 'Drag to change the order';
+  const t = h('span', 'mq-t'); t.append(h('b', '', x.base || x.name));
+  if (withDir && x.dir) t.append(h('small', '', x.dir.split('/').pop()));
+  row.append(grip, h('span', 'mq-n', String(i + 1)), t);
+  if (x === V.entry) row.append(h('span', 'mq-now'));
+  return row;
+}
+function mqMore() {
+  const list = PL.list || [], from = MQ.start + MQ.shown;
+  if (from >= list.length) return;
+  const to = Math.min(list.length, from + MQ.CHUNK), withDir = MP.scope !== 'folder';
+  $('mqList').append(...list.slice(from, to).map((x, k) => mqRow(x, from + k, withDir)));
+  MQ.shown = to - MQ.start;
+}
+function renderMq() {
+  const e = V.entry;
+  if (!e) return;
+  const list = playlist(e);
+  $('mqHead').textContent = 'Up next · ' + list.length + (list.length === 1 ? ' file' : ' files');
+  MQ.start = Math.max(0, list.indexOf(e)); MQ.shown = 0;
+  $('mqList').replaceChildren();
+  $('mqList').scrollTop = 0;
+  mqMore();
+}
+$('mqList').addEventListener('scroll', () => {
+  const b = $('mqList');
+  if (b.scrollTop + b.clientHeight > b.scrollHeight - 160) mqMore();
+}, { passive: true });
+function openMq() {
+  if (!V.entry) return;
+  closeOverview();
+  $('vMenu').hidden = true; $('vMore').removeAttribute('aria-expanded');
+  V.menuOpen = true;
+  $('mqMenu').hidden = false;
+  $('mQueue').setAttribute('aria-expanded', 'true');
+  renderMq();
+  showUi();
+}
+$('mQueue').onclick = () => (!$('mqMenu').hidden ? closeMenu() : openMq());
+$('mqList').addEventListener('click', (ev) => {
+  const row = ev.target.closest('.mq-row');
+  if (!row || ev.target.closest('.mq-grip') || row._e === V.entry) return;
+  V.autoplay = true;
+  openViewer(row._e);
+});
+$('mqList').addEventListener('pointerdown', (ev) => {
+  const grip = ev.target.closest('.mq-grip');
+  if (!grip) return;
+  ev.preventDefault();
+  const box = $('mqList'), row = grip.parentNode;
+  const rows = [...box.children].filter((r) => r._e);
+  const from = rows.indexOf(row);
+  const step = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : 50;     // every row has the same height, so the place under the pointer is plain arithmetic
+  const line = h('div', 'mq-line'), ghost = row.cloneNode(true);
+  ghost.className = 'mq-row mq-ghost';
+  const r0 = row.getBoundingClientRect();
+  ghost.style.width = r0.width + 'px'; ghost.style.left = r0.left + 'px';
+  row.classList.add('drag');
+  box.append(line); document.body.append(ghost);
+  let raf = 0, y = ev.clientY, slot = from;
+  const frame = () => {
+    const bb = box.getBoundingClientRect();
+    box.scrollTop += y < bb.top + 28 ? -10 : y > bb.bottom - 28 ? 10 : 0;
+    ghost.style.top = (y - r0.height / 2) + 'px';
+    slot = Math.max(0, Math.min(rows.length, Math.round((y - bb.top + box.scrollTop - rows[0].offsetTop - r0.height / 2) / step + 0.5)));
+    line.style.top = (rows[0].offsetTop + slot * step - 2) + 'px';
+    line.hidden = slot === from || slot === from + 1;                             // dropping it where it already is changes nothing
+    raf = requestAnimationFrame(frame);
+  };
+  raf = requestAnimationFrame(frame);
+  const move = (m) => { y = m.clientY; };
+  const done = () => {
+    cancelAnimationFrame(raf);
+    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', done); document.removeEventListener('pointercancel', done);
+    ghost.remove(); line.remove(); row.classList.remove('drag');
+    if (slot !== from && slot !== from + 1) {
+      box.insertBefore(row, rows[slot] || line.nextSibling);
+      row.animate([{ background: 'var(--surface-3)' }, { background: 'transparent' }], { duration: 500 });
+      const now = [...box.children].filter((r) => r._e);
+      PL.list = PL.list.slice(0, MQ.start).concat(now.map((r) => r._e), PL.list.slice(MQ.start + MQ.shown));     // the part that is not drawn stays as it was
+      now.forEach((r, i) => { r.querySelector('.mq-n').textContent = String(MQ.start + i + 1); });
+      updateBar();
+    }
+  };
+  document.addEventListener('pointermove', move); document.addEventListener('pointerup', done); document.addEventListener('pointercancel', done);
+});
+
 /* ----- “More” menu ----- */
 function openMenu() {
   closeOverview();
+  closeMq();
   V.menuOpen = true;
   $('vMenu').hidden = false;
   $('vMore').setAttribute('aria-expanded', 'true');
@@ -675,13 +806,14 @@ function openMenu() {
 }
 function closeMenu() {
   V.menuOpen = false;
+  closeMq();
   $('vMenu').hidden = true;
   $('vMore').removeAttribute('aria-expanded');
   showUi();
 }
 $('vMore').onclick = () => (V.menuOpen ? closeMenu() : openMenu());
 document.addEventListener('pointerdown', (e) => {
-  if (V.menuOpen && !e.target.closest('#vMenu, #vMore, #mMore')) closeMenu();
+  if (V.menuOpen && !e.target.closest('#vMenu, #vMore, #mMore, #mqMenu, #mQueue')) closeMenu();
 });
 
 /* ----- Black / white screen (hides the slide, like B and W in PowerPoint) ----- */
@@ -720,8 +852,10 @@ V.el.addEventListener('click', (e) => { if (e.target.closest('button')) V.stage.
 $('vClose').onclick = closeViewer;
 $('vFull').onclick = toggleFullscreen;
 $('vFirst').onclick = () => navigate('first');
-$('vPrev').onclick = $('vSidePrev').onclick = () => navigate('prev');
-$('vNext').onclick = $('vSideNext').onclick = () => navigate('next');
+$('vPrev').onclick = () => navigate('prev');
+$('vNext').onclick = () => navigate('next');
+$('vSidePrev').onclick = () => (V.driver && V.driver.isMedia ? queueStep(-1) : navigate('prev'));
+$('vSideNext').onclick = () => (V.driver && V.driver.isMedia ? queueStep(1) : navigate('next'));
 $('vLast').onclick = () => navigate('last');
 $('vOverview').onclick = () => (V.overviewOpen ? closeOverview() : openOverview());
 $('qPrev').onclick = () => queueStep(-1);
@@ -735,6 +869,7 @@ $('mSpeed').onclick = $('mSpeedVal').onclick = () => { if (V.driver && V.driver.
 $('mSpeedDn').onclick = () => stepRate(-1);
 $('mSpeedUp').onclick = () => stepRate(1);
 $('mCC').onclick = $('mSubs').onclick = toggleSubs;
+document.querySelectorAll('#mScope [data-scope]').forEach((b) => { b.onclick = () => { MP.scope = b.dataset.scope; PL.list = null; MP.seen = new Set(); savePref('fv-mscope', MP.scope); updateBar(); if (!$('mqMenu').hidden) renderMq(); }; });
 document.querySelectorAll('#mRepeat [data-rep]').forEach((b) => { b.onclick = () => { MP.repeat = b.dataset.rep; savePref('fv-mrep', MP.repeat); updateBar(); }; });
 $('mShuffle').onclick = () => { MP.shuffle = !MP.shuffle; MP.seen = new Set(); savePref('fv-mshuf', MP.shuffle ? '1' : '0'); updateBar(); };
 $('mPrevFile').onclick = () => queueStep(-1);

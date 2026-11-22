@@ -95,7 +95,7 @@ const KINDS = {
 const state = {
   files: [],          // list of entries (see makeEntry)
   subs: [],           // subtitle files (.srt / .vtt) found next to the videos
-  filter: 'all',      // selected type filter
+  kinds: new Set(),   // selected file types (empty = all of them)
   sort: 'name',       // sort mode
   query: '',          // search text
   selectedId: null,   // highlighted card

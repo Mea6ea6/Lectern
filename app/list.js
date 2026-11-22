@@ -51,7 +51,7 @@ function sortFiles(list) {
 // The files that pass the filter and the search
 function matchingFiles() {
   const q = state.query.trim().toLowerCase();
-  return state.files.filter((e) => (state.filter === 'all' || e.kind === state.filter) && (!q || e.name.toLowerCase().includes(q)));
+  return state.files.filter((e) => (!state.kinds.size || state.kinds.has(e.kind)) && (!q || e.name.toLowerCase().includes(q)));
 }
 // The content of one folder (dir = 'A/B' or ''): its sub-folders (with the number of matching files inside) and its own files
 function listDir(dir, pool) {
@@ -278,31 +278,59 @@ function renderStatus() {
   $('status').textContent = text;
 }
 
+/* ----- Filter: a small drop-down with check boxes, so several file types can be shown together ----- */
+function kindsTitle() {
+  const n = state.kinds.size;
+  return !n ? 'All' : n === 1 ? KINDS[[...state.kinds][0]].title : n + ' types';
+}
 function renderChips() {
   const present = Object.keys(KINDS).filter((k) => state.files.some((e) => e.kind === k));
-  const filters = [{ id: 'all', title: 'All' }, ...present.map((k) => ({ id: k, title: KINDS[k].title }))];
-  if (!filters.some((f) => f.id === state.filter)) state.filter = 'all';
-  const chips = filters.map((f) => {
-    const count = f.id === 'all' ? state.files.length : state.files.filter((e) => e.kind === f.id).length;
-    const chip = h('button', 'chip k-' + f.id + (state.filter === f.id ? ' active' : ''), f.title);
-    chip.title = f.id === 'all' ? 'Show all files' : 'Show only: ' + f.title;
-    chip.type = 'button';
-    chip.appendChild(h('b', '', String(count)));
-    chip.onclick = () => { state.filter = f.id; render(); };
-    return chip;
-  });
-  $('chips').replaceChildren(...chips);
-  $('filterVal').textContent = filters.find((f) => f.id === state.filter).title;
+  for (const k of [...state.kinds]) if (!present.includes(k)) state.kinds.delete(k);
+  const focusKind = document.activeElement && $('filterMenu').contains(document.activeElement) ? document.activeElement.dataset.kind : null;
+  const row = (kind, title, count, on) => {
+    const b = h('button', 'dd-check k-' + (kind || 'all'));
+    b.type = 'button'; b.dataset.kind = kind || ''; b.tabIndex = -1;
+    b.setAttribute('role', 'menuitemcheckbox'); b.setAttribute('aria-checked', String(on));
+    const box = h('span', 'dd-box'); box.appendChild(icon('i-check'));
+    b.append(box, h('span', 'grow', title), h('b', '', String(count)));
+    b.title = kind ? (on ? 'Hide ' : 'Show ') + title + ' files' : 'Show all files';
+    return b;
+  };
+  $('filterMenu').replaceChildren(
+    row('', 'All types', state.files.length, !state.kinds.size),
+    ...present.map((k) => row(k, KINDS[k].title, state.files.filter((e) => e.kind === k).length, state.kinds.has(k))));
+  $('filterVal').textContent = kindsTitle();
+  if (focusKind != null) { const f = $('filterMenu').querySelector('[data-kind="' + focusKind + '"]'); if (f) f.focus(); }
 }
-
-// Filter button: the chip row slides open / closed (always closed when the app starts)
-function setFiltersOpen(open) {
-  $('chipsWrap').classList.toggle('open', open);
-  $('chipsWrap').setAttribute('aria-hidden', String(!open));
-  $('filterBtn').setAttribute('aria-expanded', String(open));
-  $('filterBtn').dataset.tip = open ? 'Hide file types' : 'Show file types';
+function filterToggle(kind) {
+  if (!kind) state.kinds.clear();
+  else if (state.kinds.has(kind)) state.kinds.delete(kind); else state.kinds.add(kind);
+  if (state.kinds.size && Object.keys(KINDS).filter((k) => state.files.some((e) => e.kind === k)).every((k) => state.kinds.has(k))) state.kinds.clear();     // everything ticked = all
+  render();
 }
-$('filterBtn').onclick = () => setFiltersOpen($('filterBtn').getAttribute('aria-expanded') !== 'true');
+const filterRows = () => [...$('filterMenu').querySelectorAll('button')];
+function openFilterMenu() {
+  $('filterMenu').hidden = false;
+  $('filterBtn').setAttribute('aria-expanded', 'true');
+}
+function closeFilterMenu(refocus) {
+  if ($('filterMenu').hidden) return;
+  $('filterMenu').hidden = true;
+  $('filterBtn').setAttribute('aria-expanded', 'false');
+  if (refocus) $('filterBtn').focus();
+}
+$('filterBtn').onclick = () => { if ($('filterMenu').hidden) openFilterMenu(); else closeFilterMenu(false); };
+$('filterMenu').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) filterToggle(b.dataset.kind); });       // the menu stays open: tick as many as you like
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#filterDD')) closeFilterMenu(false); });
+$('filterDD').addEventListener('keydown', (e) => {
+  const rows = filterRows(), i = rows.indexOf(document.activeElement);
+  const handled = () => { e.preventDefault(); e.stopPropagation(); };
+  if (e.key === 'Escape' && !$('filterMenu').hidden) { handled(); closeFilterMenu(true); }
+  else if (e.key === 'ArrowDown') { handled(); if ($('filterMenu').hidden) openFilterMenu(); rows[(i + 1) % rows.length].focus(); }
+  else if (e.key === 'ArrowUp') { handled(); if ($('filterMenu').hidden) openFilterMenu(); rows[(i - 1 + rows.length) % rows.length].focus(); }
+  else if ((e.key === 'Enter' || e.key === ' ') && i >= 0) { handled(); filterToggle(rows[i].dataset.kind); }
+  else if (e.key === 'Tab') closeFilterMenu(false);
+});
 
 $('search').oninput = (e) => { state.query = e.target.value; render(); };
 /* ----- Sort: our own drop-down (the browser's native list can't be styled) ----- */
@@ -1180,11 +1208,12 @@ $('btnRecent').onclick = openRecent;
 /* ----- Sticky header: slides away while scrolling down, returns at the first scroll up ----- */
 (function stickyBar() {
   const bar = $('homebar');
-  let last = window.scrollY, away = false;
+  let last = window.scrollY, away = false, settle = 0;
   const setAway = (v) => { if (v !== away) { away = v; bar.classList.toggle('away', v); } };
   const busy = () => !$('settings').hidden || !$('sortMenu').hidden || bar.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
   window.addEventListener('scroll', () => {
     if (document.body.classList.contains('viewing')) return;
+    if (performance.now() < settle) { last = Math.max(0, window.scrollY); return; }       // the bar itself changed size (filters opened): not the person's scrolling
     const y = Math.max(0, window.scrollY), dy = y - last;
     last = y;
     bar.classList.toggle('stuck', y > 4);
@@ -1193,7 +1222,7 @@ $('btnRecent').onclick = openRecent;
     else if (dy < -3) setAway(false);
   }, { passive: true });
   bar.addEventListener('focusin', () => setAway(false));
-  const setH = () => document.documentElement.style.setProperty('--hbh', bar.offsetHeight + 'px');
+  const setH = () => { settle = performance.now() + 450; last = Math.max(0, window.scrollY); document.documentElement.style.setProperty('--hbh', bar.offsetHeight + 'px'); };
   if (window.ResizeObserver) new ResizeObserver(setH).observe(bar);
   setH();
 })();

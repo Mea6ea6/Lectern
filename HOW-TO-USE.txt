@@ -102,9 +102,11 @@ VIDEO AND AUDIO
   Click = play / pause, double click = full screen. Up / Down = volume, M = sound off,
   < and > = speed (0.25x - 2x), , and . = one frame back / forward, C = subtitles,
   D = pen on the paused picture. J / L = 10 seconds back / forward.
-  More: speed, subtitles file, repeat (off / folder / one), shuffle for music,
+  More: speed, subtitles file, repeat (off / all / one), play from (folder /
+  subfolders / all), shuffle for music,
   audio track (if the file has several). The little window button = picture in
-  picture. [ and ] = previous / next file of the folder.
+  picture. [ and ] = previous / next file. The list button next to More shows
+  what plays next; drag the dots to change the order.
   Subtitles: put a .srt or .vtt with the same name next to the video - it is found
   automatically. Recordings longer than 2 minutes offer "Continue from 42:10?".
   Songs show their cover, title and artist (mp3, FLAC, M4A).
