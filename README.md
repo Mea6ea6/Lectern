@@ -19,7 +19,7 @@ Open presentations, PDFs, documents, spreadsheets, photos, video and more straig
 
 <img src="docs/start-dark.png" width="49%" alt="Start screen, dark theme"> <img src="docs/library-light.png" width="49%" alt="File library, light theme">
 
-<img src="docs/draw-dark.png" width="49%" alt="Pen and marker over a page"> <img src="docs/queue-dark.png" width="49%" alt="Class queue">
+<img src="docs/draw-dark.png" width="49%" alt="Pen and marker over a page"> <img src="docs/queue-dark.png" width="49%" alt="Queue">
 
 </div>
 
@@ -47,15 +47,15 @@ A lecture hall computer is a locked-down machine with whatever office software h
 | **Video & audio** | Volume (↑/↓, M), speed 0.25–2× (< >), time and hover time on the bar, frame step (, .), repeat, click = play/pause, double click = fullscreen |
 | **Subtitles** | A .srt / .vtt with the same name next to the video is picked up automatically (C to toggle, or choose a file in More) |
 | **Audio tags & cover** | Title, artist and cover art from mp3 / FLAC / M4A, on the cards and in the player |
-| **Next file** | When a file ends, the next one of the same folder starts at once (video too). The class queue goes first. Repeat: Off / All / One; Shuffle for music; "Play from" a folder, its subfolders or everything. The **Playlist** window (next to More) lists the files and lets you drag them to change the order. <kbd>[</kbd> <kbd>]</kbd> or the arrow buttons switch files |
-| **More video tools** | <kbd>J</kbd> / <kbd>L</kbd> jump 10 seconds, picture in picture (where the browser has it), audio track choice (where the browser shows several). The More menu shows only what fits the file: music gets no zoom, laser or black screen |
-| **Pen on video** | Pause and draw on the frame (D) |
-| **Class queue** | Pick the files for a lesson (documents, slides, films, songs in any mix), put them in order, flip through them one after another. The number in the top bar ("2 / 5") opens the list: click a file, drag to reorder, the cross (on hover) takes a file out. A queue of different kinds is a plain list, with no playlist, shuffle or repeat. Cleared when the page reloads or another folder is opened |
+| **Next file** | When a file ends, the next one of the same folder starts at once (video too). The queue goes first. Repeat: Off / All / One; Shuffle for music; "Play from" a folder, its subfolders or everything. The **Queue** window (next to More) lists the files and lets you drag them to change the order. <kbd>[</kbd> <kbd>]</kbd> or the arrow buttons switch files |
+| **More video tools** | <kbd>J</kbd> / <kbd>L</kbd> jump 10 seconds, audio track choice (where the browser shows several). The More menu shows only what fits the file: music gets no zoom, laser or black screen |
+| **Pen on video** | Pause and draw on the frame (More → Draw, or D) |
+| **Queue** | Pick the files for a lesson (documents, slides, films, songs in any mix), put them in order, flip through them one after another. The number in the top bar ("2 / 5") opens the list: click a file, drag to reorder, the cross (on hover) takes a file out. A queue of different kinds is a plain list, with no playlist, shuffle or repeat. Cleared when the page reloads or another folder is opened |
 | **Bookmarks** | Mark pages (<kbd>M</kbd>), see them on the progress bar and in the overview, jump with <kbd>,</kbd> <kbd>.</kbd> |
 | **Laser pointer** | A red dot that follows the mouse or a finger (<kbd>L</kbd>); nothing is drawn on the page |
 | **Timer** | Silent timer (<kbd>T</kbd>): countdown, or count up to a set time. The readout sits quietly in the top bar and in the file list header, and turns red when the time is reached |
 | **Speaker notes** | PPTX and ODP notes in a side panel (<kbd>N</kbd>) |
-| **Presenter view** | Two windows: slides on the projector, a companion window on your laptop with your speech (any file) plus a panel with the current and next slide, the notes and a shared timer (<kbd>P</kbd>). Slides turn from either window (More → Stop presenter view ends it); pen, laser and black screen stay in the presentation window. Works offline, for PDF, PowerPoint, video and audio: for a film or a song the panel has pause, ±5 s, previous / next, a time bar and the queue (click to play, cross to take out, foldable like the notes) |
+| **Presenter view** | Two windows: slides on the projector, a companion window on your laptop with your speech (any file) plus a panel with the current and next slide, the notes and a shared timer (<kbd>P</kbd>). Slides turn from either window (More → Stop presenter view ends it). The companion window opens with a short note on what it is for (it can be switched off, and More → About this window brings it back); pen, laser and black screen stay in the presentation window. Works offline, for PDF, PowerPoint, video and audio: for a film or a song the panel has pause, ±5 s, previous / next, a time bar and the queue (click to play, cross to take out, foldable like the notes) |
 | **Page animation** | Pages slide in a few pixels when you turn them (More → Page animation switches it off); cards slide in after a folder is chosen; respects the system's reduced-motion setting |
 | **Fullscreen window** | More (top right) → Fullscreen window hides the browser's bars on any screen (Esc leaves) |
 | **Hints** | Small designed tooltips with key hints appear when you pause over a button |
@@ -87,7 +87,7 @@ Open **<https://lectern-wheat.vercel.app>**. In Chrome or Edge use **Install** i
 | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | Select a file, turn pages |
 | <kbd>Enter</kbd> | Open the selected file |
 | <kbd>Space</kbd> | Show file details |
-| <kbd>Q</kbd> | Add the selected file to the class queue |
+| <kbd>Q</kbd> | Add the selected file to the queue |
 | <kbd>Esc</kbd> | Close or go back |
 
 ### In the viewer
@@ -96,7 +96,7 @@ Open **<https://lectern-wheat.vercel.app>**. In Chrome or Edge use **Install** i
 |---|---|
 | <kbd>→</kbd> <kbd>Space</kbd> / <kbd>←</kbd> | Next / previous page (video and audio: 5 seconds; <kbd>Space</kbd> plays or pauses) |
 | <kbd>D</kbd> | Pen and marker on / off (<kbd>1</kbd> pen, <kbd>2</kbd> marker, <kbd>3</kbd> eraser, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redo) |
-| <kbd>[</kbd> <kbd>]</kbd> | Previous / next file of the class queue |
+| <kbd>[</kbd> <kbd>]</kbd> | Previous / next file of the queue |
 | <kbd>M</kbd> / <kbd>,</kbd> <kbd>.</kbd> | Bookmark this page / previous, next bookmark |
 | <kbd>N</kbd> | Speaker notes (PPTX, ODP) |
 | <kbd>P</kbd> | Presenter view: opens the companion window (in the companion: <kbd>↑</kbd> <kbd>↓</kbd> or <kbd>Page Up</kbd> <kbd>Page Down</kbd> turn the slides, <kbd>←</kbd> <kbd>→</kbd> turn this window's own file) |
@@ -170,7 +170,7 @@ Files keep the folder they were in. With **Show folders** on (the folder button 
 - **Icons** — cards with a preview;
 - **List** — one row per file: type, name, date, size;
 
-The header (title, the search in the middle, and under it the buttons in four groups with small titles: Files, View, Arrange, Lists) stays on top, slides away while you scroll down and comes back at the first scroll up. Controls that cannot work in the current situation (for example "Keep place on the drive" without a chosen folder, or "Presenter view" for a picture) are not shown.
+The header (title, the search in the middle, and under it the buttons in groups with small titles: View, Arrange, Lists for the open folder on the left, and Open (Choose folder, Add files) apart on the right) stays on top, slides away while you scroll down and comes back at the first scroll up. Controls that cannot work in the current situation (for example "Keep place on the drive" without a chosen folder, or "Presenter view" for a picture) are not shown.
 
 ## Recent files
 

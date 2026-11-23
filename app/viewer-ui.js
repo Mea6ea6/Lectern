@@ -91,7 +91,7 @@ async function openViewer(entry) {
     updateBar();
     if (driver.isMedia && !$('mqMenu').hidden) renderMq();
     if (auto && driver.isMedia) driver.toggle(); else resumeOffer();
-    if (!Resume.open && loadPref('fv-esc', '0') !== '1') { savePref('fv-esc', '1'); showToast('Press Esc to go back to your files', 3200); }     // said once, then never again
+    if (!Resume.open && loadPref('fv-esc', '0') !== '1') { savePref('fv-esc', '1'); showToast('Press {Esc} to go back to your files', 3200); }     // said once, then never again
   } catch (err) {
     if (token !== V.openToken) return;
     console.error(err);
@@ -350,13 +350,9 @@ function updateMediaBar(d) {
   $('mRepB').dataset.tip = 'Repeat: ' + (MP.repeat === 'off' ? 'off' : MP.repeat === 'all' ? 'the whole list' : 'this file');
   $('mPrevFile').disabled = !mediaHasNext(-1);
   $('mNextFile').disabled = !mediaHasNext(1);
-  $('mPip').hidden = !d.canPip;
-  $('mPip').setAttribute('aria-pressed', String(d.pip));
   const tracks = d.audioTracks;
   $('mDub').hidden = !tracks.length;
   if (tracks.length) $('mDubVal').textContent = d.audioTrackName(d.audioTrackIndex);
-  $('mInk').hidden = !d.canDraw;
-  $('mInk').setAttribute('aria-pressed', String(!!(window.Pen && Pen.on)));
 }
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const fmtRate = (r) => (Math.round(r * 100) / 100) + '×';
@@ -413,6 +409,7 @@ function updateBar() {
   $('vPrev').disabled = $('vSidePrev').disabled = atStart && !prevFile;
   $('vLast').disabled = atEnd;
   $('vNext').disabled = $('vSideNext').disabled = atEnd && !nextFile;
+  for (const [id, media5, plain] of [['vSidePrev', '#i-back5', '#i-prev'], ['vSideNext', '#i-fwd5', '#i-next']]) $(id).querySelector('use').setAttribute('href', ready && d.isMedia ? media5 : plain);     // in a film the arrow jumps 5 seconds: it says so
   $('vSidePrev').dataset.tip = ready && d.isMedia ? 'Back 5 seconds (←)' : 'Previous';
   $('vSideNext').dataset.tip = ready && d.isMedia ? 'Forward 5 seconds (→)' : 'Next';
   $('vSidePrev').setAttribute('aria-label', $('vSidePrev').dataset.tip); $('vSideNext').setAttribute('aria-label', $('vSideNext').dataset.tip);
@@ -490,15 +487,53 @@ function viewRestore(entry) {
   V.view.zoom = clamp(s.z, 0.25, 4); V.view.fit = s.f; V.view.rot = s.r;
 }
 
+/* Notices behave like the ones on a phone: a click or a swipe in any direction sends them away.
+   Key names are written in braces, "Press {Esc} to go back", and are drawn as keycaps. */
 let toastTimer = null;
+function toastHide() {
+  const t = $('toast');
+  clearTimeout(toastTimer);
+  t.classList.remove('show');
+}
 function showToast(text, ms) {
   if (!text) return;
   const t = $('toast');
-  t.textContent = text;
+  t.style.removeProperty('--dx'); t.style.removeProperty('--dy'); t.classList.remove('swiping');
+  t.replaceChildren(...String(text).split(/\{([^{}]+)\}/).map((part, i) => (i % 2 ? h('kbd', '', part) : document.createTextNode(part))));
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), ms || 1200);
+  toastTimer = setTimeout(toastHide, ms || 1200);
 }
+(function toastGestures() {
+  const t = $('toast');
+  let x0 = 0, y0 = 0, dx = 0, dy = 0, down = false;
+  t.addEventListener('pointerdown', (e) => { down = true; x0 = e.clientX; y0 = e.clientY; dx = dy = 0; clearTimeout(toastTimer); try { t.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } });
+  t.addEventListener('pointermove', (e) => {
+    if (!down) return;
+    dx = e.clientX - x0; dy = e.clientY - y0;
+    if (Math.abs(dx) + Math.abs(dy) > 6) { t.classList.add('swiping'); t.style.setProperty('--dx', dx + 'px'); t.style.setProperty('--dy', dy + 'px'); }
+  });
+  const end = () => {
+    if (!down) return;
+    down = false;
+    const moved = Math.abs(dx) + Math.abs(dy);
+    if (moved < 6 || moved > 40) {                                   // a tap, or a swipe far enough: gone
+      if (moved >= 6) { t.style.setProperty('--dx', dx * 4 + 'px'); t.style.setProperty('--dy', dy * 4 + 'px'); }
+      toastHide();
+    } else { t.style.removeProperty('--dx'); t.style.removeProperty('--dy'); toastTimer = setTimeout(toastHide, 1200); }
+    t.classList.remove('swiping');
+  };
+  t.addEventListener('pointerup', end); t.addEventListener('pointercancel', end);
+})();
+
+/* A fade at the edge of a scrolling menu shows that there is more: with a thin scroll bar (or none, as on a Mac) it is easy to miss */
+function scrollHint(el) {
+  const f = () => { el.classList.toggle('more-below', el.scrollHeight - el.scrollTop - el.clientHeight > 4); };
+  el.addEventListener('scroll', f, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(f).observe(el);
+  f();
+}
+for (const id of ['vMenu', 'settings', 'mqList', 'qList']) scrollHint($(id));
 
 /* ----- Fullscreen ----- */
 function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
@@ -741,7 +776,6 @@ $('mShufB').onclick = () => setShuffle(!MP.shuffle);
 $('mRepB').onclick = () => { MP.repeat = MP.repeat === 'off' ? 'all' : MP.repeat === 'all' ? 'one' : 'off'; savePref('fv-mrep', MP.repeat); updateBar(); };
 $('mPrevFile').onclick = () => queueStep(-1);
 $('mNextFile').onclick = () => queueStep(1);
-$('mPip').onclick = () => { if (V.driver && V.driver.isMedia && V.driver.canPip) V.driver.togglePip(); };
 $('mDub').onclick = () => { if (V.driver && V.driver.isMedia) V.driver.nextAudioTrack(); };
 $('mSubsFile').onclick = () => { closeMenu(); $('subPick').value = ''; $('subPick').click(); };
 $('subPick').onchange = async () => {
@@ -750,7 +784,6 @@ $('subPick').onchange = async () => {
   try { await d.setSubtitles(f); showToast('Subtitles: ' + f.name); }
   catch (err) { showToast('Could not read this subtitles file'); }
 };
-$('mInk').onclick = () => toggleInk();
 $('mMore').onclick = () => (V.menuOpen ? closeMenu() : openMenu());
 
 /* ----- Pen and marker (the code lives in app/modules/ink.js and loads on first use) ----- */
@@ -764,7 +797,7 @@ async function toggleInk() {
   try { await lib('ink'); Pen.restore(); Pen.toggle(); }
   catch (err) { console.warn(err); showToast('Could not load the pen tools'); }
 }
-$('vInk').onclick = toggleInk;
+$('vInk').onclick = () => { closeMenu(); toggleInk(); };
 
 /* ----- Laser pointer: a red dot that follows the mouse (or a finger on a touch screen). Nothing is drawn ----- */
 const Laser = { on: false, dot: $('laserDot'), trail: $('laserTrail'), pts: [], raf: 0 };

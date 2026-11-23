@@ -144,7 +144,7 @@ const Marks = (function () {
     if (!usable()) return;
     const cur = V.driver.currentIndex(), arr = list();
     const to = dir > 0 ? arr.find((i) => i > cur) : arr.slice().reverse().find((i) => i < cur);
-    if (to === undefined) { showToast(arr.length ? 'No more bookmarks' : 'No bookmarks yet — press M'); return; }
+    if (to === undefined) { showToast(arr.length ? 'No more bookmarks' : 'No bookmarks yet — press {M}'); return; }
     V.driver.goTo(to);
   }
   function refresh() {

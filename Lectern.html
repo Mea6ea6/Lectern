@@ -99,7 +99,6 @@
     <symbol id="i-repeat"   viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a4 4 0 0 0-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 0 0 4-4v-1"/></symbol>
     <symbol id="i-grip"     viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/></symbol>
     <symbol id="i-list"     viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
-    <symbol id="i-pip"      viewBox="0 0 24 24"><path d="M3 6h18v12H3zM12 12h7v4h-7z"/></symbol>
     <symbol id="i-shuffle"  viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-6 6M4 20l16-16M21 16v5h-5M15 15l6 6M4 4l5 5"/></symbol>
     <symbol id="i-audio"    viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10zM16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/></symbol>
     <symbol id="i-music"    viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></symbol>
@@ -161,25 +160,8 @@
     </div>
   </header>
 
-  <!-- Under the search, in the order you use them: where the files come from · how they look · how they are arranged · lists -->
+  <!-- Under the search. Left: everything for the folder that is open (view · arrange · lists). Right, apart: opening other files and folders, so a stray click cannot replace the open folder -->
   <div class="toolbar" id="toolbar" hidden>
-    <div class="tb-group" id="tbFiles">
-      <span class="tb-cap">Files</span>
-      <div class="tb-row">
-        <button class="btn btn-icon tb-btn reopen-btn" type="button" hidden title="Open the folder from last time">
-          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl reopen-label">Reopen last folder</span>
-        </button>
-        <button class="btn btn-icon tb-btn" id="btnFolder" type="button" title="Choose another folder" aria-label="Choose folder">
-          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Choose folder</span>
-        </button>
-        <button class="btn btn-icon tb-btn" id="btnFiles" type="button" title="Add single files to the list" aria-label="Add files">
-          <svg class="icon"><use href="#i-addfile"/></svg><span class="tb-lbl">Add files</span>
-        </button>
-        <button class="btn btn-icon tb-btn" id="btnRefresh" type="button" hidden title="Rescan the folder for new files" aria-label="Rescan folder">
-          <svg class="icon"><use href="#i-refresh"/></svg><span class="tb-lbl">Rescan</span>
-        </button>
-      </div>
-    </div>
     <div class="tb-group" id="tbView">
       <span class="tb-cap">View</span>
       <div class="tb-row">
@@ -189,6 +171,9 @@
         </div>
         <button class="btn btn-icon tb-btn tb-folders" id="btnFolders" type="button" aria-pressed="true" title="Show folders" aria-label="Show folders">
           <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Folders</span>
+        </button>
+        <button class="btn btn-icon tb-btn" id="btnRefresh" type="button" hidden title="Rescan the folder for new files" aria-label="Rescan folder">
+          <svg class="icon"><use href="#i-refresh"/></svg><span class="tb-lbl">Rescan</span>
         </button>
       </div>
     </div>
@@ -216,14 +201,28 @@
         </div>
       </div>
     </div>
-    <div class="tb-group tb-end">
+    <div class="tb-group">
       <span class="tb-cap">Lists</span>
       <div class="tb-row">
         <button class="btn" id="btnRecent" type="button" hidden title="Files you opened lately">
           <svg class="icon"><use href="#i-history"/></svg><span>Recent</span>
         </button>
-        <button class="btn" id="btnQueue" type="button" hidden title="Class queue">
+        <button class="btn" id="btnQueue" type="button" hidden title="Queue: the files for the lesson, in order">
           <svg class="icon"><use href="#i-queue"/></svg><span>Queue</span><b class="qcount" id="qCount"></b>
+        </button>
+      </div>
+    </div>
+    <div class="tb-group tb-end" id="tbFiles">
+      <span class="tb-cap">Open</span>
+      <div class="tb-row">
+        <button class="btn btn-icon tb-btn reopen-btn" type="button" hidden title="Open the folder from last time">
+          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl reopen-label">Reopen last folder</span>
+        </button>
+        <button class="btn btn-icon tb-btn" id="btnFolder" type="button" title="Choose another folder" aria-label="Choose folder">
+          <svg class="icon"><use href="#i-folder"/></svg><span class="tb-lbl">Choose folder</span>
+        </button>
+        <button class="btn btn-icon tb-btn" id="btnFiles" type="button" title="Add single files to the list" aria-label="Add files">
+          <svg class="icon"><use href="#i-addfile"/></svg><span class="tb-lbl">Add files</span>
         </button>
       </div>
     </div>
@@ -293,7 +292,7 @@
       <!-- Only when the open file is part of the class queue -->
       <div class="qnav" id="qNav" hidden>
         <button class="vbtn vbtn-icon" id="qPrev" type="button" title="Previous file in the queue ([ or Shift+←)" aria-label="Previous file"><svg class="icon"><use href="#i-prev"/></svg></button>
-        <button class="qpos" id="qPos" type="button" aria-haspopup="true" title="All files of the queue" aria-label="Queue"></button>
+        <button class="vbtn qpos" id="qPos" type="button" aria-haspopup="true" title="All files of the queue" aria-label="Queue"><svg class="icon"><use href="#i-list"/></svg><b id="qPosText"></b></button>
         <button class="vbtn vbtn-icon" id="qNext" type="button" title="Next file in the queue (] or Shift+→)" aria-label="Next file"><svg class="icon"><use href="#i-next"/></svg></button>
       </div>
     </div>
@@ -349,9 +348,6 @@
         <button class="vbtn vbtn-icon" id="vMark" type="button" title="Bookmark this page (M)" aria-label="Bookmark this page" aria-pressed="false">
           <svg class="icon"><use href="#i-bookmark"/></svg>
         </button>
-        <button class="vbtn" id="vInk" type="button" title="Pen and marker (D)" aria-pressed="false">
-          <svg class="icon"><use href="#i-draw"/></svg><span>Draw</span>
-        </button>
         <button class="vbtn" id="vOverview" type="button" title="Overview (G)">
           <svg class="icon"><use href="#i-grid"/></svg><span>Overview</span>
         </button>
@@ -374,11 +370,9 @@
         <button class="vbtn vbtn-icon" id="mMute" type="button" aria-haspopup="true" aria-expanded="false" title="Volume (↑ ↓, M mutes)" aria-label="Volume"><svg class="icon"><use id="mMuteIcon" href="#i-volume"/></svg></button>
         <button class="vbtn" id="mSpeed" type="button" hidden title="Playback speed (&lt; and &gt;). Click to go back to normal">1×</button>
         <button class="vbtn vbtn-icon" id="mCC" type="button" hidden aria-pressed="false" title="Subtitles (C)" aria-label="Subtitles"><svg class="icon"><use href="#i-cc"/></svg></button>
-        <button class="vbtn vbtn-icon" id="mPip" type="button" hidden aria-pressed="false" title="Small floating window (picture in picture)" aria-label="Picture in picture"><svg class="icon"><use href="#i-pip"/></svg></button>
-        <button class="vbtn vbtn-icon" id="mInk" type="button" hidden aria-pressed="false" title="Pen and marker on the paused picture (D)" aria-label="Pen and marker"><svg class="icon"><use href="#i-draw"/></svg></button>
         <button class="vbtn vbtn-icon" id="mShufB" type="button" hidden aria-pressed="false" title="Shuffle" aria-label="Shuffle"><svg class="icon"><use href="#i-shuffle"/></svg></button>
         <button class="vbtn vbtn-icon" id="mRepB" type="button" hidden aria-pressed="false" data-mode="off" title="Repeat" aria-label="Repeat"><svg class="icon"><use href="#i-repeat"/></svg><i class="rep-one">1</i></button>
-        <button class="vbtn vbtn-icon" id="mQueue" type="button" aria-haspopup="true" title="Playlist: the files that play next, in order" aria-label="Playlist"><svg class="icon"><use href="#i-list"/></svg></button>
+        <button class="vbtn vbtn-icon" id="mQueue" type="button" aria-haspopup="true" title="Queue: the files that play next, in order" aria-label="Queue"><svg class="icon"><use href="#i-list"/></svg></button>
         <button class="vbtn vbtn-icon" id="mMore" type="button" aria-haspopup="true" title="Speed, subtitles, repeat, tools and settings" aria-label="More"><svg class="icon"><use href="#i-more"/></svg></button>
       </div>
     </div>
@@ -449,6 +443,7 @@
       </div>
       <!-- Video / audio of the presentation window: the buttons on top, then the queue (can be folded like the notes) -->
       <div class="pv-media" id="pvMedia">
+        <div class="pv-mpic" id="pvMPic" hidden><img id="pvMImg" alt=""></div>
         <div class="pv-cap-row"><span class="pv-cap" id="pvMTime">0:00 / 0:00</span><span class="pv-cap" id="pvMState"></span></div>
         <div class="pv-mbar" id="pvMBar" title="Click to jump"><i id="pvMFill"></i></div>
         <div class="pv-mbtns">
@@ -520,6 +515,9 @@
     </div>
     <div class="menu-gap doc-only"></div>
     <div class="menu-head">Tools</div>
+    <button class="menu-item pic-tool" id="vInk" type="button" aria-pressed="false" title="Pen and marker (D)">
+      <svg class="icon"><use href="#i-draw"/></svg><span class="grow">Draw</span><kbd>D</kbd>
+    </button>
     <button class="menu-item pic-tool" id="mLaser" type="button" aria-pressed="false" title="Laser pointer (L)">
       <svg class="icon"><use href="#i-laser"/></svg><span class="grow">Laser pointer</span><kbd>L</kbd>
     </button>
@@ -534,6 +532,9 @@
     </button>
     <button class="menu-item" id="mPresenter" type="button" title="Presenter view: a second window (P)">
       <svg class="icon"><use href="#i-presenter"/></svg><span class="grow" id="mPresenterText">Presenter view</span><kbd>P</kbd>
+    </button>
+    <button class="menu-item" id="mCompanionHelp" type="button" title="What this window is for" hidden>
+      <svg class="icon"><use href="#i-info"/></svg><span class="grow">About this window</span>
     </button>
     <div class="menu-gap"></div>
     <div class="menu-head">Window</div>
@@ -579,13 +580,13 @@
 
   <!-- The class queue while viewing: every file of it; click one to open it, ✕ takes it out, drag to reorder -->
   <div class="menu mq-menu q-menu" id="qMenu" hidden>
-    <div class="menu-head" id="qHead">Class queue</div>
+    <div class="menu-head" id="qHead">Queue</div>
     <div class="mq-list" id="qList"></div>
   </div>
 
   <!-- Video / audio: the playlist, what plays next (drag to change the order) -->
   <div class="menu mq-menu" id="mqMenu" hidden>
-    <div class="menu-head" id="mqHead">Playlist</div>
+    <div class="menu-head" id="mqHead">Queue</div>
     <div class="mq-list" id="mqList"></div>
   </div>
 

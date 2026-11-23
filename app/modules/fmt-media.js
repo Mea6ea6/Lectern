@@ -203,7 +203,7 @@ class MediaViewer extends BaseViewer {
     // A video file without a picture (sound only) is shown like audio
     this.hasPicture = wantVideo && el.videoWidth > 0;
     this.canDraw = this.hasPicture;                          // the pen works on a paused picture
-    ['timeupdate', 'play', 'pause', 'ended', 'seeked', 'durationchange', 'volumechange', 'ratechange', 'enterpictureinpicture', 'leavepictureinpicture'].forEach((ev) => el.addEventListener(ev, () => this.onChange()));
+    ['timeupdate', 'play', 'pause', 'ended', 'seeked', 'durationchange', 'volumechange', 'ratechange'].forEach((ev) => el.addEventListener(ev, () => this.onChange()));
     el.addEventListener('ended', () => { if (this.onEnded) this.onEnded(); });
     if (this.hasPicture && el.requestVideoFrameCallback) {   // how long is one frame? (for stepping frame by frame)
       el.addEventListener('playing', () => {
@@ -275,13 +275,6 @@ class MediaViewer extends BaseViewer {
     this.el.muted = m; savePref('fv-muted', m ? '1' : '0');
     if (!m) savePref('fv-vol', String(this.el.volume));
   }
-  // Picture in picture: a small floating window (Chrome, Edge, Safari; Firefox has its own button on the video)
-  get canPip() { return this.hasPicture && !!document.pictureInPictureEnabled && !!this.el.requestPictureInPicture && !this.el.disablePictureInPicture; }
-  get pip() { return document.pictureInPictureElement === this.el; }
-  async togglePip() {
-    try { if (this.pip) await document.exitPictureInPicture(); else await this.el.requestPictureInPicture(); } catch (e) { /* the browser said no */ }
-    this.onChange();
-  }
   // Several sound tracks (dubbing / original): only where the browser shows them
   get audioTracks() { const t = this.el && this.el.audioTracks; return t && t.length > 1 ? Array.from(t) : []; }
   get audioTrackIndex() { return Math.max(0, this.audioTracks.findIndex((t) => t.enabled)); }
@@ -333,7 +326,6 @@ class MediaViewer extends BaseViewer {
   }
 
   destroy() {
-    if (this.el && this.pip) { try { document.exitPictureInPicture().catch(() => {}); } catch (e) { /* fine */ } }
     if (this.el) { try { this.el.pause(); } catch (e) { /* fine */ } this.el.removeAttribute('src'); this.el.load(); }
     if (this.url) URL.revokeObjectURL(this.url);
     if (this.trackUrl) URL.revokeObjectURL(this.trackUrl);

@@ -19,6 +19,7 @@ const Link = {
   ch: null,
   alive: false, peerRole: '', seen: 0, win: null,
   seq: 0, key: 0,           // presenter: the number of the file now shown (0 = nothing to present)
+  pic: '', picKey: 0,       // presenter: the cover of the song now playing (made once)
   items: [],                // presenter: the files of the rows that the companion shows (a video / song)
   last: '', resent: 0,
   rem: null,                // companion: the file of the presenter { key, name, viewer, ratio, notes, ready }
@@ -50,6 +51,24 @@ function linkFile() {
   Link.key = presentable() ? ++Link.seq : 0;
   if (Link.key && Link.alive) linkSendFile();
 }
+// A small picture for the second window: the frame of the video now showing, or the cover of the song (made once per file)
+function mediaPic(d) {
+  try {
+    if (!d.hasPicture && Link.picKey === Link.key) return Link.pic;
+    const cover = d.hasPicture ? null : $('content').querySelector('img.media-cover');
+    const src = d.hasPicture ? d.el : cover;
+    const w = d.hasPicture ? d.el.videoWidth : cover && cover.naturalWidth, hh = d.hasPicture ? d.el.videoHeight : cover && cover.naturalHeight;
+    let url = '';
+    if (src && w > 0) {
+      const k = Math.min(1, 280 / w), c = h('canvas');
+      c.width = Math.round(w * k); c.height = Math.round(hh * k);
+      c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+      url = c.toDataURL('image/jpeg', 0.6);
+    }
+    if (!d.hasPicture) { Link.pic = url; Link.picKey = Link.key; }
+    return url;
+  } catch (err) { return ''; }                  // a picture that cannot be read is simply not shown
+}
 function linkPush(force) {
   if (Link.role !== 'presenter') return;
   const d = V.driver, ok = !!Link.key && !!d && $('vMsg').hidden;
@@ -64,6 +83,7 @@ function linkPush(force) {
   const sig = JSON.stringify(s);
   if (!force && sig === Link.last) return;
   Link.last = sig;
+  if (s.media) s.media.pic = mediaPic(d);
   Link.send(s);
 }
 function linkSendAll() { linkSendFile(); linkPush(true); if (Timer.active) timerShare(); }
@@ -84,7 +104,7 @@ function presenterStart() {
   if (!w) { showToast('The browser blocked the new window — allow pop-ups for this page', 4000); return; }
   Link.win = w;
   linkUi();
-  showToast('Drag the companion window to your own screen, then press F here', 5000);
+  showToast('Drag the companion window to your own screen, then press {F} here', 5000);
 }
 
 // Turn presenter view off: the companion window closes and this window is an ordinary viewer again
@@ -105,6 +125,7 @@ function companionLeave() {                       // the presenter window ended 
   document.title = pageTitle;
   V.el.classList.remove('pv-open'); $('pv').hidden = true;
   for (const id of ['mPresenter', 'mLaser', 'mBlack', 'mNotes', 'vInk']) $(id).hidden = false;
+  $('mCompanionHelp').hidden = true;
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* fine */ }
   linkUi();
 }
@@ -229,12 +250,13 @@ function pvRender() {
 // Video / song: time, the buttons and the queue (rows are drawn again only when they change, so a click is never lost)
 function pvMedia(m) {
   if (!m) return;
+  if (m.pic !== undefined) { $('pvMImg').src = m.pic || ''; $('pvMPic').hidden = !m.pic; }
   $('pvMTime').textContent = fmtTime(m.time) + ' / ' + fmtTime(m.dur);
   $('pvMFill').style.width = (m.dur > 0 ? Math.min(100, m.time / m.dur * 100) : 0) + '%';
   $('pvMPlayIcon').setAttribute('href', m.playing ? '#i-pause' : '#i-play');
   $('pvMPlay').setAttribute('aria-label', m.playing ? 'Pause' : 'Play');
   $('pvMState').textContent = m.playing ? 'Playing' : 'Paused';
-  $('pvQCap').textContent = m.mode === 'queue' ? 'Queue' : 'Up next';
+  $('pvQCap').textContent = 'Queue';
   const sig = JSON.stringify(m.rows);
   if (pvMedia.sig === sig) return;
   pvMedia.sig = sig;
@@ -266,6 +288,43 @@ pvResize.observe($('pvNext'));
 $('pvPrev').onclick = () => linkCmd('prev');
 $('pvNextBtn').onclick = $('pvNext').onclick = () => linkCmd('next');
 
+/* ----- The welcome note of the companion window (can be switched off; More → About this window brings it back) ----- */
+const COMPANION_HELP = [
+  ['What this window is for', 'The presentation is in the other window, on the projector. This window stays with you: the current and the next slide, your notes and the buttons.'],
+  ['Set up the screens', 'Drag this window to your own screen. In the other window press {F} to fill the projector.'],
+  ['Control', 'Previous and Next, or {↑} and {↓}, turn the slides in the other window. For a video or a song: pause, ±5 seconds, the previous and the next file, and the queue.'],
+  ['Which file', 'The one open in the other window. To change it, open another file there.'],
+  ['What stays in the other window', 'Pen, laser, black screen and the choice of the file. The timer is shared by both windows.'],
+  ['No internet needed', 'The windows talk inside the browser. Nothing is sent anywhere.'],
+  ['Finish', 'In the other window: More → Stop presenter view. This window closes by itself.'],
+];
+function companionHelp() {
+  if (Link.role !== 'companion' || !M.el.hidden) return;
+  const box = h('div', 'ch-box');
+  box.append(h('h2', 'modal-title', 'Companion window'), h('p', 'modal-text', 'Your private screen as the speaker. The audience does not see it.'));
+  const list = h('ol', 'ch-list');
+  for (const [title, text] of COMPANION_HELP) {
+    const li = h('li'), p = h('span', 'ch-text');
+    li.append(h('b', null, title));
+    for (const part of text.split(/(\{[^}]+\})/)) {
+      const m = /^\{(.+)\}$/.exec(part);
+      if (m) p.append(h('kbd', null, m[1])); else p.append(part);
+    }
+    li.append(p); list.append(li);
+  }
+  box.append(list);
+  const check = h('label', 'ch-check');
+  const input = h('input'); input.type = 'checkbox'; input.checked = loadPref('fv-companion-help-off', '0') === '1';
+  input.onchange = () => savePref('fv-companion-help-off', input.checked ? '1' : '0');
+  check.append(input, h('span', 'ch-box-mark'), h('span', null, "Don't show this again"));
+  const actions = h('div', 'modal-actions');
+  const ok = h('button', 'btn btn-primary', 'Got it'); ok.type = 'button'; ok.onclick = closeModal;
+  actions.append(ok);
+  box.append(check, actions);
+  openModal(box, { cls: 'companion-help', onEnter: closeModal });
+}
+$('mCompanionHelp').onclick = () => { closeMenu(); companionHelp(); };
+
 /* ----- Both windows ----- */
 function linkStatus() {
   if (Link.role === 'none') return null;
@@ -287,6 +346,12 @@ function linkUi() {
     $('pvState').classList.toggle('off', !st.here);
     $('pvStateText').textContent = st.here ? 'Connected' : 'Not connected';
   }
+  const pill = document.querySelector('#viewer .timer-pill');
+  if (pill) {
+    const away = Link.role !== 'none', home = $('vFull').parentNode;
+    if (away && pill.parentNode !== home) home.insertBefore(pill, $('vFull'));
+    else if (!away && pill.parentNode === home) $('vTitle').parentNode.append(pill);
+  }     // presenting: the timer sits left of Fullscreen
   $('mPresenterText').textContent = presenterOn() ? 'Stop presenter view' : 'Presenter view';
   $('mPresenter').dataset.tip = presenterOn() ? 'Close the second window (P)' : 'Presenter view: a second window (P)';
   syncPresenterItem();
@@ -356,8 +421,10 @@ if (Link.role === 'companion') {
   V.el.classList.add('pv-open');
   $('pv').hidden = false;
   for (const id of ['mPresenter', 'mLaser', 'mBlack', 'mNotes', 'vInk']) $(id).hidden = true;     // these belong to the presentation window
+  $('mCompanionHelp').hidden = false;
   Link.send({ t: 'hello' });
   linkUi();
+  if (loadPref('fv-companion-help-off', '0') !== '1') setTimeout(companionHelp, 400);     // the first look: what this window is for
 }
 
 /* ----- Start ----- */

@@ -15,11 +15,12 @@ HOW TO START FROM A FLASH DRIVE
   2. On the classroom computer plug in the drive and double-click "Lectern.html".
      It opens in the browser (Chrome, Edge, Firefox or Safari).
   3. Press "Choose folder" and pick the "Files" folder (or drag the folder, or
-     single files, into the window). Once files are shown, "Choose folder",
-     "Add files" and "Rescan" are in the "Files" row under the search box.
+     single files, into the window). Once files are shown, "Choose folder"
+     and "Add files" are in the "Open" group at the right under the search box,
+     apart from the buttons for the open folder.
        Chrome / Edge   A normal folder picker. The folder is remembered: next time
                        press "Reopen" (the browser asks once for permission).
-                       "Rescan" (Files row) picks up files you added.
+                       "Rescan" (View group) picks up files you added.
        Firefox         The browser asks "Upload files to this site?" — answer
                        yes. This is only its standard wording: nothing is
                        uploaded anywhere. Dragging the folder into the window
@@ -57,6 +58,9 @@ PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
      forward, previous / next file buttons, a time bar to click, and the queue
      (click a file to play it, the cross takes it out; the arrow folds the list).
      Good for a listening exercise: the text on your screen, the sound in the room.
+  The second window starts with a short note on what it is for. Tick "Don't show
+  this again" to hide it; More > About this window shows it again.
+
   To end it: More > Stop presenter view (the second window closes).
   If the browser blocks the new window, allow pop-ups for this page.
   Both windows must be in the same browser, as two separate windows (not tabs).
@@ -67,7 +71,7 @@ FULLSCREEN WINDOW
 
 IN THE VIEWER
   Bottom bar      First / Previous / Next / Last, progress bar (click or drag),
-                  Draw, Overview (all pages as a grid), More (zoom, fit, rotate,
+                  Overview (all pages as a grid), More (zoom, fit, rotate, Draw,
                   laser pointer, timer, black screen, keep screen on, theme)
   Fullscreen      Tap the left / right edge to turn pages, swipe, tap the middle
                   to show the buttons. The buttons hide themselves.
@@ -75,7 +79,7 @@ IN THE VIEWER
                   seconds. Keys: Space = play / pause, ← → = 5 seconds.
 
 PEN AND MARKER (any page or slide)
-  Press "Draw" (or D). The top and bottom bars step aside, so the page gets the
+  Press D (or More > Draw). The top and bottom bars step aside, so the page gets the
   whole screen, and one compact bar appears. Choose Pen, Marker (see-through) or
   Eraser, a colour and a thickness (drag the slider; the dot next to it shows the
   size, and each tool remembers its own). A circle around the pointer shows how
@@ -87,7 +91,7 @@ PEN AND MARKER (any page or slide)
   arrows in the drawing bar (or the keys) to change page. Press Done (D / Esc)
   to return to normal gestures.
 
-CLASS QUEUE (the files for one lesson, in order)
+QUEUE (the files for one lesson, in order)
   Press the "+" on a file card (or Q on the keyboard). The "Queue" button in the
   top bar opens the list: move files up / down, remove, Start.
   While a file of the queue is open, the arrows in the top bar (or [ and ]) jump
@@ -97,7 +101,7 @@ CLASS QUEUE (the files for one lesson, in order)
   open it, drag the grip to change the order, the cross (it shows when the
   mouse is over a file) takes it out. This works for any mix of files: a
   document, a presentation, two films and a song, one after the other. A queue of
-  different kinds is a plain list, so the playlist, shuffle and repeat buttons
+  different kinds is a plain list, so the shuffle and repeat buttons
   are not shown. Films and songs of such a queue start by themselves in turn;
   documents wait for you (next file: [ ] or the arrows).
   The queue lives while the page is open: after a reload, or when you choose a
@@ -116,14 +120,14 @@ VIDEO AND AUDIO
   D = pen on the paused picture. J / L = 10 seconds back / forward.
   More: speed, subtitles file, repeat (off / all / one), play from (folder /
   subfolders / all), shuffle for music,
-  audio track (if the file has several). The little window button = picture in
-  picture. [ and ] = previous / next file. The list button next to More shows
-  what plays next; drag the dots to change the order.
+  audio track (if the file has several). [ and ] = previous / next file. The
+  list button next to More shows the queue: what plays next; drag the dots to
+  change the order. Drawing on a paused video: More > Draw.
   Subtitles: put a .srt or .vtt with the same name next to the video - it is found
   automatically. Recordings longer than 2 minutes offer "Continue from 42:10?".
   Songs show their cover, title and artist (mp3, FLAC, M4A).
   Folder: when a song or video ends, the next one of the folder starts at once.
-  Queue: the next file of the class queue goes first, also at once.
+  Queue: the next file of the queue goes first, also at once.
   (In the video player M is sound; bookmarks are for documents.)
 
 BOOKMARKS

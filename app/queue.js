@@ -65,7 +65,7 @@ function markQueue(entry, i = queueIndexOf(entry)) {
   if (!btn) return;
   if (i >= 0) { const num = h('span', 'qn', String(i + 1)), x = icon('i-trash'); x.classList.add('qx'); btn.replaceChildren(num, x); }
   else btn.replaceChildren(icon('i-plus'));
-  btn.title = i >= 0 ? 'In the class queue (place ' + (i + 1) + ') — click to remove (Q)' : 'Add to the class queue (Q)';
+  btn.title = i >= 0 ? 'In the queue (place ' + (i + 1) + ') — click to remove (Q)' : 'Add to the queue (Q)';
   btn.setAttribute('aria-label', btn.title);
 }
 
@@ -105,7 +105,7 @@ function updateQueueNav() {
   $('qNav').hidden = !show;
   V.el.classList.toggle('queue-mode', queueMode());
   if (!show) { if (!$('qMenu').hidden) closeMenu(); return; }
-  $('qPos').textContent = (i + 1) + ' / ' + Q.items.length;
+  $('qPosText').textContent = (i + 1) + ' / ' + Q.items.length;
   $('qPrev').disabled = !queueNeighbor(-1);
   $('qNext').disabled = !queueNeighbor(1);
   if (!$('qMenu').hidden) renderQ();
@@ -127,7 +127,7 @@ function openQueue() {
 
 function renderQueueDialog(first) {
   const box = h('div');
-  box.appendChild(h('h2', 'modal-title', 'Class queue'));
+  box.appendChild(h('h2', 'modal-title', 'Queue'));
   const loaded = Q.items.filter((it) => it.entry).length;
 
   if (!Q.items.length) {
@@ -146,30 +146,21 @@ function renderQueueDialog(first) {
     hint.append('Add files with ', h('b', '', '+'), ' on a card, or press ', h('kbd', '', 'Q'));
     box.appendChild(hint);
   } else {
-    box.appendChild(h('p', 'modal-text', 'Put the files in order, then press Start. Inside a file, [ and ] jump to the next and previous one.'));
+    box.appendChild(h('p', 'modal-text', 'Drag the dots to put the files in order, then press Start. Inside a file, [ and ] jump to the next and previous one.'));
     const list = h('div', 'q-list');
     Q.items.forEach((it, i) => {
       const row = h('div', 'q-row' + (it.entry ? '' : ' missing'));
       const info = h('span', 'q-name');
       info.append(h('b', '', it.name), h('small', '', it.entry ? whereText(it.entry) : 'Not loaded — choose the folder again'));
-      const btn = (iconId, label, fn, disabled) => {
-        const b = h('button', 'vbtn vbtn-icon q-btn');
-        b.type = 'button'; b.title = label; b.setAttribute('aria-label', label);
-        b.appendChild(icon(iconId));
-        b.disabled = !!disabled;
-        b.onclick = () => { fn(); b.blur(); };
-        return b;
-      };
-      const move = (d) => () => { const t = Q.items[i + d]; Q.items[i + d] = it; Q.items[i] = t; queueChanged(); };
-      row.append(
-        h('span', 'q-num', String(i + 1)),
-        h('span', 'tag tag-' + (EXT_TO_KIND[it.ext] || 'text'), (it.ext || '?').toUpperCase()),
-        info,
-        btn('i-up', 'Move up', move(-1), i === 0),
-        btn('i-down', 'Move down', move(1), i === Q.items.length - 1),
-        btn('i-x', 'Remove from the queue', () => { Q.items.splice(i, 1); queueChanged(); }));
+      const grip = h('span', 'mq-grip'); grip.append(icon('i-grip')); grip.dataset.tip = 'Drag to change the order';
+      const x = h('button', 'mq-x'); x.type = 'button'; x.append(icon('i-x')); x.dataset.tip = 'Remove from the queue'; x.setAttribute('aria-label', 'Remove from the queue');
+      x.onclick = () => { Q.items.splice(Q.items.indexOf(it), 1); queueChanged(); };
+      row._e = it; row._g = 'q';                                  // what the drag code of the lists needs (see rowDrag in viewer-queue.js)
+      row.append(grip, h('span', 'q-num', String(i + 1)),
+        h('span', 'tag tag-' + (EXT_TO_KIND[it.ext] || 'text'), (it.ext || '?').toUpperCase()), info, x);
       list.appendChild(row);
     });
+    list.addEventListener('pointerdown', (ev) => rowDrag(ev, list, (g, rows) => { Q.items = rows.map((r) => r._e); queueChanged(); }));
     box.appendChild(list);
     const clear = h('button', 'btn q-clear-btn', 'Remove all');
     clear.title = 'Take every file out of the queue';
@@ -186,7 +177,7 @@ function renderQueueDialog(first) {
   actions.append(close);
   if (Q.items.length) {                       // nothing to start when the list is empty
     const start = h('button', 'btn btn-primary', 'Start');
-    start.title = 'Start the class queue';
+    start.title = 'Start the queue';
     start.type = 'button';
     start.disabled = !loaded;
     start.onclick = queueStart;

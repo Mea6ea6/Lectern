@@ -113,7 +113,7 @@ function mqRow(it) {
   if (!it.noGrip) { const grip = h('span', 'mq-grip'); grip.append(icon('i-grip')); grip.dataset.tip = 'Drag to change the order'; row.append(grip); }
   row.append(num, t);
   if (it.g !== 'cur') {                                            // any file that is still to come can be taken out in advance
-    const tip = it.g === 'q' ? 'Remove from the queue' : 'Skip it: take it out of the playlist';
+    const tip = it.g === 'q' ? 'Remove from the queue' : 'Skip it: take it out of the queue';
     const x = h('button', 'mq-x'); x.type = 'button'; x.append(icon('i-x')); x.dataset.tip = tip; x.setAttribute('aria-label', tip);
     row.append(x);
   }
@@ -176,7 +176,7 @@ function rowDrag(ev, box, drop) {
     box.insertBefore(row, rows[slot] || line.nextSibling);
     row.animate([{ background: 'var(--surface-3)' }, { background: 'transparent' }], { duration: 500 });
     drop(row._g, [...box.children].filter((r) => r._e && r._g === row._g));
-    updateBar();
+    if (V.entry) updateBar();
   };
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', done); document.addEventListener('pointercancel', done);
 }
@@ -203,7 +203,7 @@ function renderMq() {
   if (!e) return;
   MQ.all = upNextEntries(); MQ.shown = 0;
   const n = ctxList(e).length;
-  $('mqHead').textContent = 'Playlist · ' + n + (n === 1 ? ' file' : ' files');
+  $('mqHead').textContent = 'Queue · ' + n + (n === 1 ? ' file' : ' files');
   $('mqList').replaceChildren();
   $('mqList').scrollTop = 0;
   mqMore();
@@ -242,7 +242,7 @@ $('mqList').addEventListener('pointerdown', (ev) => rowDrag(ev, $('mqList'), (g,
 /* ----- The class queue window (the number "1 / 3" in the top bar): every file of the queue, whatever its kind ----- */
 function renderQ() {
   const rows = queueEntries();
-  $('qHead').textContent = 'Class queue · ' + rows.length + (rows.length === 1 ? ' file' : ' files');
+  $('qHead').textContent = 'Queue · ' + rows.length + (rows.length === 1 ? ' file' : ' files');
   $('qList').replaceChildren(...rows.map(mqRow));
 }
 function openQ() {
