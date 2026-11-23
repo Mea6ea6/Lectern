@@ -445,7 +445,7 @@ window.addEventListener('load', () => setTimeout(() => { BOOTING = false; }, 0))
 (function () {
   const OUT_MS = 220;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes', 'timerDlg', 'footer', 'footKeys', 'footStart', 'resume', 'upnext'].forEach((id) => {
+  ['settings', 'sortMenu', 'modal', 'viewer', 'overview', 'vMenu', 'cover', 'dropHint', 'inkBar', 'notes', 'timerDlg', 'footer', 'footKeys', 'footStart', 'resume'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     let logical = native.get.call(el), timer = 0;
@@ -778,8 +778,8 @@ function renderRecentDialog(first) {
       row.title = 'Open ' + it.entry.name;
       const info = h('span', 'q-name');
       info.append(h('b', '', it.entry.base), h('small', '', [recentLabel(it.entry, it.saved), agoText(it.t)].filter(Boolean).join(' · ')));
-      const x = h('button', 'vbtn vbtn-icon q-btn');
-      x.type = 'button'; x.title = 'Remove from the list'; x.setAttribute('aria-label', 'Remove from the list'); x.appendChild(icon('i-x'));
+      const x = h('button', 'mq-x');
+      x.type = 'button'; x.dataset.tip = 'Remove from the list'; x.setAttribute('aria-label', 'Remove from the list'); x.appendChild(icon('i-x'));
       x.onclick = (ev) => { ev.stopPropagation(); const map = recentMap(); map[it.key] = { d: 1, t: Date.now() }; savePref(RECENT_KEY, JSON.stringify(map)); drivePush(); renderRecentDialog(); };
       const go = () => { closeModal(); openViewer(it.entry); };
       row.onclick = go;

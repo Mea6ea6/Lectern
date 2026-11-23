@@ -198,7 +198,6 @@ button:disabled { cursor: default; }
 .brand h1 { margin: 0; font-size: var(--title-size); font-weight: 700; letter-spacing: var(--title-track); }
 .brand p { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; text-shadow: 0 0 10px rgb(var(--surface-rgb) / .9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.actions-files { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 .anchor { position: relative; }
 .popover {
@@ -206,8 +205,7 @@ button:disabled { cursor: default; }
   padding: 10px 12px;
   background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
 }
-.pop-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; }
-.pop-label, .menu-label {
+.menu-label {
   font-size: var(--label-size); font-weight: var(--label-weight);
   text-transform: var(--label-case); letter-spacing: var(--label-track);
   color: var(--ink-soft);
@@ -504,7 +502,7 @@ button:disabled { cursor: default; }
 }
 
 .ov-grid { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
-.ov-cell { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 8px; border-radius: var(--r-lg); --hb: transparent; }   /* a slide is a button: the background shows under the pointer and stays on the current slide */
+.ov-cell { position: relative; display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 8px; border-radius: var(--r-lg); --hb: transparent; }   /* a slide is a button: the background shows under the pointer and stays on the current slide */
 .ov-thumb {
   position: relative; width: 100%; overflow: hidden;
   background: #fff; border-radius: var(--r-md); box-shadow: var(--sh-1);
@@ -522,6 +520,9 @@ button:disabled { cursor: default; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ov-cell.current .ov-cap { background: var(--ink); color: var(--on-ink); }
+/* The page number on the picture: the same round number as in the list of the companion note */
+.num-dot { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgb(var(--surface-3-rgb)); color: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
+.ov-num { position: absolute; left: 18px; bottom: 18px; }
 
 /* ---------- “More” menu ---------- */
 .menu {
@@ -555,8 +556,8 @@ button:disabled { cursor: default; }
 .stepper button:disabled { opacity: .35; }
 .stepper #mZoomVal { flex: 1.5; }
 /* every control group in the menus has the same size */
-.menu-row .seg, .pop-row .seg { display: flex; width: 236px; flex: none; }
-.menu-row .seg button, .pop-row .seg button { flex: 1; justify-content: center; padding: 0 8px; }
+.menu-row .seg { display: flex; width: 236px; flex: none; }
+.menu-row .seg button { flex: 1; justify-content: center; padding: 0 8px; }
 
 .switch { position: relative; flex: none; width: 42px; height: 24px; border-radius: 12px; background: var(--surface-3); transition: background .15s; }
 .switch::after {
@@ -774,8 +775,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .q-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .q-name b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .q-name small { color: var(--ink-soft); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.q-btn { min-height: 40px; min-width: 40px; background: var(--surface-3); }
-.q-btn .icon { width: 20px; height: 20px; }
 /* Empty queue: faint placeholder rows */
 .q-ghost { pointer-events: none; user-select: none; margin-top: 14px; }
 .q-ghost .q-row { box-shadow: none; }
@@ -796,8 +795,8 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 
 /* ---------- Viewer: top bar with the queue arrows ---------- */
 .vleft { display: flex; align-items: center; gap: 10px; }
-.qnav { display: flex; align-items: center; gap: 4px; padding: 3px; background: var(--surface-2); border-radius: var(--r-md); }
-.qnav .vbtn { min-height: 42px; min-width: 42px; background: transparent; }
+.qnav { display: flex; align-items: center; gap: 8px; }          /* three separate buttons, like zoom: − 100% + */
+.qnav .vbtn { min-height: 42px; min-width: 42px; background: var(--surface-2); box-shadow: var(--sh-1); }
 .qpos { gap: 8px; padding: 0 14px 0 12px; font-variant-numeric: tabular-nums; }
 .qpos b { font-weight: 600; font-size: 14px; }
 .qpos[aria-expanded="true"] { background: var(--ink); color: var(--on-ink); }
@@ -892,7 +891,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .odf-table, .rtf-table { border-collapse: collapse; margin: .6em 0; max-width: 100%; }
 .odf-table td, .rtf-table td { padding: 4px 8px; border: 1px solid #c9c9c9; vertical-align: top; }
 .odf-textbox { border: 1px dashed #bbb; padding: 6px 10px; margin: .4em 0; }
-.rtf-empty { color: #888; }
 
 .odp-slide { position: relative; overflow: hidden; background: #fff; color: #000; font-size: 24px; line-height: 1.2; }
 .odp-shape { position: absolute; box-sizing: border-box; overflow: visible; word-wrap: break-word; }
@@ -935,7 +933,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
    Cards (files) are the exception: they grow and lift on hover / arrow-key selection.
    A pressed/selected toggle keeps its own inverted colours (that is state, not hover) - except Draw.
    New interactive elements: add them to the lists below instead of writing their own :active rule. */
-.btn, .chip, .vbtn, .dd-btn, .seg button, .card, .ov-cell, .card-info, .card-queue, .stepper button, .ink-swatch, .q-btn,
+.btn, .chip, .vbtn, .dd-btn, .seg button, .card, .ov-cell, .card-info, .card-queue, .stepper button, .ink-swatch,
 .timer-pill, .timer-step, .side, .pv-fold {
   transition: scale .38s cubic-bezier(.22, 1.25, .36, 1), filter .15s, box-shadow .2s, background-color .22s ease, color .22s ease, opacity .12s, transform .09s ease-out;   /* the overshoot is the spring back */
 }
@@ -943,28 +941,27 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
   transition: scale .12s ease-out, translate .12s ease-out, filter .15s, box-shadow .09s, background .09s, color .09s, opacity .09s, transform .09s ease-out;
 }
 /* Rows of menus and dropdowns (.menu-item, .dd-menu button) are deliberately static: no shrinking, no bounce */
-@media (hover: hover) { .ov-cell:hover { background-color: color-mix(in srgb, transparent, var(--hov-c) 9%); } }
-.ov-cell.current { background-color: color-mix(in srgb, transparent, var(--hov-c) 9%); }
+@media (hover: hover) { .ov-cell:hover, .pv-tile:hover { background-color: color-mix(in srgb, transparent, var(--hov-c) 9%); } }
+.ov-cell.current, .pv-tile.current { background-color: color-mix(in srgb, transparent, var(--hov-c) 9%); }
 .ov-cell:active { scale: .97; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .btn:active:not(:disabled), .chip:active, .vbtn:active:not(:disabled), .dd-btn:active, .card-info:active, .card-queue:active,
-.stepper button:active:not(:disabled), .ink-swatch:active, .timer-step:active, .q-btn:active:not(:disabled),
+.stepper button:active:not(:disabled), .ink-swatch:active, .timer-step:active,
 .card:active:not(:has(button:active)) { scale: .97; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .timer-pill:active, .pv-fold:active { scale: .95; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .seg button:active:not(:disabled) { scale: .96; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
 .side:active:not(:disabled) { scale: .9; transition-duration: .18s; transition-timing-function: cubic-bezier(.25,.8,.35,1); }
-@media (prefers-reduced-motion: reduce) { .btn, .chip, .vbtn, .dd-btn, .seg button, .stepper button, .side, .q-btn { transition-duration: .01ms; } }
+@media (prefers-reduced-motion: reduce) { .btn, .chip, .vbtn, .dd-btn, .seg button, .stepper button, .side { transition-duration: .01ms; } }
 
 /* Hover on a button: the background gets a little lighter (smoothly). Toggled-on and solid buttons keep their own colours. */
 :root, [data-theme="light"] { --hov-c: #000; --hov-p: 5%; }   /* light theme: the controls are already white, so hover tints them a touch darker */
 [data-theme="dark"] { --hov-c: #fff; --hov-p: 8%; }
 .btn, .chip, .card-queue, .dd-btn { --hb: var(--surface); }
 .vbtn, .stepper button, .card-info, .pv-fold { --hb: var(--surface-2); }
-.q-btn { --hb: var(--surface-3); }
 .seg button, .timer-pill, .timer-step, .side { --hb: transparent; }
 @media (hover: hover) {
   .btn:hover:not(:disabled):not(.btn-primary):not(.q-clear-btn), .chip:hover:not(.active), .dd-btn:hover, .vbtn:hover:not(:disabled):not(.vbtn-solid):not([aria-pressed="true"]),
   .seg button:hover:not(:disabled):not([aria-pressed="true"]), .stepper button:hover:not(:disabled), .card-info:hover, .card-queue:hover,
-  .q-btn:hover:not(:disabled), .timer-pill:hover, .timer-step:hover, .pv-fold:hover {
+  .timer-pill:hover, .timer-step:hover, .pv-fold:hover {
     background-color: color-mix(in srgb, var(--hb), var(--hov-c) var(--hov-p));
   }
   .side:hover:not(:disabled) { background-color: rgb(255 255 255 / .1); }
@@ -1178,7 +1175,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .pv-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--ink); }
 .pv-state { display: inline-flex; align-items: center; gap: 7px; flex: none; font-size: 12px; font-weight: 600; }
 .pv-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 14px 14px; }
-.pv-live { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.pv-live { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
 .pv.idle .pv-live { display: none; }
 .pv-empty { display: none; }
 .pv-empty { margin: auto; padding: 0 14px; text-align: center; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
@@ -1189,15 +1186,29 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 }
 .pv-shot canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 .pv-shot .clone-host { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
-.pv-shot.end::after { content: "Last slide"; position: absolute; inset: 0; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 .pv-cap-row { display: flex; align-items: baseline; justify-content: space-between; flex: none; }
 .pv-cap { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-.pv-row { display: flex; gap: 14px; align-items: stretch; flex: none; min-height: 118px; }
-.pv-next { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-.pv-next .pv-shot { align-self: flex-start; cursor: pointer; }
-.pv-btns { flex: none; width: 132px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
-.pv-btns .vbtn { justify-content: space-between; padding: 0 12px 0 16px; }
-.pv-btns .vbtn kbd { margin: 0; }
+/* Below the big slide: all slides, then the other files of the queue, in one row */
+.pv-strip { display: flex; gap: var(--gap, 16px); align-items: center; flex: none; overflow-x: auto; overflow-y: hidden; padding: 6px 4px 10px; scrollbar-width: thin; }
+.pv-group { display: flex; gap: 6px; flex: none; }
+.pv-tile { position: relative; flex: none; padding: 6px; border-radius: var(--r-lg); --hb: transparent; transition: background-color .15s, scale .15s; }   /* like a cell of the overview: a background under the pointer and on the current slide */
+.pv-tile.current .pv-tshot { box-shadow: var(--sh-3); }
+.pv-tile:active { scale: .96; }
+.pv-tshot { position: relative; display: block; contain: paint; overflow: hidden; background: #fff; border-radius: 4px; }
+.pv-tshot canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pv-tshot .clone-host { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.pv-tnum { position: absolute; left: 12px; bottom: 12px; width: 20px; height: 20px; font-size: 11px; }
+.pv-file { flex: none; width: 124px; height: var(--th, 58px); display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 4px; padding: 8px 10px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--sh-1); text-align: left; --hb: var(--surface-2); }
+.pv-fname { max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; font-weight: 600; line-height: 1.25; word-break: break-word; }
+.pv-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
+.pv-nav-g { display: flex; gap: 8px; }
+.pv-nav .vbtn { min-height: 42px; min-width: 42px; background: var(--surface-2); box-shadow: var(--sh-1); }
+.pv-mnav { gap: 6px; }
+.pv-mnav .pv-nav-g { gap: 6px; }
+.pv-mnav .vbtn { min-width: 40px; min-height: 40px; padding: 0; }
+.pv-mnav .vbtn-solid { background: var(--ink); color: var(--on-ink); }
+.pv-mnav .pv-label { font-size: 13px; white-space: nowrap; }
+.pv-label { flex: 1; text-align: center; font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
 .vbtn-solid kbd { background: rgb(var(--surface-rgb) / .2); box-shadow: none; color: var(--on-ink); }
 .pv-notes-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--surface-2); border-radius: var(--r-md); }   /* its own block, like a code block */
 .pv-notes { height: 100%; -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); overflow: auto; padding: 14px 16px 28px; font-size: 18px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
@@ -1246,9 +1257,6 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 .thumb .media-snip.has-cover { position: relative; padding: 0; width: auto; height: 90%; aspect-ratio: 1; overflow: hidden; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }     /* the cover is a square in the middle of the card */
 .thumb .media-snip.has-cover img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; border-radius: 0; box-shadow: none; }
 .media-snip.has-cover .media-dur { position: absolute; right: 8px; bottom: 8px; padding: 2px 9px; border-radius: var(--r-pill); background: var(--surface); color: var(--ink); box-shadow: var(--sh-1); -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd); }
-.upnext .resume-text { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
-#upnext.anim-in  { animation: foot-in .34s var(--ease-out) backwards; }
-#upnext.anim-out { animation: foot-out .2s var(--ease-in) forwards; pointer-events: none; }
 
 /* Old .ppt files: text only, drawn as plain white slides */
 .ppt-slide { position: absolute; inset: 0; background: #fff; color: #111; padding: 72px 96px; overflow: hidden; font-family: Inter, system-ui, sans-serif; }
@@ -1282,6 +1290,7 @@ canvas.pdf-page { display: block; background: #fff; box-shadow: var(--sh-page); 
 body.large-ui { --ui: 1.25; }
 body.large-ui .homebar, body.large-ui main, body.large-ui .footer, body.large-ui .vbar,
 body.large-ui .modal-card, body.large-ui .toast { zoom: var(--ui); }
+body.large-ui .modal-card { max-height: calc((100vh - 40px) / var(--ui)); }   /* zoom scales vh too: without this the dialog grows past the screen */
 body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / var(--ui)); }
 
 /* One look for empty, loading and error states (stateNode() in core.js) */
@@ -1311,7 +1320,7 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .homebar.away { transform: translateY(-105%); box-shadow: none; pointer-events: none; }
 .card { scroll-margin-top: calc(var(--hbh, 0px) + 12px); }
 .card, .card * { -webkit-user-select: none; user-select: none; }              /* a file card behaves like a picture: no text selection */
-.card .page-thumb, .info-thumb .page-thumb, .cv-thumb .page-thumb { pointer-events: none; }
+.card .page-thumb, .info-thumb .page-thumb { pointer-events: none; }
 
 /* ---------- Toolbar: groups ---------- */
 .tb-group { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -1434,8 +1443,6 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .mq-x:hover { background: var(--surface-3); color: var(--ink); }
 .mq-x .icon { width: 16px; height: 16px; }
 
-.mq-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.mq-shuf { min-height: 36px; min-width: 36px; }
 .rep-one { display: none; position: absolute; font: 700 9px/1 var(--font, inherit); font-style: normal; translate: 0 1px; }
 #mRepB { position: relative; }
 #mRepB[data-mode="one"] .rep-one { display: block; }
@@ -1466,8 +1473,6 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .pv.is-media .pv-live { display: none; }
 .pv-mbar { flex: none; position: relative; height: 14px; cursor: pointer; border-radius: 4px; background: linear-gradient(var(--surface-3), var(--surface-3)) center / 100% 4px no-repeat; }
 .pv-mbar i { position: absolute; left: 0; top: 50%; height: 4px; width: 0; margin-top: -2px; border-radius: 4px; background: var(--ink); }
-.pv-mbtns { flex: none; display: flex; justify-content: space-between; gap: 6px; }
-.pv-mbtns .vbtn { flex: 1; min-width: 0; }
 .pv-qwrap .pv-q { height: 100%; max-height: none; padding: 6px 8px 24px; margin: 0; }
 .pv-q .mq-row { cursor: pointer; min-height: 44px; padding-left: 4px; }
 .pv-q .mq-n { width: 34px; padding-right: 8px; }
@@ -1501,12 +1506,16 @@ body.large-ui .menu { max-height: calc((100% - var(--bt) - var(--bb) - 24px) / v
 .ch-check input { position: absolute; opacity: 0; pointer-events: none; }
 .ch-box-mark { position: relative; flex: none; width: 20px; height: 20px; border-radius: 6px; background: var(--surface-3); transition: background .15s; }
 .ch-box-mark::after {
-  content: ""; position: absolute; left: 6px; top: 2.5px; width: 5px; height: 10px; border: solid var(--on-ink); border-width: 0 2px 2px 0;
-  transform: rotate(45deg) scale(0); transition: transform .15s;
+  content: ""; position: absolute; inset: 0; background: var(--on-ink); transform: scale(0); transition: transform .15s;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.2 10.4l3.2 3.2 6.4-6.8' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.2 10.4l3.2 3.2 6.4-6.8' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
 }
 .ch-check input:checked + .ch-box-mark { background: var(--ink); }
-.ch-check input:checked + .ch-box-mark::after { transform: rotate(45deg) scale(1); }
+.ch-check input:checked + .ch-box-mark::after { transform: scale(1); }
 .ch-check input:focus-visible + .ch-box-mark { box-shadow: 0 0 0 3px var(--ink-faint); }
 .companion-help .modal-actions { justify-content: center; margin-top: 16px; }
 .companion-help .modal-title { margin-bottom: 6px; }
 .companion-help .modal-text { margin-bottom: 14px; }
+
+/* ---------- Companion window: all slides, and the files row ---------- */
+.modal:has(.companion-help) { background: transparent; }

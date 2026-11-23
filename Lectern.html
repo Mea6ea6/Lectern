@@ -16,8 +16,8 @@
     window.applyGlass = function (value) {
       var solid = Math.max(0, Math.min(100, value)) / 100, g = 1 - solid, r = document.documentElement.style;
       r.setProperty('--g', g.toFixed(3));                              // how much glass (0 … 1)
-      r.setProperty('--a1', (1 - 0.4 * g).toFixed(3));               // panels: opacity
-      r.setProperty('--a2', (1 - 0.56 * g).toFixed(3));               // controls on panels: opacity
+      r.setProperty('--a1', (1 - 1.1 * g).toFixed(3));               // panels: opacity
+      r.setProperty('--a2', (1 - 1.4 * g).toFixed(3));               // controls on panels: opacity
       r.setProperty('--wall-o', g.toFixed(3));                        // the grey "wallpaper" behind the glass
       r.setProperty('--bd', g < 0.03 ? 'none' : 'blur(' + Math.round(g * 150) + 'px) saturate(' + (1 + 0.7 * g).toFixed(2) + ')');
     };
@@ -424,16 +424,18 @@
     <div class="pv-body">
       <div class="pv-empty" id="pvEmpty"></div>
       <div class="pv-live">
-        <div class="pv-cap-row"><span class="pv-cap">Now</span><span class="pv-cap" id="pvPos"></span></div>
-        <div class="pv-shot" id="pvNow" style="--r:.5625;--maxh:180px"></div>
-        <div class="pv-row">
-          <div class="pv-next">
-            <span class="pv-cap">Next</span>
-            <div class="pv-shot" id="pvNext" style="--r:.5625;--maxh:100px"></div>
+        <div class="pv-shot" id="pvNow" style="--r:.5625;--maxh:150px"></div>
+        <!-- All the slides of the file, then the other files of the queue: one row, scrolled sideways -->
+        <div class="pv-strip" id="pvStrip"></div>
+        <div class="pv-nav">
+          <div class="pv-nav-g">
+            <button class="vbtn vbtn-icon" id="pvFirst" type="button" title="First slide" aria-label="First slide"><svg class="icon"><use href="#i-first"/></svg></button>
+            <button class="vbtn vbtn-icon" id="pvPrev" type="button" title="Previous slide (↑)" aria-label="Previous slide"><svg class="icon"><use href="#i-prev"/></svg></button>
           </div>
-          <div class="pv-btns">
-            <button class="vbtn" id="pvPrev" type="button" title="Previous slide (↑)"><span>Previous</span><kbd>↑</kbd></button>
-            <button class="vbtn vbtn-solid" id="pvNextBtn" type="button" title="Next slide (↓)"><span>Next</span><kbd>↓</kbd></button>
+          <span class="pv-label" id="pvLabel"></span>
+          <div class="pv-nav-g">
+            <button class="vbtn vbtn-icon" id="pvNextBtn" type="button" title="Next slide (↓)" aria-label="Next slide"><svg class="icon"><use href="#i-next"/></svg></button>
+            <button class="vbtn vbtn-icon" id="pvLast" type="button" title="Last slide" aria-label="Last slide"><svg class="icon"><use href="#i-last"/></svg></button>
           </div>
         </div>
         <div class="pv-cap-row"><span class="pv-cap">Notes</span>
@@ -444,14 +446,19 @@
       <!-- Video / audio of the presentation window: the buttons on top, then the queue (can be folded like the notes) -->
       <div class="pv-media" id="pvMedia">
         <div class="pv-mpic" id="pvMPic" hidden><img id="pvMImg" alt=""></div>
-        <div class="pv-cap-row"><span class="pv-cap" id="pvMTime">0:00 / 0:00</span><span class="pv-cap" id="pvMState"></span></div>
         <div class="pv-mbar" id="pvMBar" title="Click to jump"><i id="pvMFill"></i></div>
-        <div class="pv-mbtns">
-          <button class="vbtn vbtn-icon" id="pvMPrevF" type="button" title="Previous file" aria-label="Previous file"><svg class="icon"><use href="#i-first"/></svg></button>
-          <button class="vbtn vbtn-icon" id="pvMBack" type="button" title="Back 5 seconds" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
-          <button class="vbtn vbtn-icon vbtn-solid" id="pvMPlay" type="button" title="Play / pause" aria-label="Play"><svg class="icon"><use id="pvMPlayIcon" href="#i-play"/></svg></button>
-          <button class="vbtn vbtn-icon" id="pvMFwd" type="button" title="Forward 5 seconds" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
-          <button class="vbtn vbtn-icon" id="pvMNextF" type="button" title="Next file" aria-label="Next file"><svg class="icon"><use href="#i-last"/></svg></button>
+        <!-- The same row as the page buttons of a document: the time instead of "Slide 1 of 3", the player buttons around it -->
+        <div class="pv-nav pv-mnav">
+          <div class="pv-nav-g">
+            <button class="vbtn vbtn-icon" id="pvMPrevF" type="button" title="Previous file" aria-label="Previous file"><svg class="icon"><use href="#i-first"/></svg></button>
+            <button class="vbtn vbtn-icon" id="pvMBack" type="button" title="Back 5 seconds" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
+            <button class="vbtn vbtn-icon vbtn-solid" id="pvMPlay" type="button" title="Play / pause" aria-label="Play"><svg class="icon"><use id="pvMPlayIcon" href="#i-play"/></svg></button>
+          </div>
+          <span class="pv-label" id="pvMTime">0:00 / 0:00</span>
+          <div class="pv-nav-g">
+            <button class="vbtn vbtn-icon" id="pvMFwd" type="button" title="Forward 5 seconds" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
+            <button class="vbtn vbtn-icon" id="pvMNextF" type="button" title="Next file" aria-label="Next file"><svg class="icon"><use href="#i-last"/></svg></button>
+          </div>
         </div>
         <div class="pv-cap-row"><span class="pv-cap" id="pvQCap">Queue</span>
           <button class="pv-fold" id="pvQFold" type="button" title="Hide the queue" aria-label="Hide the queue" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
@@ -590,15 +597,6 @@
     <div class="mq-list" id="mqList"></div>
   </div>
 
-  <!-- Video / audio finished: the next file of the queue starts by itself -->
-  <div class="resume upnext" id="upnext" role="dialog" aria-label="Next file" hidden>
-    <div class="resume-text" id="upnextText"></div>
-    <div class="resume-actions">
-      <button class="btn" id="upnextNo" type="button" title="Stay on this file (Esc)">Stay here</button>
-      <button class="btn btn-primary" id="upnextYes" type="button" title="Start the next file now (Enter)">Play now <kbd>Enter</kbd></button>
-    </div>
-    <span class="resume-bar" id="upnextBar"></span>
-  </div>
   <input type="file" id="subPick" accept=".srt,.vtt" hidden>
 
   <div class="toast" id="toast"></div>

@@ -79,7 +79,9 @@ function linkPush(force) {
     Link.items = rows.map((r) => r.e);               // the second window refers to a row by its number
     s = { t: 'state', key: Link.key, media: { playing: d.playing, time: Math.floor(d.el.currentTime || 0), dur: d.el.duration || 0, mode: queueMode() ? 'queue' : 'playlist',
       rows: rows.slice(0, 40).map((r) => ({ g: r.g, n: r.n, title: r.title, sub: r.sub, hideN: !!r.hideN, end: !!r.end })) } };
-  } else if (ok) s = { t: 'state', key: Link.key, index: d.currentIndex(), count: d.count };
+  } else if (ok) s = { t: 'state', key: Link.key, index: d.currentIndex(), count: d.count, qi: queueIndexOf(V.entry),
+      qs: Q.items.map((it, i) => it.entry && { i, n: it.entry.base || it.entry.name, tag: it.entry.tag, k: it.entry.kind }).filter(Boolean).slice(0, 60) };
+    Link.items = Q.items.map((it) => it.entry);       // the second window refers to a file by its number
   const sig = JSON.stringify(s);
   if (!force && sig === Link.last) return;
   Link.last = sig;
@@ -136,8 +138,13 @@ function linkCmd(c, extra) {
 // The presentation window obeys the companion: turn the page, or (video / song) pause, jump, change the file
 function remoteCmd(m) {
   const d = V.driver;
-  if (!d.isMedia) { if (['next', 'prev', 'first', 'last'].includes(m.c)) d.go(m.c); return; }
   const e = Link.items[m.i], same = !!e && (e.base || e.name) === m.n && e !== V.entry;      // the row must still be the same file
+  if (m.c === 'go') { if (same) { if (playable(e)) V.autoplay = true; openViewer(e); } return; }
+  if (!d.isMedia) {
+    if (['next', 'prev', 'first', 'last'].includes(m.c)) d.go(m.c);
+    else if (m.c === 'goto' && m.i >= 0 && m.i < d.count) d.goTo(m.i);
+    return;
+  }
   switch (m.c) {
     case 'toggle': d.toggle(); break;
     case 'back': d.skip(-5); break;
@@ -145,7 +152,6 @@ function remoteCmd(m) {
     case 'seek': d.seek(m.r); break;
     case 'prevf': queueStep(-1); break;
     case 'nextf': queueStep(1); break;
-    case 'go': if (same) { if (playable(e)) V.autoplay = true; openViewer(e); } break;
     case 'rm': if (same) { upNextRemove(e, m.g); updateBar(); } break;
   }
 }
@@ -224,11 +230,15 @@ function pvRender() {
   if (msg) { pvJob++; return; }
   if (rem.viewer === 'media') { pvJob++; pvMedia(pos.media); return; }
 
-  const i = pos.index, last = pos.count - 1;
-  $('pvPos').textContent = (rem.viewer === 'pdf' ? 'Page ' : 'Slide ') + (i + 1) + ' of ' + pos.count;
-  $('pvPrev').disabled = i <= 0;
-  $('pvNextBtn').disabled = i >= last;
-  for (const id of ['pvNow', 'pvNext']) $(id).style.setProperty('--r', rem.ratio);
+  const i = pos.index, last = pos.count - 1, what = rem.viewer === 'pdf' ? 'page' : 'slide';
+  $('pvLabel').textContent = (rem.viewer === 'pdf' ? 'Page ' : 'Slide ') + (i + 1) + ' of ' + pos.count;
+  $('pvFirst').disabled = $('pvPrev').disabled = i <= 0;
+  $('pvNextBtn').disabled = $('pvLast').disabled = i >= last;
+  for (const [id, text] of [['pvFirst', 'First'], ['pvPrev', 'Previous'], ['pvNextBtn', 'Next'], ['pvLast', 'Last']]) {
+    const key = id === 'pvPrev' ? ' (↑)' : id === 'pvNextBtn' ? ' (↓)' : '';
+    $(id).dataset.tip = text + ' ' + what + key; $(id).setAttribute('aria-label', text + ' ' + what);
+  }
+  $('pvNow').style.setProperty('--r', rem.ratio);
   const text = rem.notes[i] || '';
   const noNotes = !rem.notes.some(Boolean);
   const box = $('pvNotes');
@@ -236,17 +246,60 @@ function pvRender() {
   box.classList.toggle('none', !text);
   box.scrollTop = 0;
 
-  // The small slides
+  // The big slide, and the row of small ones
   const job = ++pvJob, eng = Link.peek, stale = () => job !== pvJob;
-  $('pvNext').classList.toggle('end', i >= last);
+  pvStrip(rem, pos, eng);
   if (!eng) return;
-  if (pvRender.last !== i && pvRender.last !== undefined && !prefersReducedMotion()) {
-    for (const id of ['pvNow', 'pvNext']) $(id).animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
-  }
+  if (pvRender.last !== i && pvRender.last !== undefined && !prefersReducedMotion()) $('pvNow').animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
   pvRender.last = i;
   eng.draw(i, $('pvNow'), stale);
-  if (i < last) eng.draw(i + 1, $('pvNext'), stale); else $('pvNext').replaceChildren();
 }
+// One row: the small slides of this file, then the other files of the queue (a gap between the files). Scrolls sideways.
+let pvSeen = null;
+function pvStrip(rem, pos, eng) {
+  const strip = $('pvStrip'), qs = pos.qi >= 0 ? pos.qs || [] : [];
+  const sig = rem.key + '|' + pos.count + '|' + pos.qi + '|' + JSON.stringify(qs);
+  if (pvStrip.sig !== sig) {
+    pvStrip.sig = sig;
+    if (pvSeen) pvSeen.disconnect();
+    pvSeen = new IntersectionObserver((items) => {
+      for (const it of items) if (it.isIntersecting) { pvSeen.unobserve(it.target); if (Link.peek) Link.peek.draw(Number(it.target.dataset.i), it.target.firstChild, () => !it.target.isConnected); }
+    }, { root: strip, rootMargin: '0px 200px' });
+    const th = rem.ratio > 1 ? 84 : 58, tw = Math.round(th / rem.ratio);          // the size is spelled out: no layout guessing from the aspect ratio
+    strip.style.setProperty('--th', th + 'px');
+    strip.replaceChildren();
+    const slides = () => {
+      const g = h('div', 'pv-group');
+      for (let i = 0; i < pos.count; i++) {
+        const t = h('button', 'pv-tile'), shot = h('span', 'pv-tshot');
+        t.type = 'button'; t.dataset.i = i; t.dataset.tip = 'Show ' + (rem.viewer === 'pdf' ? 'page ' : 'slide ') + (i + 1);
+        shot.style.width = tw + 'px'; shot.style.height = th + 'px';
+        t.append(shot, h('b', 'num-dot pv-tnum', String(i + 1)));
+        t.onclick = () => linkCmd('goto', { i });
+        g.appendChild(t); pvSeen.observe(t);
+      }
+      return g;
+    };
+    if (!qs.length) strip.appendChild(slides());
+    for (const f of qs) {
+      if (f.i === pos.qi) { strip.appendChild(slides()); continue; }
+      const t = h('button', 'pv-file');
+      t.type = 'button'; t.dataset.tip = 'Open ' + f.n + ' in the presentation window';
+      t.append(h('span', 'tag tag-' + f.k, f.tag), h('span', 'pv-fname', f.n));
+      t.onclick = () => linkCmd('go', { i: f.i, n: f.n });
+      strip.appendChild(t);
+    }
+  }
+  const cur = strip.querySelector('.pv-tile.current');
+  if (cur) cur.classList.remove('current');
+  const now = strip.querySelector('.pv-tile[data-i="' + pos.index + '"]');
+  if (now) {
+    now.classList.add('current');
+    now.scrollIntoView({ inline: 'center', block: 'nearest', behavior: pvStrip.placed && !prefersReducedMotion() ? 'smooth' : 'auto' });
+    pvStrip.placed = true;
+  }
+}
+$('pvStrip').addEventListener('wheel', (ev) => { if (Math.abs(ev.deltaY) > Math.abs(ev.deltaX)) { ev.preventDefault(); $('pvStrip').scrollLeft += ev.deltaY; } }, { passive: false });
 // Video / song: time, the buttons and the queue (rows are drawn again only when they change, so a click is never lost)
 function pvMedia(m) {
   if (!m) return;
@@ -255,7 +308,6 @@ function pvMedia(m) {
   $('pvMFill').style.width = (m.dur > 0 ? Math.min(100, m.time / m.dur * 100) : 0) + '%';
   $('pvMPlayIcon').setAttribute('href', m.playing ? '#i-pause' : '#i-play');
   $('pvMPlay').setAttribute('aria-label', m.playing ? 'Pause' : 'Play');
-  $('pvMState').textContent = m.playing ? 'Playing' : 'Paused';
   $('pvQCap').textContent = 'Queue';
   const sig = JSON.stringify(m.rows);
   if (pvMedia.sig === sig) return;
@@ -284,9 +336,10 @@ const pvResize = new ResizeObserver((items) => {
   }
 });
 pvResize.observe($('pvNow'));
-pvResize.observe($('pvNext'));
 $('pvPrev').onclick = () => linkCmd('prev');
-$('pvNextBtn').onclick = $('pvNext').onclick = () => linkCmd('next');
+$('pvNextBtn').onclick = () => linkCmd('next');
+$('pvFirst').onclick = () => linkCmd('first');
+$('pvLast').onclick = () => linkCmd('last');
 
 /* ----- The welcome note of the companion window (can be switched off; More → About this window brings it back) ----- */
 const COMPANION_HELP = [

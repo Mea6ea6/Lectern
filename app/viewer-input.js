@@ -288,7 +288,7 @@ document.addEventListener('keydown', (e) => {
   /* a dialog is open */
   if (!M.el.hidden) {
     if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
-    else if (e.key === 'Enter' && M.onEnter && !(e.target.closest && e.target.closest('.q-btn'))) { e.preventDefault(); M.onEnter(); }
+    else if (e.key === 'Enter' && M.onEnter && !(e.target.closest && e.target.closest('.mq-x'))) { e.preventDefault(); M.onEnter(); }
     else if (e.key === ' ' && M.spaceCloses) { e.preventDefault(); closeModal(); }
     return;
   }
@@ -299,8 +299,6 @@ document.addEventListener('keydown', (e) => {
 
 
     if (V.cover) return act(hideCover);                       // any key brings the slide back
-    if (UpNext.open && e.key === 'Enter') return act(() => upNextClose(true));
-    if (UpNext.open && e.key === 'Escape') return act(() => upNextClose(false));
     if (Resume.open && e.key === 'Enter') return act(() => resumeClose(true));
     if (Resume.open && e.key === 'Escape') return act(() => resumeClose(false));
 

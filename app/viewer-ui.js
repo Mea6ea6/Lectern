@@ -29,8 +29,7 @@ const V = {
 
 async function openViewer(entry) {
   const token = ++V.openToken;
-  upNextClose(false);
-  const auto = V.autoplay; V.autoplay = false;     // came from the "Next" countdown: start playing at once
+  const auto = V.autoplay; V.autoplay = false;     // came from the previous file of the queue: start playing at once
   closeDriver();
   closeMenu();
   closeOverview();
@@ -108,7 +107,6 @@ function closeDriver() {
 
 function closeViewer() {
   V.openToken++;
-  upNextClose(false);
   posSave();
   if (V.viewTimer) { clearTimeout(V.viewTimer); viewSave(); }
   V.posReady = false; resumeClose(false); V.posReady = false;
@@ -292,33 +290,6 @@ function resumeClose(accept) {
 $('resumeYes').onclick = () => resumeClose(true);
 $('resumeNo').onclick = () => resumeClose(false);
 
-/* ----- Video / audio finished: the next file of the queue starts by itself after a short countdown ----- */
-const UPNEXT_MS = 8000;
-const UpNext = { open: false, anim: null, timer: 0, target: null };
-
-function upNextShow(entry) {
-  if (!entry || UpNext.open) return;
-  UpNext.target = entry;
-  $('upnextText').textContent = 'Next: ' + (entry.base || entry.name);
-  $('upnext').hidden = false;
-  UpNext.open = true;
-  if (UpNext.anim) UpNext.anim.cancel();
-  UpNext.anim = $('upnextBar').animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: UPNEXT_MS, easing: 'linear', fill: 'forwards' });
-  clearTimeout(UpNext.timer);
-  UpNext.timer = setTimeout(() => upNextClose(true), UPNEXT_MS);
-}
-function upNextClose(go) {
-  if (!UpNext.open) return;
-  UpNext.open = false;
-  clearTimeout(UpNext.timer);
-  if (UpNext.anim) { UpNext.anim.cancel(); UpNext.anim = null; }
-  $('upnext').hidden = true;
-  const to = UpNext.target; UpNext.target = null;
-  if (go && to) { V.autoplay = true; openViewer(to); }       // the next video / song starts playing on its own
-}
-$('upnextYes').onclick = () => upNextClose(true);
-$('upnextNo').onclick = () => upNextClose(false);
-
 // Everything that only video / audio have: time, volume, speed, subtitles, repeat, pen
 function updateMediaBar(d) {
   $('mTime').textContent = d.label();
@@ -393,7 +364,6 @@ function updateBar() {
   if (ready && d.count > 1 && !(d instanceof ScrollViewer) && !d.isMedia) animatePage(d);
   if (ready && Resume.open && !V.jumping && (d.isMedia ? d.playing : d instanceof ScrollViewer ? d.scrollRatio() > .03 : d.index > 0)) resumeClose(false);   // you are already moving: the question is no longer needed
   if (ready) posSaveSoon();
-  if (UpNext.open && (!ready || !d.isMedia || !d.el.ended)) upNextClose(false);       // played again or moved away: no countdown
   $('vPos').textContent = ready ? d.label() : '';
 
   const p = ready ? d.progress() : 0;
@@ -659,7 +629,8 @@ function openOverview() {
     const thumb = h('span', 'ov-thumb');
     thumb.dataset.i = i;
     thumb.style.aspectRatio = '1 / ' + d.thumbRatio;
-    cell.append(thumb, h('span', 'ov-cap', d.caption(i)));
+    const cap = d.caption(i);
+    cell.append(thumb, cap === String(i + 1) ? h('b', 'num-dot ov-num', cap) : h('span', 'ov-cap', cap));      // a plain number sits on the picture; a name (sheet, chapter) stays below
     if (Marks.has(i)) cell.classList.add('marked');
     cell.onclick = () => { closeOverview(); V.driver.goTo(i); };
     grid.appendChild(cell);
@@ -800,8 +771,9 @@ async function toggleInk() {
 $('vInk').onclick = () => { closeMenu(); toggleInk(); };
 
 /* ----- Laser pointer: a red dot that follows the mouse (or a finger on a touch screen). Nothing is drawn ----- */
-const Laser = { on: false, dot: $('laserDot'), trail: $('laserTrail'), pts: [], raf: 0 };
-const TRAIL_MS = 450;                   // how long the trail lives
+const Laser = { on: false, dot: $('laserDot'), trail: $('laserTrail'), pts: [], raf: 0, held: false, up: 0 };
+const TRAIL_MS = 450;                   // a trail without a press: how long it lives
+const HELD_FADE_MS = 700;               // a trail drawn while pressed: stays until the release, then fades this fast
 function setLaser(on) {
   on = !!on;
   if (on === Laser.on) return;
@@ -810,7 +782,7 @@ function setLaser(on) {
   V.el.classList.toggle('laser-on', on);
   $('mLaser').setAttribute('aria-pressed', String(on));
   Laser.trail.hidden = !on;
-  if (!on) { Laser.dot.hidden = true; Laser.pts.length = 0; }
+  if (!on) { Laser.dot.hidden = true; Laser.pts.length = 0; Laser.held = false; }
   showToast(on ? 'Laser pointer on' : 'Laser pointer off');
 }
 function laserAim(e) {
@@ -819,8 +791,9 @@ function laserAim(e) {
   if (e.target.closest && e.target.closest('.vbar, .menu, .notes, .overview, .modal, .timer-pill')) { Laser.dot.hidden = true; return; }
   Laser.dot.hidden = false;
   Laser.dot.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px)';
-  Laser.pts.push({ x: e.clientX, y: e.clientY, t: performance.now(), start: e.type === 'pointerdown' });
-  if (Laser.pts.length > 80) Laser.pts.shift();
+  if (e.type === 'pointerdown') { Laser.held = e.button === 0; Laser.pts.length = 0; }          // a new press starts a new line
+  Laser.pts.push({ x: e.clientX, y: e.clientY, t: performance.now(), start: e.type === 'pointerdown', h: Laser.held });
+  if (Laser.pts.length > (Laser.held ? 3000 : 80)) Laser.pts.shift();
   if (!Laser.raf) Laser.raf = requestAnimationFrame(laserDraw);
 }
 // The trail: short line segments that get thinner and fainter with age, then disappear
@@ -832,18 +805,23 @@ function laserDraw() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
   const now = performance.now(), pts = Laser.pts;
-  while (pts.length && now - pts[0].t > TRAIL_MS) pts.shift();
+  const age = (p) => !p.h ? (now - p.t) / TRAIL_MS : Laser.held ? 0 : (now - Math.max(p.t, Laser.up)) / HELD_FADE_MS;
+  while (pts.length && age(pts[0]) > 1) pts.shift();
   g.lineCap = 'round';
   for (let i = 1; i < pts.length; i++) {
     if (pts[i].start) continue;                                  // a new touch does not connect to the previous one
-    const k = 1 - (now - pts[i].t) / TRAIL_MS;                   // 1 = fresh, 0 = gone
+    const k = 1 - age(pts[i]);                                   // 1 = fresh (or still pressed), 0 = gone
     g.strokeStyle = 'rgba(255,45,32,' + (k * 0.55).toFixed(3) + ')';
     g.lineWidth = 1 + 3 * k;
     g.beginPath(); g.moveTo(pts[i - 1].x, pts[i - 1].y); g.lineTo(pts[i].x, pts[i].y); g.stroke();
   }
   if (pts.length) Laser.raf = requestAnimationFrame(laserDraw);
 }
-function laserLose(e) { if (Laser.on && (e.type === 'pointerleave' || e.pointerType !== 'mouse')) Laser.dot.hidden = true; }
+function laserLose(e) {
+  if (!Laser.on) return;
+  if (Laser.held) { Laser.held = false; Laser.up = performance.now(); if (!Laser.raf) Laser.raf = requestAnimationFrame(laserDraw); }   // let go: the line starts to fade
+  if (e.type === 'pointerleave' || e.pointerType !== 'mouse') Laser.dot.hidden = true;
+}
 V.el.addEventListener('pointermove', laserAim);
 V.el.addEventListener('pointerdown', laserAim);
 ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => V.el.addEventListener(ev, laserLose));

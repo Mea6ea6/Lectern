@@ -52,7 +52,9 @@ PRESENTER VIEW (two windows: slides on the projector, your speech on the laptop)
   2. In the second window open the file with your speech. On the right it shows the
      current and next slide and the notes. Up / Down (or Page Up / Page Down on a
      clicker) turn the slides; Left / Right turn the speech file. You can also turn
-     slides in the first window. The timer is shared.
+     slides in the first window. The timer is shared. Under the big slide is one row
+     with all the slides, then the other files of the queue: scroll it sideways, click
+     a slide to show it, click a file to open it in the slides window.
   3. Pen, laser and black screen work in the slides window only.
   Video / song: the panel in the second window has the pause, 5 seconds back /
      forward, previous / next file buttons, a time bar to click, and the queue
@@ -146,7 +148,8 @@ KEYBOARD
            D = draw (1 pen, 2 marker, 3 eraser; Ctrl+Z undo, Ctrl+Shift+Z redo)
            M = bookmark   , . = previous / next bookmark   N = notes
            B = black screen   W = white screen   R = rotate   + − 0 = zoom
-           L = laser pointer (a red dot follows the mouse or a finger)
+           L = laser pointer (a red dot follows the mouse or a finger;
+                       hold the button or the finger to leave a line until you let go)
            P = presenter view (see below)
            T = timer (silent; shown in the top bar, turns red when the time is reached)
            Zoomed in: drag the page with the mouse to move it
