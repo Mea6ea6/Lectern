@@ -1,6 +1,6 @@
 'use strict';
 /* Lectern — what plays after this file, and the class queue while viewing.  One of the app/*.js files that Lectern.html loads in this order:
-   core.js, drive.js, errors.js, list.js, viewers.js, viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js.
+   core.js, drive.js, errors.js, list.js, queue.js, thumbs.js, viewers.js, viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js, extras.js, link.js, presenter.js, companion.js, start.js. They are plain scripts that share one global scope
    They are plain scripts that share one global scope (no modules, so it also works from a file:// address on a flash drive). */
 
 /* ----- Which file follows a video / song: the class queue first, else the next media file of the same folder -----

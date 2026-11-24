@@ -423,47 +423,41 @@
     </div>
     <div class="pv-body">
       <div class="pv-empty" id="pvEmpty"></div>
+      <!-- One order for every file, top to bottom: the file / slide now, its buttons, the other files of the queue, the notes (only when the file has some) -->
       <div class="pv-live">
         <div class="pv-shot" id="pvNow" style="--r:.5625;--maxh:150px"></div>
-        <!-- All the slides of the file, then the other files of the queue: one row, scrolled sideways -->
-        <div class="pv-strip" id="pvStrip"></div>
-        <div class="pv-nav">
-          <div class="pv-nav-g">
-            <button class="vbtn vbtn-icon" id="pvFirst" type="button" title="First slide" aria-label="First slide"><svg class="icon"><use href="#i-first"/></svg></button>
-            <button class="vbtn vbtn-icon" id="pvPrev" type="button" title="Previous slide (↑)" aria-label="Previous slide"><svg class="icon"><use href="#i-prev"/></svg></button>
-          </div>
-          <span class="pv-label" id="pvLabel"></span>
-          <div class="pv-nav-g">
-            <button class="vbtn vbtn-icon" id="pvNextBtn" type="button" title="Next slide (↓)" aria-label="Next slide"><svg class="icon"><use href="#i-next"/></svg></button>
-            <button class="vbtn vbtn-icon" id="pvLast" type="button" title="Last slide" aria-label="Last slide"><svg class="icon"><use href="#i-last"/></svg></button>
+        <div class="pv-ctl pv-doc">
+          <div class="pv-nav">
+            <div class="pv-nav-g">
+              <button class="vbtn vbtn-icon" id="pvFirst" type="button" title="First slide" aria-label="First slide"><svg class="icon"><use href="#i-first"/></svg></button>
+              <button class="vbtn vbtn-icon" id="pvPrev" type="button" title="Previous slide (↑)" aria-label="Previous slide"><svg class="icon"><use href="#i-prev"/></svg></button>
+            </div>
+            <span class="pv-label" id="pvLabel"></span>
+            <div class="pv-nav-g">
+              <button class="vbtn vbtn-icon" id="pvNextBtn" type="button" title="Next slide (↓)" aria-label="Next slide"><svg class="icon"><use href="#i-next"/></svg></button>
+              <button class="vbtn vbtn-icon" id="pvLast" type="button" title="Last slide" aria-label="Last slide"><svg class="icon"><use href="#i-last"/></svg></button>
+            </div>
           </div>
         </div>
-        <div class="pv-cap-row"><span class="pv-cap">Notes</span>
-          <button class="pv-fold" id="pvFold" type="button" title="Hide notes" aria-label="Hide notes" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
-        </div>
-        <div class="pv-notes-wrap" id="pvNotesWrap"><div class="pv-notes" id="pvNotes"></div></div>
-      </div>
-      <!-- Video / audio of the presentation window: the buttons on top, then the queue (can be folded like the notes) -->
-      <div class="pv-media" id="pvMedia">
-        <div class="pv-mpic" id="pvMPic" hidden><img id="pvMImg" alt=""></div>
-        <div class="pv-mbar" id="pvMBar" title="Click to jump"><i id="pvMFill"></i></div>
-        <!-- The same row as the page buttons of a document: the time instead of "Slide 1 of 3", the player buttons around it -->
-        <div class="pv-nav pv-mnav">
-          <div class="pv-nav-g">
+        <div class="pv-ctl pv-media">
+          <div class="pv-mrow"><span id="pvMTime">0:00 / 0:00</span><span id="pvMState">Paused</span></div>
+          <div class="pv-mbar" id="pvMBar" title="Click to jump"><i id="pvMFill"></i></div>
+          <div class="pv-mbtns">
             <button class="vbtn vbtn-icon" id="pvMPrevF" type="button" title="Previous file" aria-label="Previous file"><svg class="icon"><use href="#i-first"/></svg></button>
             <button class="vbtn vbtn-icon" id="pvMBack" type="button" title="Back 5 seconds" aria-label="Back 5 seconds"><svg class="icon"><use href="#i-back5"/></svg></button>
             <button class="vbtn vbtn-icon vbtn-solid" id="pvMPlay" type="button" title="Play / pause" aria-label="Play"><svg class="icon"><use id="pvMPlayIcon" href="#i-play"/></svg></button>
-          </div>
-          <span class="pv-label" id="pvMTime">0:00 / 0:00</span>
-          <div class="pv-nav-g">
             <button class="vbtn vbtn-icon" id="pvMFwd" type="button" title="Forward 5 seconds" aria-label="Forward 5 seconds"><svg class="icon"><use href="#i-fwd5"/></svg></button>
             <button class="vbtn vbtn-icon" id="pvMNextF" type="button" title="Next file" aria-label="Next file"><svg class="icon"><use href="#i-last"/></svg></button>
           </div>
         </div>
-        <div class="pv-cap-row"><span class="pv-cap" id="pvQCap">Queue</span>
-          <button class="pv-fold" id="pvQFold" type="button" title="Hide the queue" aria-label="Hide the queue" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
+        <!-- The slides of the file and the other files of the queue: one row, scrolled sideways -->
+        <div class="pv-strip" id="pvStrip"></div>
+        <div class="pv-notes-block" id="pvNotesBlock">
+          <div class="pv-cap-row"><span class="pv-cap">Notes</span>
+            <button class="pv-fold" id="pvFold" type="button" title="Hide notes" aria-label="Hide notes" aria-expanded="true"><svg class="icon"><use href="#i-chev"/></svg></button>
+          </div>
+          <div class="pv-notes-wrap" id="pvNotesWrap"><div class="pv-notes" id="pvNotes"></div></div>
         </div>
-        <div class="pv-notes-wrap pv-qwrap" id="pvQWrap"><div class="mq-list pv-q" id="pvQList"></div></div>
       </div>
     </div>
   </aside>
@@ -618,6 +612,9 @@
 <script src="app/viewer-timer.js"></script>
 <script src="app/viewer-input.js"></script>
 <script src="app/extras.js"></script>
+<script src="app/link.js"></script>
 <script src="app/presenter.js"></script>
+<script src="app/companion.js"></script>
+<script src="app/start.js"></script>
 </body>
 </html>

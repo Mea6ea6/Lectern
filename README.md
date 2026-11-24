@@ -55,7 +55,7 @@ A lecture hall computer is a locked-down machine with whatever office software h
 | **Laser pointer** | A red dot that follows the mouse or a finger (<kbd>L</kbd>). Hold the button or the finger and the dot leaves a line that stays until you let go, then fades; nothing is drawn on the page |
 | **Timer** | Silent timer (<kbd>T</kbd>): countdown, or count up to a set time. The readout sits quietly in the top bar and in the file list header, and turns red when the time is reached |
 | **Speaker notes** | PPTX and ODP notes in a side panel (<kbd>N</kbd>) |
-| **Presenter view** | Two windows: slides on the projector, a companion window on your laptop with your speech (any file) plus a panel with the current and next slide, the notes and a shared timer (<kbd>P</kbd>). Slides turn from either window. Under the big current slide the companion has one row with every slide of the file followed by the other files of the queue: scroll it sideways, click a slide to show it or a file to open it in the presentation window (More → Stop presenter view ends it). The companion window opens with a short note on what it is for (it can be switched off, and More → About this window brings it back); pen, laser and black screen stay in the presentation window. Works offline, for PDF, PowerPoint, video and audio: for a film or a song the panel has pause, ±5 s, previous / next, a time bar and the queue (click to play, cross to take out, foldable like the notes) |
+| **Presenter view** | Two windows: slides on the projector, a companion window on your laptop with your speech (any file) plus a panel with the current and next slide, the notes and a shared timer (<kbd>P</kbd>). Slides turn from either window. The panel always has the same order, whatever the file: its name, a preview of the slide (or the picture of the film or song), the buttons (page buttons, or the player: time, state, a bar, previous file, ±5 s, play / pause, next file), one row with the slides of the file and the other files of the queue, and the notes (only when the file has some). Scroll the row sideways, click a slide to show it or a file to open it in the presentation window, point at a file and press the cross to take it out of the queue (More → Stop presenter view ends it). The companion window opens with a short note on what it is for (it can be switched off, and More → About this window brings it back); pen, laser and black screen stay in the presentation window. Works offline, for PDF, PowerPoint, video and audio |
 | **Page animation** | Pages slide in a few pixels when you turn them (More → Page animation switches it off); cards slide in after a folder is chosen; respects the system's reduced-motion setting |
 | **Fullscreen window** | More (top right) → Fullscreen window hides the browser's bars on any screen (Esc leaves) |
 | **Hints** | Small designed tooltips with key hints appear when you pause over a button |
@@ -134,7 +134,7 @@ A web page can't see the full path of a chosen folder, so Lectern shows the fold
 ```
 Lectern.html            entry point
 app/
-  core.js … presenter.js  application logic (plain scripts, loaded in order: list, queue, thumbs, viewers, viewer-ui, viewer-queue, …)
+  core.js … start.js  application logic (plain scripts, loaded in order: list, queue, thumbs, viewers, viewer-ui, viewer-queue, …)
   style.css             themes, glass system, layout
   fonts/  fonts.css     Inter, bundled locally
   lib/                  PDF, DOCX, PPTX, XLSX, HEIC libraries (loaded on demand)

@@ -4,7 +4,7 @@
    Vanilla JS, no build step. Runs from Lectern.html (USB stick) and as a PWA.
 
    THE CODE IS SPLIT INTO PLAIN SCRIPTS (Lectern.html loads them in this order, they share one global scope):
-     core.js (1-4)  ·  drive.js (memory on the flash drive)  ·  list.js, queue.js, thumbs.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  presenter.js
+     core.js (1-4)  ·  drive.js (memory on the flash drive)  ·  list.js, queue.js, thumbs.js (5-6)  ·  viewers.js (7)  ·  viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js (8)  ·  errors.js (unreadable files)  ·  extras.js (tooltips, bookmarks, notes)  ·  link.js, presenter.js, companion.js (presenter view)  ·  start.js
    They are not ES modules on purpose: modules do not load from a file:// address, and Lectern runs from a flash drive.
    A function declared in a later file is not yet known while an earlier file runs its top-level code.
 

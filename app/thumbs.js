@@ -1,6 +1,6 @@
 'use strict';
 /* Lectern — Thumbnails of the cards, made one at a time.  One of the app/*.js files that Lectern.html loads in this order:
-   core.js, drive.js, errors.js, list.js, queue.js, thumbs.js, viewers.js, viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js, extras.js, presenter.js.
+   core.js, drive.js, errors.js, list.js, queue.js, thumbs.js, viewers.js, viewer-ui.js, viewer-queue.js, viewer-timer.js, viewer-input.js, extras.js, link.js, presenter.js, companion.js, start.js. They are plain scripts that share one global scope
    They are plain scripts that share one global scope (no modules, so it also works from a file:// address on a flash drive). */
 
 /* ---------------------------------------------------------------------
